@@ -1037,6 +1037,9 @@ subroutine WriteObservationHeaderForBC(fid,realization_base,coupler_name)
       string = ',"Fluid flux ' // trim(coupler_name) // &
                 ' [m^3/' // trim(realization_base%output_option%tunit) // ']"'
     case default
+      option%io_buffer = 'WriteObservationHeaderForBC not supported for &
+        &current flow mode: ' // option%flowmode
+      call PrintErrMsg(option)
   end select
   write(fid,'(a)',advance="no") trim(string)
 
@@ -1365,7 +1368,8 @@ subroutine WriteObservationDataForBC(fid,realization_base,patch,connection_set)
   if (associated(connection_set)) then
     offset = connection_set%offset
     select case(option%iflowmode)
-      case(MPH_MODE,TH_MODE,TH_TS_MODE,G_MODE,H_MODE,WF_MODE,SCO2_MODE)
+      case(MPH_MODE,TH_MODE,TH_TS_MODE,G_MODE,H_MODE,WF_MODE,SCO2_MODE, &
+           IMMISCIBLE_MODE)
         option%io_buffer = 'WriteObservationDataForBC() needs to be set up &
           & for multiphase flow modes.'
         call PrintErrMsg(option)
@@ -2028,6 +2032,7 @@ subroutine OutputIntegralFlux(realization_base)
   use NW_Transport_Aux_module
   use Integral_Flux_module
   use Utility_module
+  use Immiscible_Aux_module, only : immis_fmw
   use General_Aux_module, only : general_fmw => fmw_comp
   use WIPP_Flow_Aux_module, only : wipp_flow_fmw => fmw_comp
   use SCO2_Aux_module, only : sco2_fmw => fmw_comp
@@ -2081,6 +2086,9 @@ subroutine OutputIntegralFlux(realization_base)
     case(WF_MODE)
       flow_dof_scale(1) = FMWH2O
       flow_dof_scale(2) = wipp_flow_fmw(2)
+    case(IMMISCIBLE_MODE)
+      flow_dof_scale(1) = immis_fmw(1)
+      flow_dof_scale(2) = immis_fmw(2)
     case(MPH_MODE)
       flow_dof_scale(1) = FMWH2O
       flow_dof_scale(2) = FMWCO2
@@ -2127,7 +2135,8 @@ subroutine OutputIntegralFlux(realization_base)
         if (.not.associated(integral_flux)) exit
         select case(option%iflowmode)
           case(RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE, &
-               TH_MODE,TH_TS_MODE,G_MODE,H_MODE,MPH_MODE,WF_MODE,SCO2_MODE)
+               TH_MODE,TH_TS_MODE,G_MODE,H_MODE,MPH_MODE,WF_MODE, &
+               SCO2_MODE,IMMISCIBLE_MODE)
             string = trim(integral_flux%name) // ' Water'
             call OutputWriteToHeader(fid,string,'kg','',icol)
             units = 'kg/' // trim(output_option%tunit) // ''
@@ -2147,7 +2156,7 @@ subroutine OutputIntegralFlux(realization_base)
             units = 'kg/' // trim(output_option%tunit) // ''
             string = trim(integral_flux%name) // ' Air'
             call OutputWriteToHeader(fid,string,units,'',icol)
-          case(WF_MODE)
+          case(WF_MODE,IMMISCIBLE_MODE)
             string = trim(integral_flux%name) // ' Gas Component'
             call OutputWriteToHeader(fid,string,'kg','',icol)
             units = 'kg/' // trim(output_option%tunit) // ''
@@ -2353,6 +2362,7 @@ subroutine OutputMassBalance(realization_base)
   use Hydrate_module, only : HydrateComputeMassBalance
   use WIPP_Flow_module, only : WIPPFloComputeMassBalance
   use ZFlow_module, only : ZFlowComputeMassBalance
+  use Immiscible_module, only : ImmiscibleComputeMassBalance
   use SCO2_module, only : SCO2ComputeMassBalance, &
                           SCO2ComputeComponentMassBalance
 
@@ -2496,7 +2506,7 @@ subroutine OutputMassBalance(realization_base)
             call OutputWriteToHeader(fid,'Global Air Mass in Gas Phase', &
                                       'kg','',icol)
           endif
-        case(WF_MODE)
+        case(WF_MODE,IMMISCIBLE_MODE)
           call OutputWriteToHeader(fid,'Global Water Mass in Liquid Phase', &
                                     'kg','',icol)
           call OutputWriteToHeader(fid,'Global Gas Component Mass in Gas &
@@ -2667,7 +2677,7 @@ subroutine OutputMassBalance(realization_base)
               string = trim(coupler%name) // ' Air Mass'
               call OutputWriteToHeader(fid,string,units,'',icol)
             endif
-          case(WF_MODE)
+          case(WF_MODE,IMMISCIBLE_MODE)
             string = trim(coupler%name) // ' Water Mass'
             call OutputWriteToHeader(fid,string,'kg','',icol)
             string = trim(coupler%name) // ' Gas Component Mass'
@@ -3018,6 +3028,8 @@ subroutine OutputMassBalance(realization_base)
             call HydrateComputeMassBalance(realization_base,sum_kg(:,:))
           case(WF_MODE)
             call WIPPFloComputeMassBalance(realization_base,sum_kg(:,1))
+          case(IMMISCIBLE_MODE)
+            call ImmiscibleComputeMassBalance(realization_base,sum_kg(:,1))
           case(SCO2_MODE)
             call SCO2ComputeMassBalance(realization_base,sum_kg(:,:), &
                                           sum_trapped(:))
@@ -3058,7 +3070,7 @@ subroutine OutputMassBalance(realization_base)
               endif
             enddo
           enddo
-        case(WF_MODE)
+        case(WF_MODE,IMMISCIBLE_MODE)
           do iphase = 1, option%nphase
             write(fid,110,advance="no") sum_kg_global(iphase,1)
           enddo
@@ -3470,7 +3482,7 @@ subroutine OutputMassBalance(realization_base)
             ! change sign for positive in / negative out
             write(fid,110,advance="no") -sum_kg_global(:,1)*output_option%tconv
           endif
-        case(WF_MODE)
+        case(WF_MODE,IMMISCIBLE_MODE)
           ! print out cumulative H2O flux
           sum_kg = 0.d0
           do iconn = 1, coupler%connection_set%num_connections

@@ -177,6 +177,7 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
   use ZFlow_Aux_module
   use PM_PNF_class
   use PM_Well_class
+  use PM_Immiscible_class
 
   implicit none
 
@@ -247,6 +248,14 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
           &OPTIONS,PROCESSES.'
         call PrintErrMsg(option)
       endif
+    class is (pm_immiscible_type)
+      option%iflowmode = IMMISCIBLE_MODE
+      option%nphase = 2
+      option%nflowdof = 2
+      option%nflowspec = 1
+      option%capillary_pressure_id = 3
+      option%flow%isothermal = PETSC_TRUE
+      option%flow%store_fluxes = PETSC_TRUE
     class is (pm_pnf_type)
       option%iflowmode = PNF_MODE
       option%nphase = 1

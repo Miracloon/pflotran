@@ -633,7 +633,7 @@ subroutine HydrostaticUpdateCoupler(coupler,option,grid)
 
     ! assign pressure
     select case(option%iflowmode)
-      case(G_MODE,WF_MODE,H_MODE,SCO2_MODE)
+      case(G_MODE,WF_MODE,H_MODE,SCO2_MODE,IMMISCIBLE_MODE)
         coupler%flow_aux_real_var(1,iconn) = pressure
       case(MPH_MODE)
         coupler%flow_aux_real_var(1,iconn) = pressure
@@ -709,6 +709,7 @@ subroutine HydrostaticUpdateCoupler(coupler,option,grid)
         coupler%flow_aux_real_var(TH_TEMPERATURE_DOF,iconn) = temperature
         coupler%flow_aux_int_var(TH_PRESSURE_DOF,iconn) = condition%iphase
       case(WF_MODE)
+      case(IMMISCIBLE_MODE)
       case(G_MODE)
         temperature = temperature_at_datum + &
                     ! gradient in K/m

@@ -351,6 +351,10 @@ subroutine PMERTSetup(this)
   ! setup survey
   this%survey => this%realization%survey
 
+  if (option%iflowmode == IMMISCIBLE_MODE) then
+    call PrintErrMsg(option,'PMERT not set up for IMMISCIBLE mode')
+  endif
+
   if ((option%iflowmode == ZFLOW_MODE .and. &
        zflow_sol_tran_eq > 0) .and. &
       option%itranmode /= NULL_MODE) then

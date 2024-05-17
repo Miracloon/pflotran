@@ -3,6 +3,7 @@ auxiliary.o : \
   general_aux.o \
   global_aux.o \
   hydrate_aux.o \
+  immiscible_aux.o \
   inlinesurface_aux.o \
   inversion_aux.o \
   material_aux.o \
@@ -220,6 +221,7 @@ condition_control.o : \
   grid.o \
   hdf5.o \
   hydrate_aux.o \
+  immiscible_aux.o \
   material.o \
   material_aux.o \
   nw_transport.o \
@@ -561,6 +563,7 @@ factory_subsurface.o : \
   pm_general.o \
   pm_geomechanics_force.o \
   pm_hydrate.o \
+  pm_immiscible.o \
   pm_inversion.o \
   pm_material_transform.o \
   pm_mphase.o \
@@ -694,6 +697,7 @@ factory_subsurface_read.o : \
   pm_fracture.o \
   pm_general.o \
   pm_hydrate.o \
+  pm_immiscible.o \
   pm_material_transform.o \
   pm_mphase.o \
   pm_nwt.o \
@@ -1251,6 +1255,50 @@ hydrostatic.o : \
   utility.o \
   wipp_flow_aux.o \
   zflow_aux.o
+immiscible.o : \
+  characteristic_curves.o \
+  connection.o \
+  coupler.o \
+  debug.o \
+  discretization.o \
+  field.o \
+  fluid.o \
+  global_aux.o \
+  grid.o \
+  immiscible_aux.o \
+  immiscible_common.o \
+  material.o \
+  material_aux.o \
+  matrix_zeroing.o \
+  option.o \
+  output_aux.o \
+  patch.o \
+  petsc_utility.o \
+  pflotran_constants.o \
+  realization_subsurface.o \
+  upwind_direction.o \
+  variables.o
+immiscible_aux.o : \
+  characteristic_curves.o \
+  eos_gas.o \
+  eos_water.o \
+  global_aux.o \
+  material_aux.o \
+  matrix_zeroing.o \
+  option.o \
+  pflotran_constants.o \
+  utility.o
+immiscible_common.o : \
+  connection.o \
+  coupler.o \
+  eos_gas.o \
+  eos_water.o \
+  global_aux.o \
+  immiscible_aux.o \
+  material_aux.o \
+  option.o \
+  pflotran_constants.o \
+  string.o
 init_common.o : \
   condition.o \
   connection.o \
@@ -1728,6 +1776,7 @@ output.o : \
   grid.o \
   hdf5.o \
   hydrate_aux.o \
+  immiscible_aux.o \
   input_aux.o \
   logging.o \
   option.o \
@@ -1885,6 +1934,8 @@ output_observation.o : \
   grid.o \
   grid_structured.o \
   hydrate.o \
+  immiscible.o \
+  immiscible_aux.o \
   integral_flux.o \
   logging.o \
   material_aux.o \
@@ -1984,6 +2035,7 @@ patch.o : \
   grid_unstructured_cell.o \
   hydrate_aux.o \
   hydrostatic.o \
+  immiscible_aux.o \
   integral_flux.o \
   material.o \
   material_aux.o \
@@ -2209,6 +2261,29 @@ pm_hydrate.o : \
   realization_subsurface.o \
   saturation_function.o \
   solver.o \
+  string.o \
+  upwind_direction.o \
+  utility.o \
+  variables.o
+pm_immiscible.o : \
+  checkpoint.o \
+  convergence.o \
+  debug.o \
+  eos_water.o \
+  field.o \
+  global.o \
+  grid.o \
+  immiscible.o \
+  immiscible_aux.o \
+  input_aux.o \
+  material_aux.o \
+  option.o \
+  patch.o \
+  pflotran_constants.o \
+  pm_base.o \
+  pm_subsurface_flow.o \
+  realization_base.o \
+  realization_subsurface.o \
   string.o \
   upwind_direction.o \
   utility.o \
@@ -2859,6 +2934,7 @@ pmc_subsurface.o : \
   pm_base_pointer.o \
   pm_general.o \
   pm_hydrate.o \
+  pm_immiscible.o \
   pm_nwt.o \
   pm_richards.o \
   pm_rt.o \

@@ -1485,7 +1485,8 @@ subroutine MaterialSetupThermal(material_parameter, material_property_array, &
   num_mat_prop = size(material_property_array)
 
   select case(option%iflowmode)
-    case(RICHARDS_MODE,RICHARDS_TS_MODE,ZFLOW_MODE,WF_MODE,PNF_MODE)
+    case(RICHARDS_MODE,RICHARDS_TS_MODE,ZFLOW_MODE,WF_MODE,PNF_MODE, &
+         IMMISCIBLE_MODE)
       option%io_buffer = 'MaterialSetupThermal should not be used in &
         &Flow mode: ' // option%flowmode
       call PrintErrMsg(option)

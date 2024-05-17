@@ -47,6 +47,7 @@ subroutine FactorySubsurfReadFlowPM(input,option,pm)
   use PM_ZFlow_class
   use PM_PNF_class
   use PM_SCO2_class
+  use PM_Immiscible_class
   use Init_Common_module
 
   implicit none
@@ -109,6 +110,8 @@ subroutine FactorySubsurfReadFlowPM(input,option,pm)
             pm => PMPNFCreate()
           case ('STOMP-CO2','SCO2')
             pm => PMSCO2Create()
+          case ('IMMISCIBLE')
+            pm => PMImmiscibleCreate()
           case default
             error_string = trim(error_string) // ',MODE'
             call InputKeywordUnrecognized(input,word,error_string,option)
@@ -1202,7 +1205,7 @@ subroutine FactorySubsurfReadInput(simulation,input)
         call InputErrorMsg(input,option,'FLOW_CONDITION','name')
         call PrintMsg(option,flow_condition%name)
         select case(option%iflowmode)
-          case(G_MODE,WF_MODE)
+          case(G_MODE,WF_MODE,IMMISCIBLE_MODE)
             call FlowConditionGeneralRead(flow_condition,input,option)
           case(H_MODE)
             call FlowConditionHydrateRead(flow_condition,input,option)

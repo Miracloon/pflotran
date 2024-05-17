@@ -56,6 +56,8 @@ subroutine CondControlAssignFlowInitCond(realization)
   use Hydrate_Aux_module, hyd_dof_to_primary_variable => dof_to_primary_variable
   use SCO2_Aux_module, sco2_dof_to_primary_variable => dof_to_primary_variable
   use Richards_Aux_module
+  use Immiscible_Aux_module, immis_dof_to_primary_variable => &
+                               dof_to_primary_variable
 
   implicit none
 
@@ -1437,7 +1439,8 @@ subroutine CondControlAssignFlowInitCond(realization)
   call VecMin(field%work,PETSC_NULL_INTEGER,tempreal,ierr);CHKERRQ(ierr)
   if (tempreal < 0.d0) then
 !    print *, tempreal
-    option%io_buffer = 'Uninitialized cells in domain.'
+    option%io_buffer = 'Uninitialized STATE in domain &
+      &(CondControlAssignFlowInitCond).'
     call PrintErrMsg(option)
   endif
 
@@ -2300,24 +2303,24 @@ subroutine CondControlScaleSourceSink(realization)
       local_id = cur_connection_set%id_dn(iconn)
       ghosted_id = grid%nL2G(local_id)
 
-      select case(option%iflowmode)
-        case(RICHARDS_MODE,RICHARDS_TS_MODE,G_MODE,WF_MODE,H_MODE,&
-              ZFLOW_MODE,SCO2_MODE)
-            call GridGetGhostedNeighbors(grid,ghosted_id,DMDA_STENCIL_STAR, &
-                                        x_width,y_width,z_width, &
-                                        x_count,y_count,z_count, &
-                                        ghosted_neighbors,option)
-            ! ghosted neighbors is ordered first in x, then, y, then z
-            icount = 0
-            sum = 0.d0
-            ! x-direction
-            do while (icount < x_count)
-              icount = icount + 1
-              neighbor_ghosted_id = ghosted_neighbors(icount)
-              sum = sum + MaterialAuxVarGetValue(material_auxvars( &
-                            neighbor_ghosted_id),PERMEABILITY_X) * &
-                          grid%structured_grid%dy(neighbor_ghosted_id)* &
-                          grid%structured_grid%dz(neighbor_ghosted_id)
+        select case(option%iflowmode)
+          case(RICHARDS_MODE,RICHARDS_TS_MODE,G_MODE,WF_MODE,H_MODE,&
+               ZFLOW_MODE,SCO2_MODE,IMMISCIBLE_MODE)
+              call GridGetGhostedNeighbors(grid,ghosted_id,DMDA_STENCIL_STAR, &
+                                          x_width,y_width,z_width, &
+                                          x_count,y_count,z_count, &
+                                          ghosted_neighbors,option)
+              ! ghosted neighbors is ordered first in x, then, y, then z
+              icount = 0
+              sum = 0.d0
+              ! x-direction
+              do while (icount < x_count)
+                icount = icount + 1
+                neighbor_ghosted_id = ghosted_neighbors(icount)
+                sum = sum + MaterialAuxVarGetValue(material_auxvars( &
+                              neighbor_ghosted_id),PERMEABILITY_X) * &
+                            grid%structured_grid%dy(neighbor_ghosted_id)* &
+                            grid%structured_grid%dz(neighbor_ghosted_id)
 
             enddo
             ! y-direction
@@ -2356,7 +2359,7 @@ subroutine CondControlScaleSourceSink(realization)
       local_id = cur_connection_set%id_dn(iconn)
       select case(option%iflowmode)
         case(RICHARDS_MODE,RICHARDS_TS_MODE,G_MODE,WF_MODE,H_MODE, &
-              ZFLOW_MODE,SCO2_MODE)
+              ZFLOW_MODE,SCO2_MODE,IMMISCIBLE_MODE)
           cur_source_sink%flow_aux_real_var(ONE_INTEGER,iconn) = &
             vec_ptr(local_id)
       end select

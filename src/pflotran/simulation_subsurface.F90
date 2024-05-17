@@ -338,6 +338,8 @@ subroutine SimSubsurfInputRecord(this)
       write(id,'(a)') 'hydrate'
     case(WF_MODE)
       write(id,'(a)') 'wipp flow'
+    case(IMMISCIBLE_MODE)
+      write(id,'(a)') 'immiscible'
     case(TH_MODE)
       write(id,'(a)') 'thermo-hydro'
     case(TH_TS_MODE)
