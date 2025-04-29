@@ -1114,7 +1114,11 @@ subroutine Output(realization_base,snapshot_plot_flag, &
       call PetscTime(tstart,ierr);CHKERRQ(ierr)
       call PetscLogEventBegin(logging%event_output_tecplot, &
                               ierr);CHKERRQ(ierr)
-      call OutputPrintExplicitFlowrates(realization_base)
+      if (realization_base%output_option%print_explicit_flowrate_hdf5) then
+        call OutputHDF5PrintExplicitFlowrates(realization_base)
+      else
+        call OutputPrintExplicitFlowrates(realization_base)
+      endif
       call PetscLogEventEnd(logging%event_output_tecplot,ierr);CHKERRQ(ierr)
       call PetscTime(tend,ierr);CHKERRQ(ierr)
       write(option%io_buffer,'(f10.2," Seconds to write to Rates file.")') &

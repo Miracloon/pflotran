@@ -32,7 +32,8 @@ module Output_HDF5_module
             OutputHDF5AttributeStringArray, &
             OutputHDF5OpenFile, &
             OutputHDF5CloseFile, &
-            OutputHDF5WriteSnapShotAtts
+            OutputHDF5WriteSnapShotAtts, &
+            OutputHDF5PrintExplicitFlowrates
 
   public :: OutputH5OpenFile, &
             OutputH5CloseFile, &
@@ -3688,5 +3689,187 @@ subroutine OutputH5CloseGroup(option,grp_id)
   call HDF5GroupClose(grp_id,option)
 
 end subroutine OutputH5CloseGroup
+
+! ************************************************************************** !
+
+subroutine WriteGridHDF5_Int(file_id, grp_id, dataspace_id, dims, dataset_name, to_write, option)
+  !
+  ! Writes an integer array to an existing file_id and grp_id
+  !
+  ! Author: Joe Eyles, WSP
+  ! Date: 29/04/2025
+  !
+
+  use hdf5
+  use HDF5_Aux_module, only : HDF5DatasetOpen, HDF5DatasetClose
+  use Option_module
+
+  implicit none
+
+  type(option_type), pointer :: option
+  integer(HID_T) :: file_id, grp_id, dataset_id, dataspace_id
+  integer :: error
+  integer(HSIZE_T) :: dims(1)
+  character(len=*) :: dataset_name
+  PetscInt, pointer :: to_write(:)
+
+  call h5dcreate_f(grp_id, dataset_name, H5T_STD_U32LE, dataspace_id, dataset_id, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not create dataset ' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+  call h5dwrite_f(dataset_id, H5T_STD_U32LE, to_write, dims, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not write integer dataset' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+  call h5dclose_f(dataset_id, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not close dataset ' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+end subroutine WriteGridHDF5_Int
+
+! ************************************************************************** !
+
+subroutine WriteGridHDF5_Real8(file_id, grp_id, dataspace_id, dims, dataset_name, to_write, option)
+  !
+  ! Writes a real array to an existing file_id and grp_id
+  !
+  ! Author: Joe Eyles, WSP
+  ! Date: 29/04/2025
+  !
+
+  use hdf5
+  use HDF5_Aux_module, only : HDF5DatasetOpen, HDF5DatasetClose
+  use Option_module
+
+  implicit none
+
+  type(option_type), pointer :: option
+  integer(HID_T) :: file_id, grp_id, dataset_id, dataspace_id
+  integer :: error
+  integer(HSIZE_T) :: dims(1)
+  character(len=*) :: dataset_name
+  PetscReal, pointer :: to_write(:)
+
+  call h5dcreate_f(grp_id, dataset_name, H5T_IEEE_F64LE, dataspace_id, dataset_id, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not create dataset ' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+  call h5dwrite_f(dataset_id, H5T_IEEE_F64LE, to_write, dims, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not write real dataset' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+  call h5dclose_f(dataset_id, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not close dataset ' // trim(dataset_name)
+    call PrintErrMsg(option)
+  endif
+end subroutine WriteGridHDF5_Real8
+
+! ************************************************************************** !
+
+subroutine OutputHDF5PrintExplicitFlowrates(realization_base)
+  !
+  ! Prints out the flow rate through a voronoi face
+  ! for explicit grid. This will be used for particle tracking.
+  ! Prints out natural id of the two nodes and the value of the flow rate
+  !
+  ! Author: Joe Eyles, WSP
+  ! Date: 29/04/2025
+  !
+
+  use Realization_Base_class, only : realization_base_type
+  use Option_module
+  use Output_Aux_module
+  use HDF5_Aux_module
+  use PFLOTRAN_Constants_module
+  use hdf5
+  use petscdm
+
+  implicit none
+
+  class(realization_base_type) :: realization_base
+  type(option_type), pointer :: option
+  type(output_option_type), pointer :: output_option
+  character(len=MAXSTRINGLENGTH) :: filename,string
+
+  PetscInt :: count
+  PetscReal, pointer :: flowrates(:,:)
+  PetscReal, pointer :: darcy(:), area(:)
+  PetscInt, pointer :: nat_ids_up(:),nat_ids_dn(:)
+  PetscReal, pointer :: density(:)
+  Vec :: vec_proc
+  PetscBool :: output_density
+
+  integer(HID_T) :: file_id, grp_dom_id, grp_conn_id, dataspace_id
+  integer :: error
+  integer(HSIZE_T) :: dims(1)
+
+  option => realization_base%option
+  output_option => realization_base%output_option
+
+  ! output of density only supported for Richards and TH
+  output_density = PETSC_FALSE
+  select case (option%iflowmode)
+    case(RICHARDS_MODE,RICHARDS_TS_MODE,TH_MODE,TH_TS_MODE)
+      output_density = PETSC_TRUE
+    case default
+  end select
+
+  filename = trim(option%global_prefix) // &
+             trim(option%group_prefix) // &
+             '-' // 'darcyvel' // '-' // &
+             trim(OutputFilenameID(output_option,option))
+
+  call OutputGetExplicitIDsFlowrates(realization_base,count,vec_proc, &
+                                     nat_ids_up,nat_ids_dn)
+  call OutputGetExplicitFlowrates(realization_base,count,vec_proc,flowrates, &
+                                  darcy,area)
+  if (output_density) then
+    call OutputGetExplicitAuxVars(realization_base,count,vec_proc, &
+                                  density)
+  endif
+
+  if (OptionIsIORank(option)) then
+    option%io_buffer = ' --> write rate output hdf5 file: ' // &
+                       trim(filename)
+    call PrintMsg(option)
+  endif
+
+  write(string,*) option%myrank
+  string = trim(filename) // '-rank' // trim(adjustl(string)) // '.h5'
+  dims(1) = count
+  call HDF5FileOpen(trim(string), file_id, PETSC_TRUE, option)
+  call HDF5GroupCreate(file_id, "Domain", grp_dom_id, option)
+  call HDF5GroupCreate(grp_dom_id, "Connections", grp_conn_id, option)
+  call h5screate_simple_f(1, dims, dataspace_id, error)
+  if (error < 0) then
+    option%io_buffer = 'Could not create dataspace for ' // trim(string)
+    call PrintErrMsg(option)
+  endif
+  call WriteGridHDF5_Int(file_id, grp_conn_id, dataspace_id, dims, "Cell1", nat_ids_up, option)
+  call WriteGridHDF5_Int(file_id, grp_conn_id, dataspace_id, dims, "Cell2", nat_ids_dn, option)
+  call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Flux", darcy, option)
+  if (output_density) then
+    call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Density", density, option)
+  endif
+  call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Area", area, option)
+  call h5sclose_f(dataspace_id, error)
+  call HDF5GroupClose(grp_conn_id, option)
+  call HDF5GroupClose(grp_dom_id, option)
+  call HDF5FileClose(file_id, option)
+
+  deallocate(flowrates)
+  deallocate(darcy)
+  deallocate(nat_ids_up)
+  deallocate(nat_ids_dn)
+  deallocate(density)
+  deallocate(area)
+
+end subroutine OutputHDF5PrintExplicitFlowrates
 
 end module Output_HDF5_module
