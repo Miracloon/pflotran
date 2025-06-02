@@ -52,6 +52,7 @@ module Waypoint_module
             WaypointListRemoveExtraWaypnts, &
             WaypointConvertTimes, &
             WaypointReturnAtTime, &
+            WaypointReturnAtTimePassed, &
             WaypointSkipToTime, &
             WaypointForceMatchToTime, &
             WaypointListPrint, &
@@ -619,6 +620,40 @@ function WaypointReturnAtTime(list,time)
   endif
 
 end function WaypointReturnAtTime
+
+! ************************************************************************** !
+
+function WaypointReturnAtTimePassed(list,time)
+  !
+  ! Returns a pointer to the waypoint just before
+  ! (or equal to) the supplied 'time' argument
+  !
+  ! Author: Kyle Mosley, WSP
+  ! Date: 05/21/25
+  !
+
+  implicit none
+
+  type(waypoint_list_type), pointer :: list
+  PetscReal :: time
+
+  type(waypoint_type), pointer :: WaypointReturnAtTimePassed
+  type(waypoint_type), pointer :: waypoint
+
+  waypoint => list%last
+  do
+    if (.not.associated(waypoint)) exit
+    if (time >= waypoint%time) exit
+    waypoint => waypoint%prev
+  enddo
+
+  if (associated(waypoint)) then
+    WaypointReturnAtTimePassed => waypoint
+  else
+    nullify(WaypointReturnAtTimePassed)
+  endif
+
+end function WaypointReturnAtTimePassed
 
 ! ************************************************************************** !
 

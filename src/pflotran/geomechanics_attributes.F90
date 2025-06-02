@@ -16,6 +16,7 @@ module Geomechanics_Attr_module
     class(realization_geomech_type), pointer :: realization
     type(geomechanics_regression_type), pointer :: regression
     type(waypoint_list_type), pointer :: waypoint_list
+    type(waypoint_list_type), pointer :: waypoint_list_dt_coupling
   end type geomechanics_attr_type
 
   public :: GeomechAttrCreate, &
@@ -40,6 +41,7 @@ function GeomechAttrCreate()
   nullify(geomech%realization)
   nullify(geomech%regression)
   nullify(geomech%waypoint_list)
+  nullify(geomech%waypoint_list_dt_coupling)
 
   GeomechAttrCreate => geomech
 

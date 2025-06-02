@@ -127,10 +127,13 @@ subroutine InitSubsurfGeomechReadInput(geomech,geomech_solver, &
   type(geomech_coupler_type), pointer :: coupler
   type(geomech_observation_type), pointer :: geomech_observation
   type(waypoint_list_type), pointer :: waypoint_list
+  type(waypoint_list_type), pointer :: waypoint_list_dt_coupling
+  type(waypoint_type), pointer :: waypoint
 
   character(len=MAXWORDLENGTH) :: word, internal_units
   character(len=MAXWORDLENGTH) :: card
   character(len=1) :: backslash
+  PetscReal :: temp_real
 
   backslash = achar(92)  ! 92 = "\" Some compilers choke on \" thinking it
                           ! is a double quote as in c/c++
@@ -139,6 +142,7 @@ subroutine InitSubsurfGeomechReadInput(geomech,geomech_solver, &
   word = ''
 
   waypoint_list => geomech%waypoint_list
+  waypoint_list_dt_coupling => geomech%waypoint_list_dt_coupling
   geomech_realization => geomech%realization
   geomech_discretization => geomech_realization%geomech_discretization
   geomech_realization%body_force(:) = option%geomechanics%gravity(:)
@@ -285,14 +289,44 @@ subroutine InitSubsurfGeomechReadInput(geomech,geomech_solver, &
           call InputErrorMsg(input,option,'word','GEOMECHANICS_TIME')
           select case(trim(word))
             case('COUPLING_TIMESTEP_SIZE')
-              call InputReadDouble(input,option,geomech_realization%dt_coupling)
+              call InputReadDouble(input,option,temp_real)
               call InputErrorMsg(input,option, &
                                  'Coupling Timestep Size','GEOMECHANICS_TIME')
               internal_units = 'sec'
-              call InputReadAndConvertUnits(input, &
-                                            geomech_realization%dt_coupling, &
+              call InputReadAndConvertUnits(input, temp_real, &
                                             internal_units,'GEOMECHANICS_TIME,&
                                             &COUPLING_TIMESTEP_SIZE',option)
+              geomech_realization%dt_coupling = temp_real
+              call InputReadCard(input,option,word)
+              if (input%ierr == 0) then
+                  call StringToUpper(word)
+                  if (StringCompare(word, 'AT', TWO_INTEGER)) then
+                      waypoint => WaypointCreate()
+                      waypoint%dt_max = temp_real
+                      call InputReadDouble(input,option,waypoint%time)
+                      call InputErrorMsg(input,option,'COUPLING_TIMESTEP_SIZE &
+                                                      &Update Time',card)
+                      call InputReadAndConvertUnits(input,waypoint%time, &
+                                                    internal_units, &
+                                                    'GEOMECHANICS_TIME,COUPLING_TIMESTEP_SIZE,&
+                                                    &Update Time',option)
+                  else
+                      option%io_buffer = 'Keyword under "COUPLING_TIMESTEP_SIZE" &
+                                        &after coupling timestep size should be "AT".'
+                      call PrintErrMsg(option)
+                  endif
+                  if (.NOT.ASSOCIATED(waypoint_list_dt_coupling)) then
+                      waypoint_list_dt_coupling => WaypointListCreate()
+                  endif
+                  call WaypointInsertInList(waypoint, &
+                                            waypoint_list_dt_coupling, &
+                                            option)
+                  if (.NOT.waypoint_list_dt_coupling%first%time == 0.0) then
+                      option%io_buffer = 'First time after keyword "AT" under &
+                                         &"COUPLING_TIMESTEP_SIZE" must be zero (0.d0).'
+                      call PrintErrMsg(option)
+                  endif
+              endif
             case('SYNC_FLOW_TIMESTEP_SIZE') ! for sync drained split
               option%geomechanics%sync_flow_dt = PETSC_TRUE
             case default

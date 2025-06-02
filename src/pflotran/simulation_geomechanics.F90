@@ -87,6 +87,7 @@ subroutine GeomechanicsSimulationInit(this,driver,option)
   call SimSubsurfInit(this,driver,option)
   this%geomech => GeomechAttrCreate()
   this%geomech%waypoint_list => WaypointListCreate()
+  this%geomech%waypoint_list_dt_coupling => WaypointListCreate()
 
 end subroutine GeomechanicsSimulationInit
 
@@ -166,6 +167,8 @@ subroutine GeomechanicsSimulationExecuteRun(this)
   implicit none
 
   class(simulation_geomechanics_type) :: this
+  type(waypoint_list_type), pointer :: dt_coupling_list
+  type(waypoint_type), pointer :: waypoint
 
   PetscReal :: time
   PetscReal :: final_time
@@ -195,6 +198,28 @@ subroutine GeomechanicsSimulationExecuteRun(this)
     if (Equal(this%geomech%realization%dt_coupling,0.d0)) then
       this%option%io_buffer = 'Set non-zero COUPLING_TIME_SIZE in GEOMECHANICS_TIME.'
       call PrintErrMsg(this%option)
+    ! If time-varying geomechanical coupling timestep size, update
+    ! this on each iteration using a waypoint list
+    else if (associated(this%geomech%waypoint_list_dt_coupling) .and. &
+             this%geomech%waypoint_list_dt_coupling%num_waypoints > 0) then
+      dt_coupling_list => this%geomech%waypoint_list_dt_coupling
+      do
+        waypoint => WaypointReturnAtTimePassed(dt_coupling_list, time)
+        if (time + waypoint%dt_max > final_time) then
+          dt = final_time-time
+        else
+          dt = waypoint%dt_max
+        endif
+
+        time = time + dt
+        this%geomech%process_model_coupler%timestepper%dt = dt
+        call this%RunToTime(time)
+
+        if (this%stop_flag /= TS_CONTINUE) exit ! end simulation
+
+        if (time >= final_time) exit
+      enddo
+    ! Else use fixed coupling timestep size
     else
 
       ! Clear checkpoint flags from subsurface waypoints. In the coupled
@@ -344,6 +369,7 @@ subroutine GeomechanicsSimulationStrip(this)
 
   call GeomechanicsRegressionDestroy(this%geomech%regression)
   call WaypointListDestroy(this%geomech%waypoint_list)
+  call WaypointListDestroy(this%geomech%waypoint_list_dt_coupling)
   call SimSubsurfStrip(this)
   call WaypointListDestroy(this%waypoint_list_subsurface)
 
