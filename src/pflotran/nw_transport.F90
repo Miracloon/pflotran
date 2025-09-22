@@ -2322,9 +2322,8 @@ subroutine NWTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids
 
     ! mineral volume fractions (sum_mol_mnrl) [mol]
     sum_mol_mnrl(1:nspecies) = sum_mol_mnrl(1:nspecies) + &
-            nwt_auxvars(ghosted_id)%mnrl_eq_conc(:) * &    ! [mol/m^3-mnrl]
-            nwt_auxvars(ghosted_id)%mnrl_vol_frac(:) * &   ! [m^3-mnrl/m^3-void]
-            porosity*volume                     ! [m^3-void/m^3-bulk * m^3-bulk]
+            nwt_auxvars(ghosted_id)%mnrl_eq_conc(:) * &    ! [mol/m^3-bulk]
+            volume                                         ! [m^3-bulk]
   enddo
 
   sum_mol_tot = sum_mol_aq + sum_mol_sb + sum_mol_mnrl     ! [mol]
