@@ -911,12 +911,8 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   nullify(simulation%process_model_coupler_list)
 
   ! sim_aux: Create PETSc Vectors and VectorScatters
-  call GeomechCreateGeomechSubsurfVec(subsurf_realization, &
-                                      geomech_realization)
   call SimAuxCopySubsurfVec(simulation%sim_aux,subsurf_realization%field%work)
 
-  call GeomechCreateSubsurfStressStrainVec(subsurf_realization, &
-                                           geomech_realization)
   call SimAuxCopySubsurfGeomechVec(simulation%sim_aux, &
         geomech_realization%geomech_field%strain_subsurf)
 
