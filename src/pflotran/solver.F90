@@ -496,7 +496,7 @@ subroutine SolverSetSNESOptions(solver, option)
 
   if (solver%snes_type == SNESNEWTONLS) then
     call SNESGetLineSearch(solver%snes,linesearch,ierr);CHKERRQ(ierr)
-    call SNESLineSearchSetTolerances(linesearch,solver%newton_stol, &
+    call SNESLineSearchSetTolerances(linesearch,PETSC_DEFAULT_REAL, &
                                      PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL, &
                                      PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL, &
                                      PETSC_DEFAULT_INTEGER, &
