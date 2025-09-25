@@ -1095,7 +1095,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
       if (patch%imat(ghosted_id) <= 0) cycle
       offset = (local_id-1)*option%nflowdof
       select case(global_auxvars(ghosted_id)%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           xmol_index = offset + GENERAL_LIQUID_STATE_X_MOLE_DOF
           pw_index = offset + GENERAL_LIQUID_PRESSURE_DOF
           if (X_p(xmol_index) - dX_p(xmol_index) < 0.d0) then
@@ -1113,13 +1113,13 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
               changed = PETSC_TRUE
             endif
           endif
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
          pgas_index = offset + GENERAL_GAS_PRESSURE_DOF
          if (X_p(pgas_index)- dX_p(pgas_index) <= 0.d0) then
            dX_p(pgas_index) = X_p(pgas_index) - ALMOST_ZERO
            changed = PETSC_TRUE
          endif
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           pgas_index = offset + GENERAL_GAS_PRESSURE_DOF
           if (X_p(pgas_index) - dX_p(pgas_index) < &
                   gen_auxvars(ZERO_INTEGER,ghosted_id)% &
@@ -1140,7 +1140,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
               changed = PETSC_TRUE
             endif
           endif
-        case(LGP_STATE)
+        case(GEN_LGP_STATE)
           pgas_index = offset + GENERAL_GAS_PRESSURE_DOF
           if (X_p(pgas_index) - dX_p(pgas_index) < &
                gen_auxvars(ZERO_INTEGER,ghosted_id)% &
@@ -1150,7 +1150,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
                   pres(option%saturation_pressure_id)
              changed = PETSC_TRUE
           endif
-        case(LP_STATE)
+        case(GEN_LP_STATE)
           xmol_index = offset + GENERAL_LIQUID_STATE_X_MOLE_DOF
           pw_index = offset + GENERAL_LIQUID_PRESSURE_DOF
           if (X_p(xmol_index) - dX_p(xmol_index) < 0.d0) then
@@ -1161,7 +1161,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
            dX_p(pw_index) = X_p(pw_index) - ALMOST_ZERO
            changed = PETSC_TRUE
           endif
-        case(GP_STATE)
+        case(GEN_GP_STATE)
           pgas_index = offset + GENERAL_GAS_PRESSURE_DOF
           if (X_p(pgas_index)- dX_p(pgas_index) <= 0.d0) then
             dX_p(pgas_index) = X_p(pgas_index) - ALMOST_ZERO
@@ -1183,14 +1183,14 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
       if (patch%imat(ghosted_id) <= 0) cycle
       offset = (local_id-1)*option%nflowdof
       select case(global_auxvars(ghosted_id)%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           xmol_index = offset + GENERAL_LIQUID_STATE_X_MOLE_DOF
           pw_index = offset + GENERAL_LIQUID_PRESSURE_DOF
           if (X_p(xmol_index) - dX_p(xmol_index) < 0.d0) then
             dX_p(xmol_index) = X_p(xmol_index)
             changed = PETSC_TRUE
           endif
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           pgas_index = offset + GENERAL_GAS_PRESSURE_DOF
           if (X_p(pgas_index) - dX_p(pgas_index) < &
                   gen_auxvars(ZERO_INTEGER,ghosted_id)% &
@@ -1228,7 +1228,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
       offset = (local_id-1)*option%nflowdof
       temp_scale = 1.d0
       select case(global_auxvars(ghosted_id)%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           liquid_pressure_index  = offset + GENERAL_LIQUID_PRESSURE_DOF
           temperature_index  = offset + GENERAL_ENERGY_DOF
           dX_p(liquid_pressure_index) = dX_p(liquid_pressure_index) * &
@@ -1247,7 +1247,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
           endif
 #endif
 !LIMIT_MAX_PRESSURE_CHANGE
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           gas_pressure_index = offset + GENERAL_GAS_PRESSURE_DOF
 !        air_pressure_index = offset + 2
           saturation_index = offset + GENERAL_GAS_SATURATION_DOF
@@ -1282,7 +1282,7 @@ subroutine PMGeneralCheckUpdatePre(this,snes,X,dX,changed,ierr)
           endif
 #endif
 !LIMIT_MAX_SATURATION_CHANGE
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           gas_pressure_index = offset + GENERAL_GAS_PRESSURE_DOF
           air_pressure_index = offset + GENERAL_GAS_STATE_AIR_PRESSURE_DOF
           dX_p(gas_pressure_index) = dX_p(gas_pressure_index) * &
@@ -1898,8 +1898,8 @@ subroutine PMGeneralMaxChange(this)
     if (i==1 .and. gen_chk_max_dpl_liq_state_only) then
       do j = 1,grid%nlmax
         ghosted_id = grid%nL2G(j)
-        if (global_auxvars(ghosted_id)%istate /= LIQUID_STATE .or. &
-            global_auxvars(ghosted_id)%istate /= LP_STATE) then
+        if (global_auxvars(ghosted_id)%istate /= GEN_LIQUID_STATE .or. &
+            global_auxvars(ghosted_id)%istate /= GEN_LP_STATE) then
           vec_ptr(j) = 0.d0
         endif
       enddo

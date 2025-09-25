@@ -158,7 +158,7 @@ subroutine GeneralAccumulation(gen_auxvar,global_auxvar,material_auxvar, &
   if (analytical_derivatives) then
     Jac = 0.d0
     select case(global_auxvar%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         ! satl = 1
         ! ----------
         ! Water Equation
@@ -219,7 +219,7 @@ subroutine GeneralAccumulation(gen_auxvar,global_auxvar,material_auxvar, &
           porosity * gen_auxvar%den(1) * gen_auxvar%d%Ul_T + &
           (1.d0 - porosity) * material_auxvar%soil_particle_density * &
             soil_heat_capacity
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         ! satg = 1
         ! ----------
         ! Water Equation
@@ -293,7 +293,7 @@ subroutine GeneralAccumulation(gen_auxvar,global_auxvar,material_auxvar, &
           porosity * gen_auxvar%den(2) * gen_auxvar%d%Ug_T + &
           (1.d0 - porosity) * material_auxvar%soil_particle_density * &
             soil_heat_capacity
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! ----------
         ! Water Equation
         ! por * (satl * denl * Xwl + satg * deng * Xwg)
@@ -674,7 +674,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
         Jlup = 0.d0
         Jldn = 0.d0
         select case(global_auxvar_up%istate)
-          case(LIQUID_STATE)
+          case(GEN_LIQUID_STATE)
             ! derivative wrt liquid pressure
             ! derivative total mole flux wrt liquid pressure
             dtot_mole_flux_dp = &
@@ -721,7 +721,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        up_scale * &
                        tot_mole_flux * gen_auxvar_up%d%Hl_T
 
-          case(GAS_STATE)
+          case(GEN_GAS_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -778,7 +778,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        up_scale * &
                        tot_mole_flux * gen_auxvar_up%d%Hl_T
 
-          case(TWO_PHASE_STATE)
+          case(GEN_TWO_PHASE_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -855,7 +855,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        tot_mole_flux * gen_auxvar_up%d%Hl_T
         end select
         select case(global_auxvar_dn%istate)
-          case(LIQUID_STATE)
+          case(GEN_LIQUID_STATE)
             ! derivative wrt liquid pressure
             ! derivative total mole flux wrt liquid pressure
             dtot_mole_flux_dp = &
@@ -902,7 +902,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        dn_scale * &
                        tot_mole_flux * gen_auxvar_dn%d%Hl_T
 
-          case(GAS_STATE)
+          case(GEN_GAS_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -957,7 +957,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        dn_scale * &
                        tot_mole_flux * gen_auxvar_dn%d%Hl_T
 
-          case(TWO_PHASE_STATE)
+          case(GEN_TWO_PHASE_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -1136,7 +1136,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
         Jgup = 0.d0
         Jgdn = 0.d0
         select case(global_auxvar_up%istate)
-          case(LIQUID_STATE)
+          case(GEN_LIQUID_STATE)
             ! derivative wrt liquid pressure
             ! derivative total mole flux wrt liquid pressure
             dtot_mole_flux_dp = &
@@ -1183,7 +1183,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        up_scale * &
                        tot_mole_flux * gen_auxvar_up%d%Hg_T
 
-          case(GAS_STATE)
+          case(GEN_GAS_STATE)
             ! derivative wrt gas pressure
             ! derivative total mole flux wrt gas pressure
             dtot_mole_flux_dp = &
@@ -1256,7 +1256,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        up_scale * &
                        tot_mole_flux * gen_auxvar_up%d%Hg_T
 
-          case(TWO_PHASE_STATE)
+          case(GEN_TWO_PHASE_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -1319,7 +1319,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        tot_mole_flux * gen_auxvar_up%d%Hg_T
         end select
         select case(global_auxvar_dn%istate)
-          case(LIQUID_STATE)
+          case(GEN_LIQUID_STATE)
             ! derivative wrt liquid pressure
             ! derivative total mole flux wrt liquid pressure
             dtot_mole_flux_dp = &
@@ -1366,7 +1366,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        dn_scale * &
                        tot_mole_flux * gen_auxvar_dn%d%Hg_T
 
-          case(GAS_STATE)
+          case(GEN_GAS_STATE)
             ! derivative wrt gas pressure
             ! derivative total mole flux wrt gas pressure
             dtot_mole_flux_dp = &
@@ -1439,7 +1439,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
                        dn_scale * &
                        tot_mole_flux * gen_auxvar_dn%d%Hg_T
 
-          case(TWO_PHASE_STATE)
+          case(GEN_TWO_PHASE_STATE)
             ! derivative wrt gas pressure
             ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
             !   liquid pressure derivatives.
@@ -1637,7 +1637,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
       Jlup = 0.d0
       Jldn = 0.d0
       select case(global_auxvar_up%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -1680,7 +1680,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jlup(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -1729,7 +1729,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jlup(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -1785,7 +1785,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           Jlup(3,3) = 0.d0
       end select
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -1828,7 +1828,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jldn(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -1878,7 +1878,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jldn(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -2046,7 +2046,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
       Jgup = 0.d0
       Jgdn = 0.d0
       select case(global_auxvar_up%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -2093,7 +2093,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jgup(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -2156,7 +2156,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jgup(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -2213,7 +2213,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           Jgup(3,3) = 0.d0
       end select
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -2259,7 +2259,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jgdn(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -2322,7 +2322,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
           ! derivative energy wrt temperature
           Jgdn(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -2437,13 +2437,13 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
     Jcup = 0.d0
     Jcdn = 0.d0
     select case(global_auxvar_up%istate)
-      case(LIQUID_STATE,GAS_STATE)
+      case(GEN_LIQUID_STATE,GEN_GAS_STATE)
         ! only derivative is energy wrt temperature
         ! derivative energy wrt temperature
         ! positive for upwind
         Jcup(3,3) = 1.d0 * dheat_flux_ddelta_temp
 
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! only derivatives are energy wrt saturation and temperature
         ! derivative energy wrt gas saturation
         Jcup(3,2) = dheat_flux_dkeff_ave * dkeff_ave_dkeffup * &
@@ -2456,7 +2456,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
 
     end select
     select case(global_auxvar_dn%istate)
-      case(LIQUID_STATE,GAS_STATE)
+      case(GEN_LIQUID_STATE,GEN_GAS_STATE)
         ! only derivative is energy wrt temperature
         ! derivative energy wrt temperature
         ! positive for upwind
@@ -2464,7 +2464,7 @@ subroutine GeneralFlux(gen_auxvar_up,global_auxvar_up, &
 
         Jcdn(3,3) = -1.d0 * dheat_flux_ddelta_temp
 
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! only derivatives are energy wrt saturation and temperature
         ! derivative energy wrt gas saturation
         Jcdn(3,2) = dheat_flux_dkeff_ave * dkeff_ave_dkeffdn * &
@@ -2683,7 +2683,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
              endif
         end select
         if (iphase == LIQUID_PHASE .and. &
-            global_auxvar_up%istate == GAS_STATE) then
+            global_auxvar_up%istate == GEN_GAS_STATE) then
           ! the idea here is to accommodate a free surface boundary
           ! face.  this will not work for an interior grid cell as
           ! there should be capillary pressure in force.
@@ -2842,7 +2842,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
     if (analytical_derivatives) then
       Jl = 0.d0
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -2889,7 +2889,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
                       dn_scale * &
                       tot_mole_flux * gen_auxvar_dn%d%Hl_T
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
           !   liquid pressure derivatives.
@@ -2944,7 +2944,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
                       dn_scale * &
                       tot_mole_flux * gen_auxvar_dn%d%Hl_T
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
           !   liquid pressure derivatives.
@@ -3179,7 +3179,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
     if (analytical_derivatives) then
       Jg = 0.d0
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -3226,7 +3226,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
                       dn_scale * &
                       tot_mole_flux * gen_auxvar_dn%d%Hg_T
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -3299,7 +3299,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
                       dn_scale * &
                       tot_mole_flux * gen_auxvar_dn%d%Hg_T
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! pl = pg - pc and dpl_dpg = 1.  Therefore, we can use all the
           !   liquid pressure derivatives.
@@ -3485,7 +3485,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
     if (analytical_derivatives) then
       Jl = 0.d0
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -3528,7 +3528,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
           ! derivative energy wrt temperature
           Jl(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -3578,7 +3578,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
           ! derivative energy wrt temperature
           Jl(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -3725,7 +3725,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
 
       Jg = 0.d0
       select case(global_auxvar_dn%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative total mole flux wrt liquid pressure
           dtot_mole_flux_dp = &
@@ -3771,7 +3771,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
           ! derivative energy wrt temperature
           Jg(3,3) = 0.d0
 
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -3834,7 +3834,7 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
           ! derivative energy wrt temperature
           Jg(3,3) = 0.d0
 
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           ! derivative total mole flux wrt gas pressure
           dtot_mole_flux_dp = &
@@ -3939,12 +3939,12 @@ subroutine GeneralBCFlux(ibndtype,auxvar_mapping,auxvars, &
   if (analytical_derivatives) then
     Jc = 0.d0
     select case(global_auxvar_dn%istate)
-      case(LIQUID_STATE,GAS_STATE)
+      case(GEN_LIQUID_STATE,GEN_GAS_STATE)
         ! only derivative is energy wrt temperature
         ! derivative energy wrt temperature
         ! positive for upwind
         Jc(3,3) = -1.d0 * dheat_flux_ddelta_temp
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! only derivatives are energy wrt saturation and temperature
         ! derivative energy wrt gas saturation
         Jc(3,2) = dheat_flux_dkeff_ave * dkeff_ave_dkeffdn * &
@@ -4051,13 +4051,13 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
     ! Use cell primary variables for state variable calculations
     xxss(ONE_INTEGER) = cell_pressure
     select case(global_auxvar%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         xxss(TWO_INTEGER) = gen_auxvar%xmol(air_comp_id,lid)
         xxss(THREE_INTEGER) = gen_auxvar%temp
         if (general_salt) then
           xxss(FOUR_INTEGER) = gen_auxvar%xmol(salt_comp_id,lid)
         endif
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         if (general_gas_air_mass_dof == GENERAL_AIR_PRESSURE_INDEX) then
           xxss(TWO_INTEGER) = gen_auxvar%pres(apid)
         else
@@ -4065,14 +4065,14 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
           xxss(TWO_INTEGER) = gen_auxvar%xmol(wat_comp_id,air_comp_id)
         endif
         xxss(THREE_INTEGER) = gen_auxvar%temp
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         xxss(TWO_INTEGER) = gen_auxvar%sat(gid)
         if (general_2ph_energy_dof == GENERAL_TEMPERATURE_INDEX) then
           xxss(THREE_INTEGER) = gen_auxvar%temp
         else
           xxss(THREE_INTEGER) = gen_auxvar%pres(apid)
         endif
-      case(LP_STATE)
+      case(GEN_LP_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%xmol(air_comp_id, wat_comp_id)
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
         if (general_salt) then
@@ -4082,7 +4082,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
             xxss(FOUR_INTEGER) = gen_auxvar_ss%sat(pid)
           endif
         endif
-      case(LGP_STATE)
+      case(GEN_LGP_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%sat(gid)
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
         if (general_salt) then
@@ -4092,7 +4092,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
             xxss(FOUR_INTEGER) = gen_auxvar_ss%sat(pid)
           endif
         endif
-      case(GP_STATE)
+      case(GEN_GP_STATE)
         if (general_gas_air_mass_dof == GENERAL_AIR_PRESSURE_INDEX) then
           xxss(TWO_INTEGER) = gen_auxvar_ss%pres(apid)
         else
@@ -4110,13 +4110,13 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
     global_auxvar_ss%istate = global_auxvar%istate
   else ! If injecting, use primary variables from user-supplied conditions
     select case(global_auxvar_ss%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%xmol(air_comp_id, wat_comp_id)
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
         if (general_salt) then
           xxss(FOUR_INTEGER) = gen_auxvar_ss%xmol(salt_comp_id, wat_comp_id)
         endif
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         if (general_gas_air_mass_dof == GENERAL_AIR_PRESSURE_INDEX) then
           xxss(TWO_INTEGER) = gen_auxvar_ss%pres(apid)
         else
@@ -4124,7 +4124,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
           xxss(TWO_INTEGER) = gen_auxvar_ss%xmol(wat_comp_id,air_comp_id)
         endif
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%sat(gid)
         if (general_2ph_energy_dof == GENERAL_TEMPERATURE_INDEX) then
           xxss(THREE_INTEGER) = gen_auxvar_ss%temp
@@ -4134,7 +4134,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
         if (general_salt) then
           xxss(FOUR_INTEGER) = gen_auxvar_ss%xmol(salt_comp_id,wat_comp_id)
         endif
-      case(LP_STATE)
+      case(GEN_LP_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%xmol(air_comp_id, wat_comp_id)
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
         if (general_salt) then
@@ -4144,7 +4144,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
             xxss(FOUR_INTEGER) = gen_auxvar_ss%sat(pid)
           endif
         endif
-      case(LGP_STATE)
+      case(GEN_LGP_STATE)
         xxss(TWO_INTEGER) = gen_auxvar_ss%sat(gid)
         xxss(THREE_INTEGER) = gen_auxvar_ss%temp
         if (general_salt) then
@@ -4154,7 +4154,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
             xxss(FOUR_INTEGER) = gen_auxvar_ss%sat(pid)
           endif
         endif
-      case(GP_STATE)
+      case(GEN_GP_STATE)
         if (general_gas_air_mass_dof == GENERAL_AIR_PRESSURE_INDEX) then
           xxss(TWO_INTEGER) = gen_auxvar_ss%pres(apid)
         else
@@ -4309,7 +4309,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
   if (analytical_derivatives) then
     Jl = 0.d0
     select case(global_auxvar%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         ! derivative wrt liquid pressure
         Jl(1,1) = dden_bool * qsrc(wat_comp_id) * &
                   gen_auxvar_ss%d%denl_pl
@@ -4317,7 +4317,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
         ! derivative wrt temperature
         Jl(1,3) = dden_bool * qsrc(wat_comp_id) * &
                   gen_auxvar_ss%d%denl_T
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         if (dabs(Res(wat_comp_id)) > 1.d-40 .and. dden_bool > 0.d0) then
           option%io_buffer = 'Volumetric water injection not set up &
             &for gas state in GeneralAuxVarComputeAndSrcSink.'
@@ -4326,7 +4326,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
         ! derivative wrt gas pressure
         ! derivative wrt air pressure
         ! derivative wrt temperature
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! derivative wrt gas pressure
         Jl(1,1) = dden_bool * qsrc(wat_comp_id) * &
                   gen_auxvar_ss%d%denl_pl
@@ -4364,7 +4364,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
   if (analytical_derivatives) then
     Jg = 0.d0
     select case(global_auxvar%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         if (dabs(Res(air_comp_id)) > 1.d-40 .and. dden_bool > 0.d0) then
           option%io_buffer = 'Volumetric air injection not set up for &
             &liquid state in GeneralAuxVarComputeAndSrcSink as there is &
@@ -4374,7 +4374,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
         ! derivative wrt liquid pressure
         ! derivative wrt air mole fraction
         ! derivative wrt temperature
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         ! derivative wrt gas pressure
         Jg(2,1) = dden_bool * qsrc(air_comp_id) * &
                   gen_auxvar_ss%d%deng_pg
@@ -4384,7 +4384,7 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
         ! derivative wrt temperature
         Jg(2,3) = dden_bool * qsrc(air_comp_id) * &
                   gen_auxvar_ss%d%deng_T
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         ! derivative wrt gas pressure
         Jg(2,1) = dden_bool * qsrc(air_comp_id) * &
                   gen_auxvar_ss%d%deng_pg
@@ -4410,16 +4410,16 @@ subroutine GeneralAuxVarComputeAndSrcSink(option,qsrc,flow_src_sink_type, &
     if (analytical_derivatives) then
       !Jg = 0.d0
       select case(global_auxvar%istate)
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           ! derivative wrt liquid pressure
           ! derivative wrt air mole fraction
           Jg(2,2) = Jg(2,2) + Res(wat_comp_id)
           ! derivative wrt temperature
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           ! derivative wrt gas pressure
           ! derivative wrt air pressure
           ! derivative wrt temperature
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! derivative wrt gas pressure
           Jg(2,1) = Jg(2,1) + &
                     dden_bool * qsrc(wat_comp_id) * &
@@ -5124,10 +5124,10 @@ function GeneralAverageDensity(iphase,istate_up,istate_dn, &
   dden_up = 0.d0
   dden_dn = 0.d0
   if (iphase == LIQUID_PHASE) then
-    if (istate_up == GAS_STATE) then
+    if (istate_up == GEN_GAS_STATE) then
       GeneralAverageDensity = density_dn(iphase)
       dden_dn = 1.d0
-    else if (istate_dn == GAS_STATE) then
+    else if (istate_dn == GEN_GAS_STATE) then
       GeneralAverageDensity = density_up(iphase)
       dden_up = 1.d0
     else
@@ -5136,10 +5136,10 @@ function GeneralAverageDensity(iphase,istate_up,istate_dn, &
       dden_dn = 0.5d0
     endif
   else if (iphase == GAS_PHASE) then
-    if (istate_up == LIQUID_STATE) then
+    if (istate_up == GEN_LIQUID_STATE) then
       GeneralAverageDensity = density_dn(iphase)
       dden_dn = 1.d0
-    else if (istate_dn == LIQUID_STATE) then
+    else if (istate_dn == GEN_LIQUID_STATE) then
       GeneralAverageDensity = density_up(iphase)
       dden_up = 1.d0
     else
@@ -5274,7 +5274,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
 
   if (compare_analytical_derivative) then
     select case(global_auxvar%istate)
-      case(LIQUID_STATE)
+      case(GEN_LIQUID_STATE)
         select case(idof)
           case(1) ! liquid pressure pl
             dpl = 1.d0
@@ -5309,7 +5309,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
             dxmolwl = general_auxvar%d%xmol_T(wid,lid)
             dxmolal = general_auxvar%d%xmol_T(acid,lid)
         end select
-      case(GAS_STATE)
+      case(GEN_GAS_STATE)
         select case(idof)
           case(1)
             dpg = 1.d0 ! pg = pg
@@ -5368,7 +5368,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
             dxmolwg = general_auxvar%d%xmol_T(wid,gid)
             dxmolag = general_auxvar%d%xmol_T(acid,gid)
         end select
-      case(TWO_PHASE_STATE)
+      case(GEN_TWO_PHASE_STATE)
         select case(idof)
           case(1) ! gas pressure pg
             dpl = 1.d0 ! pl = pg - pc
@@ -5453,17 +5453,17 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
   print *, '--------------------------------------------------------'
   print *, 'Derivative with respect to ' // trim(string)
   select case(global_auxvar%istate)
-    case(LIQUID_STATE)
+    case(GEN_LIQUID_STATE)
       print *, '     Thermodynamic state: Liquid phase'
       liquid_density = general_auxvar%den(lid)
       liquid_energy = general_auxvar%U(lid)
       liquid_saturation = general_auxvar%sat(lid)
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
       print *, '     Thermodynamic state: Gas phase'
       gas_density = general_auxvar%den(gid)
       gas_energy = general_auxvar%U(gid)
       gas_saturation = general_auxvar%sat(gid)
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       print *, '     Thermodynamic state: Two phase'
       liquid_density = general_auxvar%den(lid)
       gas_density = general_auxvar%den(gid)
@@ -5483,7 +5483,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
               gas_saturation)* &
               general_auxvar%effective_porosity*material_auxvar%volume
   select case(global_auxvar_pert%istate)
-    case(LIQUID_STATE)
+    case(GEN_LIQUID_STATE)
       print *, '     Thermodynamic state (pert): Liquid phase'
       liquid_density_pert = general_auxvar_pert%den(lid)
       liquid_energy_pert = general_auxvar_pert%U(lid)
@@ -5491,7 +5491,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
       gas_density_pert = 0.d0
       gas_energy_pert = 0.d0
       gas_saturation_pert = 0.d0
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
       print *, '     Thermodynamic state (pert): Gas phase'
       liquid_density_pert = 0.d0
       liquid_energy_pert = 0.d0
@@ -5499,7 +5499,7 @@ subroutine GeneralAuxVarDiff(idof,general_auxvar,global_auxvar, &
       gas_density_pert = general_auxvar_pert%den(gid)
       gas_energy_pert = general_auxvar_pert%U(gid)
       gas_saturation_pert = general_auxvar_pert%sat(gid)
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       print *, '     Thermodynamic state (pert): Two phase'
       liquid_density_pert = general_auxvar_pert%den(lid)
       gas_density_pert = general_auxvar_pert%den(gid)

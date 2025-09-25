@@ -2390,13 +2390,13 @@ subroutine FlowConditionGeneralRead(condition,input,option)
     endif
   else
     if (associated(general%rate)) then
-      condition%iphase = ANY_STATE
+      condition%iphase = GEN_ANY_STATE
     elseif (associated(general%liquid_flux) .and. &
             associated(general%gas_flux) .and. &
             (option%iflowmode == WF_MODE .or. &
              associated(general%energy_flux) .or. &
              associated(general%temperature))) then
-      condition%iphase = ANY_STATE
+      condition%iphase = GEN_ANY_STATE
     else
       ! some sort of dirichlet-based pressure, temperature, etc.
       if (option%iflowmode == G_MODE) then
@@ -2424,44 +2424,44 @@ subroutine FlowConditionGeneralRead(condition,input,option)
              (associated(general%mole_fraction) .or. &
               associated(general%relative_humidity)) ) then
           ! multiphase condition
-          condition%iphase = MULTI_STATE
+          condition%iphase = GEN_MULTI_STATE
         else if (associated(general%gas_pressure) .and. &
                 associated(general%gas_saturation)) then
           ! two phase condition
           if (general_salt) then
             if (associated(general%salt_mole_fraction)) then
               if (general%salt_mole_fraction%itype == AT_SOLUBILITY_BC) then
-                condition%iphase = LGP_STATE
+                condition%iphase = GEN_LGP_STATE
               else
-                condition%iphase = TWO_PHASE_STATE
+                condition%iphase = GEN_TWO_PHASE_STATE
               endif
             else if (associated(general%precipitate_saturation)) then
-                condition%iphase = LGP_STATE
+                condition%iphase = GEN_LGP_STATE
             endif
           else
-            condition%iphase = TWO_PHASE_STATE
+            condition%iphase = GEN_TWO_PHASE_STATE
           endif
         else if (associated(general%liquid_pressure) .and. &
             (associated(general%precipitate_saturation)) .and. &
             (associated(general%mole_fraction))) then
           ! liquid-precipitate condition
-          condition%iphase = LP_STATE
+          condition%iphase = GEN_LP_STATE
         else if ((associated(general%liquid_pressure) .or. &
                  associated(general%gas_pressure)) .and. &
                 associated(general%gas_saturation) .and. &
                 associated(general%precipitate_saturation)) then
           ! liquid-gas-precipitate condition
-          condition%iphase = LGP_STATE
+          condition%iphase = GEN_LGP_STATE
         else if (associated(general%liquid_pressure) .and. &
                  associated(general%mole_fraction)) then
           if (associated(general%salt_mole_fraction)) then
             if (general%salt_mole_fraction%itype == AT_SOLUBILITY_BC) then
-              condition%iphase = LP_STATE
+              condition%iphase = GEN_LP_STATE
             else
-              condition%iphase = LIQUID_STATE
+              condition%iphase = GEN_LIQUID_STATE
             endif
           else
-            condition%iphase = LIQUID_STATE
+            condition%iphase = GEN_LIQUID_STATE
           endif
         else if (associated(general%gas_pressure) .and. &
                  (associated(general%mole_fraction) .or. &
@@ -2469,11 +2469,11 @@ subroutine FlowConditionGeneralRead(condition,input,option)
           ! gas phase condition
           if (associated(general%salt_mole_fraction)) then
             if (general%salt_mole_fraction%itype == AT_SOLUBILITY_BC) then
-              condition%iphase = GP_STATE
+              condition%iphase = GEN_GP_STATE
             ! else GAS_state
             endif
           else
-            condition%iphase = GAS_STATE
+            condition%iphase = GEN_GAS_STATE
           endif
         endif
       else
@@ -2490,16 +2490,16 @@ subroutine FlowConditionGeneralRead(condition,input,option)
         ! two phase condition
         if (associated(general%salt_mole_fraction)) then
           if (general%salt_mole_fraction%itype == AT_SOLUBILITY_BC) then
-            condition%iphase = LGP_STATE
+            condition%iphase = GEN_LGP_STATE
           else
-            condition%iphase = TWO_PHASE_STATE
+            condition%iphase = GEN_TWO_PHASE_STATE
           endif
         else
-           condition%iphase = TWO_PHASE_STATE
+           condition%iphase = GEN_TWO_PHASE_STATE
         endif
       endif
     endif
-    if (condition%iphase == NULL_STATE) then
+    if (condition%iphase == GEN_NULL_STATE) then
       option%io_buffer = 'General Phase non-rate/flux condition contains &
         &an unsupported combination of primary dependent variables.'
       call PrintErrMsg(option)
