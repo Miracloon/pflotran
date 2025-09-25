@@ -242,7 +242,7 @@ subroutine CondControlAssignFlowInitCond(realization)
             '" must be of type Dirichlet or Hydrostatic'
           ! error checking.  the data must match the state
           select case(initial_condition%flow_condition%iphase)
-            case(TWO_PHASE_STATE)
+            case(GEN_TWO_PHASE_STATE)
               if (.not. &
                   (general%gas_pressure%itype == DIRICHLET_BC .or. &
                     general%gas_pressure%itype == HYDROSTATIC_BC)) then
@@ -263,7 +263,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                   call PrintErrMsg(option)
                 endif
               endif
-            case(LGP_STATE)
+            case(GEN_LGP_STATE)
               if (.not. &
                     (general%gas_pressure%itype == DIRICHLET_BC .or. &
                     general%gas_pressure%itype == HYDROSTATIC_BC)) then
@@ -289,7 +289,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                     call PrintErrMsg(option)
                   endif
               endif
-            case(LIQUID_STATE)
+            case(GEN_LIQUID_STATE)
               if (.not. &
                   (general%liquid_pressure%itype == DIRICHLET_BC .or. &
                     general%liquid_pressure%itype == HYDROSTATIC_BC)) then
@@ -310,7 +310,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                   call PrintErrMsg(option)
                 endif
               endif
-            case(LP_STATE)
+            case(GEN_LP_STATE)
               if (.not. &
                   (general%liquid_pressure%itype == DIRICHLET_BC .or. &
                     general%liquid_pressure%itype == HYDROSTATIC_BC)) then
@@ -323,7 +323,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                 option%io_buffer = 'Mole fraction ' // trim(string)
                 call PrintErrMsg(option)
               endif
-            case(GAS_STATE)
+            case(GEN_GAS_STATE)
               if (.not. &
                   (general%gas_pressure%itype == DIRICHLET_BC .or. &
                     general%gas_pressure%itype == HYDROSTATIC_BC)) then
@@ -336,7 +336,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                 option%io_buffer = 'Gas saturation ' // trim(string)
                 call PrintErrMsg(option)
               endif
-            case(GP_STATE)
+            case(GEN_GP_STATE)
               if (.not. &
                     (general%gas_pressure%itype == DIRICHLET_BC .or. &
                     general%gas_pressure%itype == HYDROSTATIC_BC)) then
@@ -365,7 +365,7 @@ subroutine CondControlAssignFlowInitCond(realization)
             ! decrement ibegin to give a local offset of 0
             ibegin = ibegin - 1
             select case(initial_condition%flow_condition%iphase)
-              case(TWO_PHASE_STATE)
+              case(GEN_TWO_PHASE_STATE)
                 xx_p(ibegin+GENERAL_GAS_PRESSURE_DOF) = &
                   general%gas_pressure%dataset%rarray(1)
                 xx_p(ibegin+GENERAL_GAS_SATURATION_DOF) = &
@@ -380,7 +380,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                     general%gas_pressure%dataset%rarray(1) - &
                     p_sat
                 endif
-              case(LGP_STATE)
+              case(GEN_LGP_STATE)
                 xx_p(ibegin+GENERAL_GAS_PRESSURE_DOF) = &
                       general%gas_pressure%dataset%rarray(1)
                 xx_p(ibegin+GENERAL_GAS_SATURATION_DOF) = &
@@ -412,7 +412,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                     endif
                   endif
                 endif
-              case(LIQUID_STATE)
+              case(GEN_LIQUID_STATE)
                 xx_p(ibegin+GENERAL_LIQUID_PRESSURE_DOF) = &
                   general%liquid_pressure%dataset%rarray(1)
                 xx_p(ibegin+GENERAL_LIQUID_STATE_X_MOLE_DOF) = &
@@ -423,7 +423,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                   xx_p(ibegin+GENERAL_LIQUID_STATE_S_MOLE_DOF) = &
                     general%salt_mole_fraction%dataset%rarray(1)
                 endif
-              case(GAS_STATE)
+              case(GEN_GAS_STATE)
                 xx_p(ibegin+GENERAL_GAS_PRESSURE_DOF) = &
                   general%gas_pressure%dataset%rarray(1)
                 if (general_gas_air_mass_dof == &
@@ -437,7 +437,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                 endif
                 xx_p(ibegin+GENERAL_ENERGY_DOF) = &
                   general%temperature%dataset%rarray(1)
-              case(LP_STATE)
+              case(GEN_LP_STATE)
                 xx_p(ibegin+GENERAL_LIQUID_PRESSURE_DOF) = &
                       general%liquid_pressure%dataset%rarray(1)
                 if (general_salt) then
@@ -461,7 +461,7 @@ subroutine CondControlAssignFlowInitCond(realization)
                       general%temperature%dataset%rarray(1)
                 xx_p(ibegin+GENERAL_LIQUID_STATE_X_MOLE_DOF) = &
                     general%mole_fraction%dataset%rarray(1)
-              case(GP_STATE)
+              case(GEN_GP_STATE)
                 xx_p(ibegin+GENERAL_GAS_PRESSURE_DOF) = &
                       general%gas_pressure%dataset%rarray(1)
                 if (general_gas_air_mass_dof == &

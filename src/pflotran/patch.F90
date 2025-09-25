@@ -23,11 +23,6 @@ module Patch_module
   use Material_Transform_module
   use Auxiliary_module
 
-  use General_Aux_module
-  use Hydrate_Aux_module
-  use TH_Aux_module
-  use SCO2_Aux_module
-
   implicit none
 
   private
@@ -921,19 +916,23 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
 
   use Option_module
   use Connection_module
-  use Reaction_Aux_module
-  use Reactive_Transport_Aux_module
-  use NW_Transport_Aux_module
-  use Global_Aux_module
-  use ZFlow_Aux_module
   use Condition_module
+  use Dataset_Common_HDF5_class
   use Transport_Constraint_Base_module
   use Transport_Constraint_NWT_module
   use Transport_Constraint_RT_module
   use Transport_Constraint_module
+
   use General_Aux_module
+  use Global_Aux_module
+  use Hydrate_Aux_module
+  use NW_Transport_Aux_module
+  use Reaction_Aux_module
+  use Reactive_Transport_Aux_module
+  use SCO2_Aux_module
+  use TH_Aux_module
   use WIPP_Flow_Aux_module
-  use Dataset_Common_HDF5_class
+  use ZFlow_Aux_module
 
   implicit none
 
@@ -1361,8 +1360,8 @@ subroutine PatchUpdateCouplerAuxVarsWF(patch,coupler,option)
   use Dataset_Gridded_HDF5_class
   use Dataset_Ascii_class
   use Dataset_module
-  use General_Aux_module, only : LIQUID_STATE, GAS_STATE, TWO_PHASE_STATE, &
-                                 ANY_STATE
+  use General_Aux_module, only : GEN_LIQUID_STATE, GEN_GAS_STATE, &
+                                 GEN_TWO_PHASE_STATE, GEN_ANY_STATE
 
   implicit none
 
@@ -1388,9 +1387,9 @@ subroutine PatchUpdateCouplerAuxVarsWF(patch,coupler,option)
   dof2 = PETSC_FALSE
   real_count = 0
   select case(flow_condition%iphase)
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       coupler%flow_aux_int_var(WIPPFLO_STATE_INDEX,1:num_connections) = &
-        TWO_PHASE_STATE
+        GEN_TWO_PHASE_STATE
       select case(general%liquid_pressure%itype)
         case(DIRICHLET_BC)
           real_count = real_count + 1
@@ -1460,16 +1459,16 @@ subroutine PatchUpdateCouplerAuxVarsWF(patch,coupler,option)
               'wipp flow gas saturation',string)
           call PrintErrMsg(option)
       end select
-    case(LIQUID_STATE)
+    case(GEN_LIQUID_STATE)
       option%io_buffer = 'LIQUID State not support for WIPP Flow mode.'
       call PrintErrMsg(option)
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
       option%io_buffer = 'GAS State not support for WIPP Flow mode.'
       call PrintErrMsg(option)
-    case(ANY_STATE)
+    case(GEN_ANY_STATE)
       if (associated(coupler%flow_aux_int_var)) then ! not used with rate
         coupler%flow_aux_int_var(WIPPFLO_STATE_INDEX,1:num_connections) = &
-          ANY_STATE
+          GEN_ANY_STATE
       endif
   end select
 
@@ -1657,7 +1656,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
   endif
 
   select case(flow_condition%iphase)
-    case(MULTI_STATE)
+    case(GEN_MULTI_STATE)
       select type(dataset => general%gas_saturation%dataset)
         class is(dataset_ascii_type)
           gas_sat = general%gas_saturation%dataset%rarray(1)
@@ -1666,19 +1665,19 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
           endif
           if (gas_sat > 0.d0 .and. gas_sat < 1.d0) then
             coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-              TWO_PHASE_STATE
+              GEN_TWO_PHASE_STATE
             ! if () then LGP_state
           ! Cannot user gas_sat == 0.d0 or Equal(gas_sat,0.d0) as optimization
           ! in the Intel compiler changes the answer.
           else if (gas_sat < 0.5d0) then
             coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-              LIQUID_STATE
+              GEN_LIQUID_STATE
           ! else if (precipitate_sat > 0.5d0 .and. general_soluble_matrix) then
           !   coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
           !     LP_STATE
           else
             coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-              GAS_STATE
+              GEN_GAS_STATE
           endif
         class is(dataset_gridded_hdf5_type)
           ! If the gas pressure dataset is defined, we must ensure that its
@@ -1701,11 +1700,11 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
                                   general%gas_saturation%dataset,iconn,gas_sat)
             if (gas_sat > 0.d0 .and. gas_sat < 1.d0) then
               coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = &
-                TWO_PHASE_STATE
+                GEN_TWO_PHASE_STATE
             else if (gas_sat < 0.5d0) then
-              coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = LIQUID_STATE
+              coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = GEN_LIQUID_STATE
             else
-              coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = GAS_STATE
+              coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = GEN_GAS_STATE
             endif
           enddo
         class default
@@ -1713,23 +1712,23 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
           call DatasetUnknownClass(dataset,option, &
                                    'PatchUpdateCouplerAuxVarsG')
       end select
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        TWO_PHASE_STATE
+        GEN_TWO_PHASE_STATE
         ! no need to loop in the next do loop if its all the same state, which
         ! you know from flow_condition%iphase
-    case(LP_STATE)
+    case(GEN_LP_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        LP_STATE
-    case(LGP_STATE)
+        GEN_LP_STATE
+    case(GEN_LGP_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        LGP_STATE
-    case(GP_STATE)
+        GEN_LGP_STATE
+    case(GEN_GP_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        GP_STATE
-    case(LIQUID_STATE)
+        GEN_GP_STATE
+    case(GEN_LIQUID_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        LIQUID_STATE
+        GEN_LIQUID_STATE
       if (general%liquid_pressure%itype == HYDROSTATIC_BC) then
         if (general%mole_fraction%itype /= DIRICHLET_BC) then
           option%io_buffer = 'Hydrostatic liquid state pressure BC for &
@@ -1746,17 +1745,17 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
         call HydrostaticUpdateCoupler(coupler,option,patch%grid)
         do iconn = 1, num_connections
           if (coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) /= &
-              LIQUID_STATE) then
+              GEN_LIQUID_STATE) then
             select case(coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn))
-              case(GAS_STATE)
+              case(GEN_GAS_STATE)
                 string = 'gas state'
-              case(TWO_PHASE_STATE)
+              case(GEN_TWO_PHASE_STATE)
                 string = 'two phase state'
-              case(LP_STATE)
+              case(GEN_LP_STATE)
                 string = 'liquid-precipitate state'
-              case(LGP_STATE)
+              case(GEN_LGP_STATE)
                 string = 'liquid-gas-precipitate state'
-              case(ANY_STATE)
+              case(GEN_ANY_STATE)
                 string = 'any phase state'
             end select
             option%io_buffer = 'A ' // trim(string) // ' cell was found &
@@ -1772,13 +1771,13 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
         dof1 = PETSC_TRUE; dof2 = PETSC_TRUE; dof3 = PETSC_TRUE;
         if (general_salt) dof4 = PETSC_TRUE
       endif
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
       coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-        GAS_STATE
-    case(ANY_STATE)
+        GEN_GAS_STATE
+    case(GEN_ANY_STATE)
       if (associated(coupler%flow_aux_int_var)) then ! not used with rate
         coupler%flow_aux_int_var(GENERAL_STATE_INDEX,1:num_connections) = &
-          ANY_STATE
+          GEN_ANY_STATE
       endif
   end select
 
@@ -1791,7 +1790,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
     do iconn = 1, num_connections
       select case(coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn))
       ! ---------------------------------------------------------------------- !
-        case(TWO_PHASE_STATE)
+        case(GEN_TWO_PHASE_STATE)
           ! gas pressure; 1st dof ------------------------ !
           select case(general%gas_pressure%itype)
             case(DIRICHLET_BC,DIRICHLET_SEEPAGE_BC)
@@ -1868,7 +1867,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
             end select
           endif
       ! ---------------------------------------------------------------------- !
-        case(LIQUID_STATE)
+        case(GEN_LIQUID_STATE)
           if (general%liquid_pressure%itype == HYDROSTATIC_BC) then
   !         option%io_buffer = 'Hydrostatic BC for general phase cannot possibly ' // &
   !           'be set up correctly. - GEH'
@@ -1983,7 +1982,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
             endif
           endif
       ! ---------------------------------------------------------------------- !
-        case(GAS_STATE)
+        case(GEN_GAS_STATE)
           gas_pressure = UNINITIALIZED_DOUBLE
           temperature = UNINITIALIZED_DOUBLE
           ! gas pressure; 1st dof ------------------------ !
@@ -2111,7 +2110,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
             dof4 = PETSC_TRUE
           endif
       ! ---------------------------------------------------------------------- !
-        case(LP_STATE)
+        case(GEN_LP_STATE)
           ! liquid pressure; 1st dof ------------------------ !
           select case(general%liquid_pressure%itype)
             case(DIRICHLET_BC)
@@ -2200,7 +2199,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
             end select
           endif
       ! ---------------------------------------------------------------------- !
-        case(GP_STATE)
+        case(GEN_GP_STATE)
           gas_pressure = UNINITIALIZED_DOUBLE
           temperature = UNINITIALIZED_DOUBLE
           ! gas pressure; 1st dof ------------------------ !
@@ -2353,7 +2352,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
             endif
 
       ! ---------------------------------------------------------------------- !
-      case(LGP_STATE)
+      case(GEN_LGP_STATE)
         ! gas pressure; 1st dof ------------------------ !
         select case(general%gas_pressure%itype)
           case(DIRICHLET_BC)
@@ -2440,7 +2439,7 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
         endif
 
       ! ---------------------------------------------------------------------- !
-        case(ANY_STATE)
+        case(GEN_ANY_STATE)
           ! temperature; 2nd dof ------------------------- !
           if (associated(general%temperature)) then
             select case(general%temperature%itype)
@@ -2465,13 +2464,13 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
   endif
 
   select case(flow_condition%iphase)
-    case(MULTI_STATE)
-    case(TWO_PHASE_STATE)
-    case(LIQUID_STATE)
+    case(GEN_MULTI_STATE)
+    case(GEN_TWO_PHASE_STATE)
+    case(GEN_LIQUID_STATE)
     ! ---> this code just prints an error, I think:
       if (general%liquid_pressure%itype == HYDROSTATIC_BC) then
         do iconn=1,coupler%connection_set%num_connections
-          if (coupler%flow_aux_int_var(ONE_INTEGER,iconn) == TWO_PHASE_STATE) then
+          if (coupler%flow_aux_int_var(ONE_INTEGER,iconn) == GEN_TWO_PHASE_STATE) then
             !geh: This cannot possibly be working.  real_count needs to be incremented
             !     but what variable is mapped?  Need to figure out how real_count
             !     factors into the hydrostatic condition
@@ -2524,8 +2523,8 @@ subroutine PatchUpdateCouplerAuxVarsG(patch,coupler,option)
         coupler%flow_bc_type(2:option%nflowdof) = DIRICHLET_BC
       else
       endif
-    case(GAS_STATE)
-    case(ANY_STATE)
+    case(GEN_GAS_STATE)
+    case(GEN_ANY_STATE)
   end select
 
   if (associated(general%liquid_flux)) then
@@ -4068,7 +4067,7 @@ subroutine PatchUpdateCouplerAuxVarsTH(patch,coupler,option)
   use Option_module
   use Condition_module
   use Hydrostatic_module
-
+  use TH_Aux_module
 
   use Grid_module
   use Dataset_Common_HDF5_class
@@ -4702,7 +4701,7 @@ subroutine PatchUpdateCouplerAuxVarsSCO2(patch,coupler,option)
 
   !MAN: need to test all of this
   select case(flow_condition%iphase)
-    case(MULTI_STATE)
+    case(SCO2_MULTI_STATE)
       select type(dataset => sco2%gas_saturation%dataset)
         class is(dataset_ascii_type)
           gas_sat = sco2%gas_saturation%dataset%rarray(1)
@@ -4715,10 +4714,10 @@ subroutine PatchUpdateCouplerAuxVarsSCO2(patch,coupler,option)
           ! in the Intel compiler changes the answer.
           elseif (gas_sat < 0.5d0) then
             coupler%flow_aux_int_var(ONE_INTEGER,1:num_connections) = &
-                LIQUID_STATE
+                SCO2_LIQUID_STATE
           else
             coupler%flow_aux_int_var(ONE_INTEGER,1:num_connections) = &
-                GAS_STATE
+                SCO2_GAS_STATE
           endif
         class is(dataset_gridded_hdf5_type)
           ! If the gas pressure dataset is defined, we must ensure that its
@@ -4745,9 +4744,9 @@ subroutine PatchUpdateCouplerAuxVarsSCO2(patch,coupler,option)
               coupler%flow_aux_int_var(ONE_INTEGER,iconn) = &
                 SCO2_TRAPPED_GAS_STATE
             elseif (gas_sat < 0.5d0) then
-              coupler%flow_aux_int_var(ONE_INTEGER,iconn) = LIQUID_STATE
+              coupler%flow_aux_int_var(ONE_INTEGER,iconn) = SCO2_LIQUID_STATE
             else
-              coupler%flow_aux_int_var(ONE_INTEGER,iconn) = GAS_STATE
+              coupler%flow_aux_int_var(ONE_INTEGER,iconn) = SCO2_GAS_STATE
             endif
           enddo
         class default
@@ -6400,12 +6399,14 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
   use Reactive_Transport_Aux_module
   use Reaction_Surface_Complexation_Aux_module
   use General_Aux_module, only : general_fmw => fmw_comp, &
-                                 GAS_STATE, LIQUID_STATE
+                                 GEN_GAS_STATE, GEN_LIQUID_STATE
   use Hydrate_Aux_module, only : hydrate_fmw => hydrate_fmw_comp, &
                                  G_STATE, L_STATE
   use WIPP_Flow_Aux_module, only : WIPPFloScalePerm
   use ZFlow_Aux_module
-  use SCO2_Aux_module, only : sco2_fmw => fmw_comp
+  use SCO2_Aux_module, only : sco2_fmw => fmw_comp, &
+                              SCO2_LIQUID_STATE, SCO2_GAS_STATE
+
   use Output_Aux_module
   use Variables_module
   use Material_Aux_module
@@ -6842,7 +6843,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    GAS_STATE) then
+                    GEN_GAS_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%liquid_phase)
@@ -6863,7 +6864,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    LIQUID_STATE) then
+                    GEN_LIQUID_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%gas_phase)
@@ -6884,7 +6885,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    LIQUID_STATE) then
+                    GEN_LIQUID_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%air_pressure_id)
@@ -7271,7 +7272,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    GAS_STATE) then
+                    GEN_GAS_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%WIPPFlo%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%liquid_phase)
@@ -7292,7 +7293,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    LIQUID_STATE) then
+                    GEN_LIQUID_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%WIPPFlo%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%gas_phase)
@@ -7410,7 +7411,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
               do local_id=1,grid%nlmax
                 ghosted_id = grid%nL2G(local_id)
                 if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                    LIQUID_STATE) then
+                    SCO2_LIQUID_STATE) then
                   vec_ptr(local_id) = &
                     patch%aux%SCO2%auxvars(ZERO_INTEGER,ghosted_id)% &
                       pres(option%co2_pressure_id)
@@ -8441,7 +8442,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
   use ERT_Aux_module
   use Variables_module
   use General_Aux_module, only : general_fmw => fmw_comp, &
-                                 GAS_STATE, LIQUID_STATE
+                                 GEN_GAS_STATE, GEN_LIQUID_STATE
   use Hydrate_Aux_module, only : hydrate_fmw => hydrate_fmw_comp, &
                                  G_STATE, L_STATE
   use WIPP_Flow_Aux_module, only : WIPPFloScalePerm
@@ -8710,7 +8711,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
                            pres(option%liquid_phase:option%gas_phase))
           case(LIQUID_PRESSURE)
             if (output_option%filter_non_state_variables) then
-              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GAS_STATE) then
+              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GEN_GAS_STATE) then
                 value = patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%liquid_phase)
               else
@@ -8723,7 +8724,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           case(GAS_PRESSURE)
             if (output_option%filter_non_state_variables) then
               if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                  LIQUID_STATE) then
+                  GEN_LIQUID_STATE) then
                 value = patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%gas_phase)
               else
@@ -8736,7 +8737,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           case(AIR_PRESSURE)
             if (output_option%filter_non_state_variables) then
               if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                  LIQUID_STATE) then
+                  GEN_LIQUID_STATE) then
                 value = patch%aux%General%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%air_pressure_id)
               else
@@ -8996,7 +8997,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
                            pres(option%liquid_phase:option%gas_phase))
           case(LIQUID_PRESSURE)
             if (output_option%filter_non_state_variables) then
-              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GAS_STATE) then
+              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GEN_GAS_STATE) then
                 value = patch%aux%WIPPFlo%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%liquid_phase)
               else
@@ -9009,7 +9010,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           case(GAS_PRESSURE)
             if (output_option%filter_non_state_variables) then
               if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                  LIQUID_STATE) then
+                  GEN_LIQUID_STATE) then
                 value = patch%aux%WIPPFlo%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%gas_phase)
               else
@@ -9067,7 +9068,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
                            pres(option%liquid_phase:option%gas_phase))
           case(LIQUID_PRESSURE)
             if (output_option%filter_non_state_variables) then
-              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GAS_STATE) then
+              if (patch%aux%Global%auxvars(ghosted_id)%istate /= GEN_GAS_STATE) then
                 value = patch%aux%SCO2%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%liquid_phase)
               else
@@ -9080,7 +9081,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           case(GAS_PRESSURE)
             if (output_option%filter_non_state_variables) then
               if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                  LIQUID_STATE) then
+                  SCO2_LIQUID_STATE) then
                 value = patch%aux%SCO2%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%gas_phase)
               else
@@ -9093,7 +9094,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           case(CO2_PRESSURE)
             if (output_option%filter_non_state_variables) then
               if (patch%aux%Global%auxvars(ghosted_id)%istate /= &
-                  LIQUID_STATE) then
+                  SCO2_LIQUID_STATE) then
                 value = patch%aux%SCO2%auxvars(ZERO_INTEGER,ghosted_id)% &
                           pres(option%co2_pressure_id)
               else

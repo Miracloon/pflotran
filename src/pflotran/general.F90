@@ -854,10 +854,10 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
 
       xxbc(:) = xx_loc_p(offset+1:offset+option%nflowdof)
       istate = boundary_condition%flow_aux_int_var(GENERAL_STATE_INDEX,iconn)
-      if (istate == ANY_STATE) then
+      if (istate == GEN_ANY_STATE) then
         istate = global_auxvars(ghosted_id)%istate
         select case(istate)
-          case(LIQUID_STATE,GAS_STATE,LP_STATE,GP_STATE)
+          case(GEN_LIQUID_STATE,GEN_GAS_STATE,GEN_LP_STATE,GEN_GP_STATE)
             do idof = 1, option%nflowdof
               select case(boundary_condition%flow_bc_type(idof))
                 case(DIRICHLET_BC,DIRICHLET_SEEPAGE_BC,HYDROSTATIC_BC)
@@ -872,7 +872,7 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
                   endif
               end select
             enddo
-          case(TWO_PHASE_STATE,LGP_STATE)
+          case(GEN_TWO_PHASE_STATE,GEN_LGP_STATE)
             do idof = 1, option%nflowdof
               select case(boundary_condition%flow_bc_type(idof))
                 case(HYDROSTATIC_BC)
@@ -969,9 +969,9 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
         ! we do this for all BCs; Neumann bcs will be set later
         do idof = 1, option%nflowdof
           if (general_salt) then
-            if (istate > 7) then !ANY_STATE, MULTI_STATE
+            if (istate > 7) then !GEN_ANY_STATE, GEN_MULTI_STATE
               real_index = boundary_condition%flow_aux_mapping(&
-                      dof_to_primary_variable(idof,LGP_STATE))
+                      dof_to_primary_variable(idof,GEN_LGP_STATE))
             else
               real_index = boundary_condition%flow_aux_mapping(&
                       dof_to_primary_variable(idof,istate))
@@ -979,7 +979,7 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
           else
             if (istate > 3) then
               real_index = boundary_condition%flow_aux_mapping(&
-                      dof_to_primary_variable(idof,TWO_PHASE_STATE))
+                      dof_to_primary_variable(idof,GEN_TWO_PHASE_STATE))
             else
               real_index = boundary_condition%flow_aux_mapping(&
                       dof_to_primary_variable(idof,istate))
@@ -999,9 +999,9 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
         global_auxvars_bc(sum_connection)%istate = istate
       else
         if (material_is_soluble) then
-          global_auxvars_bc(sum_connection)%istate = LGP_STATE
+          global_auxvars_bc(sum_connection)%istate = GEN_LGP_STATE
         else
-          global_auxvars_bc(sum_connection)%istate = TWO_PHASE_STATE
+          global_auxvars_bc(sum_connection)%istate = GEN_TWO_PHASE_STATE
         endif
       endif
       ! GENERAL_UPDATE_FOR_BOUNDARY indicates call from non-perturbation
@@ -1125,35 +1125,35 @@ subroutine GeneralUpdateAuxVars(realization,update_state,update_state_bc)
 
       if (dabs(qsrc(wat_comp_id)) > 0.d0 .and. &
           dabs(qsrc(air_comp_id)) > 0.d0) then
-        global_auxvars_ss(sum_connection)%istate = TWO_PHASE_STATE
+        global_auxvars_ss(sum_connection)%istate = GEN_TWO_PHASE_STATE
       elseif (dabs(qsrc(wat_comp_id)) > 0.d0) then
         if (general_salt .and. .not. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = LIQUID_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_LIQUID_STATE
         elseif (general_salt .and. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = LP_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_LP_STATE
         endif
       elseif (dabs(qsrc(air_comp_id)) > 0.d0) then
         if (general_salt .and. .not. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = GAS_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_GAS_STATE
         elseif (general_salt .and. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = GP_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_GP_STATE
         else
-          global_auxvars_ss(sum_connection)%istate = GAS_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_GAS_STATE
         endif
       else
         if (general_salt .and. .not. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = TWO_PHASE_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_TWO_PHASE_STATE
         elseif (general_salt .and. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = LGP_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_LGP_STATE
         endif
       endif
 
       if (global_auxvars_ss(sum_connection)%istate /= &
           global_auxvars(ghosted_id)%istate) then
         if (general_salt .and. material_is_soluble) then
-          global_auxvars_ss(sum_connection)%istate = LGP_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_LGP_STATE
         else
-          global_auxvars_ss(sum_connection)%istate = TWO_PHASE_STATE
+          global_auxvars_ss(sum_connection)%istate = GEN_TWO_PHASE_STATE
         endif
       endif
 
@@ -2421,10 +2421,10 @@ function GeneralAverageDensity(iphase,istate_up,istate_dn, &
   dden_up = 0.d0
   dden_dn = 0.d0
   if (iphase == LIQUID_PHASE) then
-    if (istate_up == GAS_STATE .or. iphase == GP_STATE) then
+    if (istate_up == GEN_GAS_STATE .or. iphase == GEN_GP_STATE) then
       GeneralAverageDensity = density_dn(iphase)
       dden_dn = 1.d0
-    else if (istate_dn == GAS_STATE .or. istate_dn == GP_STATE) then
+    else if (istate_dn == GEN_GAS_STATE .or. istate_dn == GEN_GP_STATE) then
       GeneralAverageDensity = density_up(iphase)
       dden_up = 1.d0
     else
@@ -2433,10 +2433,10 @@ function GeneralAverageDensity(iphase,istate_up,istate_dn, &
       dden_dn = 0.5d0
     endif
   else if (iphase == GAS_PHASE) then
-    if (istate_up == LIQUID_STATE .or. istate_up == LP_STATE) then
+    if (istate_up == GEN_LIQUID_STATE .or. istate_up == GEN_LP_STATE) then
       GeneralAverageDensity = density_dn(iphase)
       dden_dn = 1.d0
-    else if (istate_dn == LIQUID_STATE .or. istate_dn == LP_STATE) then
+    else if (istate_dn == GEN_LIQUID_STATE .or. istate_dn == GEN_LP_STATE) then
       GeneralAverageDensity = density_up(iphase)
       dden_up = 1.d0
     else

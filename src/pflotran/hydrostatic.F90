@@ -721,13 +721,13 @@ subroutine HydrostaticUpdateCoupler(coupler,option,grid)
           ! we hijack the air pressure entry, storing capillary pressure there
           coupler%flow_aux_real_var(1,iconn) = gas_pressure
           coupler%flow_aux_real_var(2,iconn) = gas_pressure - pressure
-          coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = TWO_PHASE_STATE
+          coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = GEN_TWO_PHASE_STATE
         else
            coupler%flow_aux_real_var(2,iconn) = concentration_at_datum
           if (general_salt) then
             coupler%flow_aux_real_var(4,iconn) = salt_fraction_at_datum
           endif
-          coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = LIQUID_STATE
+          coupler%flow_aux_int_var(GENERAL_STATE_INDEX,iconn) = GEN_LIQUID_STATE
         endif
       case(H_MODE)
         select case (coupler%flow_aux_int_var(HYDRATE_STATE_INDEX,iconn))

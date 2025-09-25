@@ -444,7 +444,7 @@ subroutine WIPPFloUpdateAuxVars(realization)
   use Connection_module
   use Material_module
   use Material_Aux_module
-  use General_Aux_module, only : ANY_STATE, TWO_PHASE_STATE
+  use General_Aux_module, only : GEN_ANY_STATE, GEN_TWO_PHASE_STATE
 
   implicit none
 
@@ -520,7 +520,7 @@ subroutine WIPPFloUpdateAuxVars(realization)
 
       xxbc(:) = xx_loc_p(offset+1:offset+option%nflowdof)
       istate = boundary_condition%flow_aux_int_var(WIPPFLO_STATE_INDEX,iconn)
-      if (istate == ANY_STATE) then
+      if (istate == GEN_ANY_STATE) then
         do idof = 1, option%nflowdof
           select case(boundary_condition%flow_bc_type(idof))
             case(HYDROSTATIC_BC)
@@ -573,7 +573,7 @@ subroutine WIPPFloUpdateAuxVars(realization)
       endif
 
       ! set this based on data given
-      global_auxvars_bc(sum_connection)%istate = TWO_PHASE_STATE
+      global_auxvars_bc(sum_connection)%istate = GEN_TWO_PHASE_STATE
       ! WIPPFLO_UPDATE_FOR_BOUNDARY indicates call from non-perturbation
       option%iflag = WIPPFLO_UPDATE_FOR_BOUNDARY
       call WIPPFloAuxVarCompute(xxbc,wippflo_auxvars_bc(sum_connection), &

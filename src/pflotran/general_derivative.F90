@@ -92,14 +92,14 @@ subroutine GeneralDerivativeDriver(option)
 
 !  istate = LIQUID_STATE
 !  istate = GAS_STATE
-  istate = TWO_PHASE_STATE
+  istate = GEN_TWO_PHASE_STATE
   select case(istate)
-    case(LIQUID_STATE)
+    case(GEN_LIQUID_STATE)
       xx(1) = 1.d6
       xx(2) = 1.d-6
       xx(3) = 30.d0
 !      xx(3) = 100.d0
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
 !      xx(1) = 1.d4
 !      xx(2) = 0.997d4
 !      xx(3) = 15.d0
@@ -109,7 +109,7 @@ subroutine GeneralDerivativeDriver(option)
 !      xx(1) = 1.d7
 !      xx(2) = 0.997d7
 !      xx(3) = 85.d0
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       xx(1) = 1.d6
       xx(2) = 0.5d0
       xx(3) = 30.d0
@@ -134,12 +134,12 @@ subroutine GeneralDerivativeDriver(option)
 !  scale2 = 100.d0
 !  scale2 = 0.1d0
   select case(istate2)
-    case(LIQUID_STATE)
+    case(GEN_LIQUID_STATE)
       xx2(1) = 1.d6*scale2
       xx2(2) = 1.d-6*scale2
       xx2(3) = 30.d0*scale2
 !      xx2(3) = 100.d0
-    case(GAS_STATE)
+    case(GEN_GAS_STATE)
 !      xx2(1) = 1.d4
 !      xx2(2) = 0.997d4
 !      xx2(3) = 15.d0
@@ -150,7 +150,7 @@ subroutine GeneralDerivativeDriver(option)
 !      xx2(1) = 1.d7
 !      xx2(2) = 0.997d7
 !      xx2(3) = 85.d0
-    case(TWO_PHASE_STATE)
+    case(GEN_TWO_PHASE_STATE)
       xx2(1) = 1.d6*scale2
 !      xx2(1) = 1.d8
       xx2(2) = 0.5d0*scale2
