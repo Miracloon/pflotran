@@ -1131,7 +1131,7 @@ recursive subroutine PMCBaseRestartBinary(this,viewer)
 
   use Logging_module
   use Checkpoint_module, only : CheckPointReadCompatibilityBinary
-  use Petsc_Utility_module, only : PetscTestFile
+  use Petsc_Utility_module, only : PUTestFile
 
   implicit none
 
@@ -1153,8 +1153,8 @@ recursive subroutine PMCBaseRestartBinary(this,viewer)
 
   ! if the top PMC,
   if (this%is_master) then
-    call PetscTestFile(this%option%restart_filename,'r',flag, &
-                       ierr);CHKERRQ(ierr)
+    call PUTestFile(this%option%restart_filename,'r',flag, &
+                    ierr);CHKERRQ(ierr)
     if (.not.flag) then
       this%option%io_buffer = 'Restart file "' // &
         trim(this%option%restart_filename) // '" not found.'
