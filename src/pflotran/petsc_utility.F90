@@ -50,7 +50,7 @@ module Petsc_Utility_module
             PUMSetValuesBlocked, &
             PUMSetValuesBlockedLocal
 
-  public :: PetscTestFile, &
+  public :: PUTestFile, &
             PUCast
 
 contains
@@ -525,7 +525,7 @@ end subroutine PUMSetValuesBlockedLocal
 
 ! ************************************************************************** !
 
-subroutine PetscTestFile(filename,char,flag,ierr)
+subroutine PUTestFile(filename,char,flag,ierr)
 
   implicit none
 
@@ -537,7 +537,7 @@ subroutine PetscTestFile(filename,char,flag,ierr)
   inquire(file=trim(filename), exist=flag)
   ierr = 0
 
-end subroutine PetscTestFile
+end subroutine PUTestFile
 
 ! ************************************************************************** !
 
