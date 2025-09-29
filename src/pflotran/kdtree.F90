@@ -884,6 +884,7 @@ subroutine KdtreeHeapify(a,i_in)
 
   i = i_in
 
+  largest = -999
   do while (largest /= i)
     l = 2 * i
     r = l + 1
