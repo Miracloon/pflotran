@@ -92,6 +92,12 @@ module Grid_module
     PetscInt :: id
   end type face_type
 
+  interface GridGetLocalIDFromCoordinate
+    module procedure GridGetLocalIDFromCoordinate1
+    module procedure GridGetLocalIDFromCoordinate2
+    module procedure GridGetLocalIDFromCoordinate3
+  end interface
+
   public :: GridCreate, &
             GridDestroy, &
             GridComputeInternalConnect, &
@@ -2093,12 +2099,12 @@ end subroutine GridMapCellsInPolVol
 
 ! ************************************************************************** !
 
-subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
+subroutine GridGetLocalIDFromCoordinate1(grid,coordinate,option,local_id)
   !
   ! Returns the local id of the grid cell occupied by a coordinate
   !
   ! Author: Glenn Hammond
-  ! Date: 10/16/15
+  ! Date: 09/30/25
   !
   use Option_module
   use Geometry_module
@@ -2107,6 +2113,52 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
 
   type(grid_type) :: grid
   type(point3d_type) :: coordinate
+  type(option_type) :: option
+  PetscInt :: local_id
+
+  call GridGetLocalIDFromCoordinate(grid,coordinate%x,coordinate%y, &
+                                    coordinate%z,option,local_id)
+
+end subroutine GridGetLocalIDFromCoordinate1
+
+! ************************************************************************** !
+
+subroutine GridGetLocalIDFromCoordinate2(grid,coordinate,option,local_id)
+  !
+  ! Returns the local id of the grid cell occupied by a coordinate
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/30/25
+  !
+  use Option_module
+
+  implicit none
+
+  type(grid_type) :: grid
+  PetscReal :: coordinate(3)
+  type(option_type) :: option
+  PetscInt :: local_id
+
+  call GridGetLocalIDFromCoordinate(grid,coordinate(1),coordinate(2), &
+                                    coordinate(3),option,local_id)
+
+end subroutine GridGetLocalIDFromCoordinate2
+
+! ************************************************************************** !
+
+subroutine GridGetLocalIDFromCoordinate3(grid,x,y,z,option,local_id)
+  !
+  ! Returns the local id of the grid cell occupied by a coordinate
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/16/15
+  !
+  use Option_module
+
+  implicit none
+
+  type(grid_type) :: grid
+  PetscReal :: x, y, z
   type(option_type) :: option
   PetscInt :: local_id, champion
   PetscReal :: champion_distance, min_distance_global
@@ -2118,31 +2170,28 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
   PetscErrorCode :: ierr
 
   local_id = UNINITIALIZED_INTEGER
-  if (coordinate%x >= grid%x_min_global .and. &
-      coordinate%x <= grid%x_max_global .and. &
-      coordinate%y >= grid%y_min_global .and. &
-      coordinate%y <= grid%y_max_global .and. &
-      coordinate%z >= grid%z_min_global .and. &
-      coordinate%z <= grid%z_max_global) then
+  if (x >= grid%x_min_global .and. &
+      x <= grid%x_max_global .and. &
+      y >= grid%y_min_global .and. &
+      y <= grid%y_max_global .and. &
+      z >= grid%z_min_global .and. &
+      z <= grid%z_max_global) then
     ! If a point is on the corner of 4 or 8 patches in AMR, the region
     ! will be assigned to all 4/8 patches...a problem.  To avoid this,
     ! we are going to perturb all point coordinates slightly upwind, as
     ! long as they are not on a global boundary (i.e. boundary condition)
     ! -- shift the coorindate slightly upwind
-    x_shift = coordinate%x - &
-              pert*(grid%x_max_global-grid%x_min_global)
-    y_shift = coordinate%y - &
-              pert*(grid%y_max_global-grid%y_min_global)
-    z_shift = coordinate%z - &
-              pert*(grid%z_max_global-grid%z_min_global)
+    x_shift = x - pert*(grid%x_max_global-grid%x_min_global)
+    y_shift = y - pert*(grid%y_max_global-grid%y_min_global)
+    z_shift = z - pert*(grid%z_max_global-grid%z_min_global)
     ! if the coodinate is shifted out of the global domain or
     ! onto an exterior edge, set it back to the original value
     if (x_shift - grid%x_min_global < tol) &
-      x_shift = coordinate%x
+      x_shift = x
     if (y_shift - grid%y_min_global < tol) &
-      y_shift = coordinate%y
+      y_shift = y
     if (z_shift - grid%z_min_global < tol) &
-      z_shift = coordinate%z
+      z_shift = z
     select case(grid%itype)
       case(STRUCTURED_GRID)
         call StructGridGetIJKFromCoordinate(grid%structured_grid, &
@@ -2154,10 +2203,8 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
         endif
       case(IMPLICIT_UNSTRUCTURED_GRID)
         !geh: must check each cell individually
-        call UGridGetCellFromPoint(coordinate%x, &
-                                   coordinate%y, &
-                                   coordinate%z, &
-                                   grid%unstructured_grid,option,local_id)
+        call UGridGetCellFromPoint(x,y,z,grid%unstructured_grid, &
+                                   option,local_id)
       case(EXPLICIT_UNSTRUCTURED_GRID,ECLIPSE_UNSTRUCTURED_GRID)
         dx = MAX_DOUBLE
         dy = MAX_DOUBLE
@@ -2165,9 +2212,7 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
         champion = UNINITIALIZED_INTEGER
         champion_distance = UNINITIALIZED_DOUBLE
         call UGridExplicitGetClosestCellFromPoint( &
-                                  coordinate%x, &
-                                  coordinate%y, &
-                                  coordinate%z, &
+                                  x,y,z, &
                                   grid%unstructured_grid%explicit_grid,&
                                   grid%nG2L, &
                                   option,champion,champion_distance)
@@ -2175,19 +2220,19 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
                             ONE_INTEGER_MPI,MPI_DOUBLE_PRECISION,MPI_MIN, &
                             option%mycomm,ierr);CHKERRQ(ierr)
         if (champion_distance == min_distance_global) then
-          dx = coordinate%x - &
+          dx = x - &
               grid%unstructured_grid%explicit_grid%cell_centroids(champion)%x
         endif
         call MPI_Allreduce(dx,min_dx,ONE_INTEGER_MPI,MPI_DOUBLE_PRECISION, &
                             MPI_MIN,option%mycomm,ierr);CHKERRQ(ierr)
         if (dx == min_dx) then
-          dy = coordinate%y - &
+          dy = y - &
               grid%unstructured_grid%explicit_grid%cell_centroids(champion)%y
         endif
         call MPI_Allreduce(dy,min_dy,ONE_INTEGER_MPI,MPI_DOUBLE_PRECISION, &
                             MPI_MIN,option%mycomm,ierr);CHKERRQ(ierr)
         if (dy == min_dy) then
-          dz = coordinate%z - &
+          dz = z - &
               grid%unstructured_grid%explicit_grid%cell_centroids(champion)%z
         endif
         call MPI_Allreduce(dz,min_dz,ONE_INTEGER_MPI,MPI_DOUBLE_PRECISION, &
@@ -2206,7 +2251,7 @@ subroutine GridGetLocalIDFromCoordinate(grid,coordinate,option,local_id)
     local_id = UNINITIALIZED_INTEGER
   endif
 
-end subroutine GridGetLocalIDFromCoordinate
+end subroutine GridGetLocalIDFromCoordinate3
 
 ! ************************************************************************** !
 
