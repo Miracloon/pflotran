@@ -17,15 +17,14 @@ module PFLOTRAN_Constants_module
   PetscInt, parameter :: PFLOTRAN_VERSION_PATCH = 0 ! (alpha < -1; beta = -1)
 
 #define VMAJOR 3
-#define VMINOR 23
-#define VSUBMINOR 6
+#define VMINOR 24
+#define VSUBMINOR 0
 #if (PETSC_VERSION_MAJOR < VMAJOR ||                    \
      (PETSC_VERSION_MAJOR == VMAJOR &&                  \
       (PETSC_VERSION_MINOR < VMINOR ||                  \
        (PETSC_VERSION_MINOR == VMINOR &&                \
         (PETSC_VERSION_SUBMINOR < VSUBMINOR)))))
-!#error "Please use PETSc version 3.24.0 or later: 'git checkout v3.21.4' in $PETSC_DIR"
-#error "Please compile with the PETSc main branch: 'git checkout main' in $PETSC_DIR"
+#error "Please use PETSc version 3.24.0 or later: 'git checkout v3.24.0' in $PETSC_DIR"
 #endif
   ! MUST INCREMENT THIS NUMBER EVERYTIME A CHECKPOINT FILE IS
   ! MODIFIED TO PREVENT COMPATIBILITY ISSUES - geh.
