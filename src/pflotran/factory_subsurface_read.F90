@@ -538,26 +538,20 @@ subroutine FactorySubsurfReadWellPM(input,option,pm)
         call InputErrorMsg(input,option,'keyword',error_string)
         call StringToUpper(word)
         select case(trim(word))
-        !-----------------------------
           case('HYDROSTATIC')
             pm => PMWellHydrostaticCreate()
             option%flow%well_coupling = WELL_MODEL_HYDROSTATIC
-        !-----------------------------
           case('WIPP_QI','WIPP_QUASI_IMPLICIT')
             pm => PMWellWIPPQICreate()
             option%flow%well_coupling = WELL_MODEL_WIPP_QI
-        !-----------------------------
           case('CLOSED_LOOP_COAXIAL')
             pm => PMWellCoaxialCreate()
             option%flow%well_coupling = WELL_MODEL_COAXIAL
-        !-----------------------------
           case('CLOSED_LOOP_U_SHAPE')
             pm => PMWellUShapeCreate()
             option%flow%well_coupling = WELL_MODEL_U_SHAPE
-        !-----------------------------
           case default
             call InputKeywordUnrecognized(input,word,error_string,option)
-        !-----------------------------
         end select
         pm%option => option
       case('OPTIONS')

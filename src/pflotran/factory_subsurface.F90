@@ -248,12 +248,7 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
       option%nflowspec = 1
       option%flow%isothermal = PETSC_TRUE
     class is (pm_th_type)
-      option%iflowmode = TH_MODE
-      option%nphase = 1
-      option%nflowdof = 2
-      option%nflowspec = 1
-      option%flow%isothermal = PETSC_FALSE
-      option%flow%store_fluxes = PETSC_TRUE
+      call PMTHSetFlowMode(pm_flow,pm_well,option)
     class is (pm_richards_ts_type)
       option%iflowmode = RICHARDS_TS_MODE
       option%nphase = 1

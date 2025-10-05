@@ -129,6 +129,7 @@ STANDARD_CFG = \
 	surfaceflow/inlinesurface/inlinesurface.cfg \
 	ufd/ufd.cfg \
 	well_model/richards/richards.cfg \
+	well_model/heat_pipe/heat_pipe.cfg \
 	wipp/nuts/nuts.cfg \
 	wipp/transport/batch/wipp_batch.cfg \
 	wipp/transport/wipp_regular.cfg \

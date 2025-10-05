@@ -2468,6 +2468,9 @@ def commandline_options():
                         'option, with the current output becoming the new '
                         'gold standard')
 
+    parser.add_argument('--oversubscribe', nargs="?", default=[],
+                        help='work around for mpi oversubscribe argument')
+
     options = parser.parse_args()
     return options
 

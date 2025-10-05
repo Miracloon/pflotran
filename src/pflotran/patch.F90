@@ -1023,7 +1023,7 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
                 coupler%flow_aux_int_var = 0
 
               case(TH_MODE,TH_TS_MODE)
-                temp_int = 2
+                temp_int = option%nflowdof
                 select case(coupler%flow_condition%pressure%itype)
                   case(HYDROSTATIC_CONDUCTANCE_BC, &
                        DIRICHLET_CONDUCTANCE_BC, &
@@ -4120,7 +4120,7 @@ subroutine PatchUpdateCouplerAuxVarsTH(patch,coupler,option)
         end select
         select case(flow_condition%pressure%itype)
           case(DIRICHLET_CONDUCTANCE_BC)
-            coupler%flow_aux_real_var(TH_CONDUCTANCE_DOF, &
+            coupler%flow_aux_real_var(th_conductance_dof, &
                                       1:num_connections) = &
                                            flow_condition%pressure%aux_real(1)
         end select
@@ -4132,7 +4132,7 @@ subroutine PatchUpdateCouplerAuxVarsTH(patch,coupler,option)
                 flow_condition%pressure%dataset,TH_PRESSURE_DOF,option)
         if (flow_condition%pressure%itype == &
             HET_HYDROSTATIC_CONDUCTANCE_BC) then
-          coupler%flow_aux_real_var(TH_CONDUCTANCE_DOF,1:num_connections) = &
+          coupler%flow_aux_real_var(th_conductance_dof,1:num_connections) = &
             flow_condition%pressure%aux_real(1)
         endif
       case default
@@ -4165,6 +4165,19 @@ subroutine PatchUpdateCouplerAuxVarsTH(patch,coupler,option)
               call DatasetUnknownClass(selector,option, &
                                        'PatchUpdateCouplerAuxVarsTH')
           end select
+          if (Initialized(th_well_dof) .and. &
+              associated(coupler%flow_aux_real_var)) then
+            if (Initialized(th_well_init_well_temperature)) then
+              coupler%flow_aux_real_var(th_well_dof, &
+                                        1:num_connections) = &
+                th_well_init_well_temperature
+            else
+              coupler%flow_aux_real_var(th_well_dof, &
+                                        1:num_connections) = &
+                coupler%flow_aux_real_var(TH_TEMPERATURE_DOF, &
+                                          1:num_connections)
+            endif
+          endif
         case (HET_DIRICHLET_BC)
           call PatchUpdateHetroCouplerAuxVars(patch,coupler, &
                   flow_condition%temperature%dataset, &
@@ -4216,6 +4229,10 @@ subroutine PatchUpdateCouplerAuxVarsTH(patch,coupler,option)
             call DatasetUnknownClass(selector,option, &
                                      'PatchUpdateCouplerAuxVarsTH')
         end select
+        if (Initialized(th_well_dof)) then
+          coupler%flow_aux_real_var(th_well_dof,:) = &
+            coupler%flow_aux_real_var(TH_TEMPERATURE_DOF,:)
+        endif
       case (HET_DIRICHLET_BC)
         call PatchUpdateHetroCouplerAuxVars(patch,coupler, &
                 flow_condition%temperature%dataset, &
@@ -6458,7 +6475,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
          SC_FUGA_COEFF,ICE_DENSITY,LIQUID_HEAD,VAPOR_PRESSURE, &
          SATURATION_PRESSURE,PRECIPITATE_SATURATION,DERIVATIVE, &
          MAXIMUM_PRESSURE,LIQUID_MASS_FRACTION,GAS_MASS_FRACTION,&
-         SOLUTE_CONCENTRATION,TOTAL_LIQUID_HEAD)
+         SOLUTE_CONCENTRATION,TOTAL_LIQUID_HEAD,WELL_TEMPERATURE,WELL_CELLS)
 
       if (associated(patch%aux%TH)) then
         select case(ivar)
@@ -6470,6 +6487,16 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
             do local_id=1,grid%nlmax
               vec_ptr(local_id) = &
                 patch%aux%TH%auxvars(grid%nL2G(local_id))%temp
+            enddo
+          case(WELL_TEMPERATURE)
+            do tempint=1,patch%aux%TH%num_well_aux
+              local_id = patch%aux%TH%auxvars_well(tempint)%local_id
+              vec_ptr(local_id) = patch%aux%TH%auxvars_well(tempint)%temp
+            enddo
+          case(WELL_CELLS)
+            do tempint=1,patch%aux%TH%num_well_aux
+              local_id = patch%aux%TH%auxvars_well(tempint)%local_id
+              vec_ptr(local_id) = 1
             enddo
           case(LIQUID_PRESSURE,MAXIMUM_PRESSURE)
             do local_id=1,grid%nlmax
@@ -8505,12 +8532,22 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
          SECONDARY_TEMPERATURE,LIQUID_DENSITY_MOL,DERIVATIVE, &
          LIQUID_HEAD,VAPOR_PRESSURE,SATURATION_PRESSURE,MAXIMUM_PRESSURE, &
          LIQUID_MASS_FRACTION,GAS_MASS_FRACTION,SOLUTE_CONCENTRATION, &
-         PRECIPITATE_SATURATION,TOTAL_LIQUID_HEAD)
+         PRECIPITATE_SATURATION,TOTAL_LIQUID_HEAD,WELL_TEMPERATURE,WELL_CELLS)
 
       if (associated(patch%aux%TH)) then
         select case(ivar)
           case(TEMPERATURE)
             value = patch%aux%TH%auxvars(ghosted_id)%temp
+          case(WELL_TEMPERATURE)
+            tempint = patch%aux%TH%auxvars(ghosted_id)%iwellaux
+            if (tempint > 0) then
+              value = patch%aux%TH%auxvars_well(tempint)%temp
+            endif
+          case(WELL_CELLS)
+            tempint = patch%aux%TH%auxvars(ghosted_id)%iwellaux
+            if (tempint > 0) then
+              value = 1
+            endif
           case(LIQUID_PRESSURE,MAXIMUM_PRESSURE)
             value = patch%aux%TH%auxvars(ghosted_id)%pres
           case(LIQUID_SATURATION)
@@ -12054,7 +12091,6 @@ subroutine PatchCreateZeroArray(patch,dof_is_active,matrix_zeroing,option)
   type(coupler_type), pointer :: cur_coupler
   type(connection_set_type), pointer :: cur_connection_set
   PetscInt :: flag
-  PetscErrorCode :: ierr
 
   flag = 0
   grid => patch%grid
@@ -12088,7 +12124,7 @@ subroutine PatchCreateZeroArray(patch,dof_is_active,matrix_zeroing,option)
     cur_coupler => cur_coupler%next
   enddo
 
-  call MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows)
+  call MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows,option)
 
   ncount = 0
 
@@ -12135,12 +12171,6 @@ subroutine PatchCreateZeroArray(patch,dof_is_active,matrix_zeroing,option)
    enddo
    cur_coupler => cur_coupler%next
   enddo
-
-  call MPI_Allreduce(n_zero_rows,flag,ONE_INTEGER_MPI,MPIU_INTEGER, &
-                     MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
-  if (flag > 0) then
-    matrix_zeroing%zero_rows_exist = PETSC_TRUE
-  endif
 
   if (ncount /= n_zero_rows) then
     option%io_buffer = 'Error:  Mismatch in non-zero row count! ' // &

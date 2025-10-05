@@ -229,6 +229,7 @@ subroutine FactSubLinkSetupPMCLinkages(simulation,pm_flow,pm_tran, &
   use PM_SCO2_class
   use PM_Hydrate_class
   use PM_Richards_class
+  use PM_TH_class
   use PM_Parameter_class
   use PM_Ponded_Water_class
   use PM_Unit_Test_class
@@ -328,6 +329,8 @@ subroutine FactSubLinkSetupPMCLinkages(simulation,pm_flow,pm_tran, &
           pm_flow%pmwell_ptr => pm_well_list
         class is (pm_richards_type)
           pm_flow%pmwell_ptr => pm_well_list
+        class is (pm_th_type)
+          pm_flow%pm_well => pm_well_list
       end select
     endif
     if (associated(pm_tran)) then
@@ -1072,7 +1075,7 @@ subroutine FactSubLinkAddPMCWell(simulation,pm_well_list,pmc_name,input)
 
     select case(option%iflowmode)
 
-      case (WF_MODE, SCO2_MODE, H_MODE, RICHARDS_MODE)
+      case (WF_MODE, SCO2_MODE, H_MODE, RICHARDS_MODE, TH_MODE)
 
       case default
         option%io_buffer = 'Currently, the WELLBORE_MODEL process model can &
@@ -1088,6 +1091,8 @@ subroutine FactSubLinkAddPMCWell(simulation,pm_well_list,pmc_name,input)
                           &used with NWT mode at the moment.'
       call PrintErrMsg(option)
     endif
+
+    pm_well%realization => realization
 
     pmc_well => PMCThirdPartyCreate()
     call pmc_well%SetName(pmc_name)

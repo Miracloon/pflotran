@@ -1824,9 +1824,9 @@ subroutine FlowConditionRead(condition,input,option)
       endif
       if (associated(enthalpy)) condition%enthalpy => enthalpy
 
-      condition%num_sub_conditions = TWO_INTEGER
+      condition%num_sub_conditions = option%nflowdof
       allocate(condition%sub_condition_ptr(condition%num_sub_conditions))
-      do idof = 1, 2
+      do idof = 1, option%nflowdof
         nullify(condition%sub_condition_ptr(idof)%ptr)
       enddo
 
@@ -1844,7 +1844,7 @@ subroutine FlowConditionRead(condition,input,option)
       if (associated(energy_rate)) &
         condition%sub_condition_ptr(TWO_INTEGER)%ptr => energy_rate
 
-      allocate(condition%itype(TWO_INTEGER))
+      allocate(condition%itype(option%nflowdof))
       condition%itype = 0
       if (associated(pressure)) condition%itype(ONE_INTEGER) = pressure%itype
       if (associated(rate)) condition%itype(ONE_INTEGER) = rate%itype
@@ -1857,6 +1857,14 @@ subroutine FlowConditionRead(condition,input,option)
         condition%itype(TWO_INTEGER) = energy_flux%itype
       if (associated(energy_rate)) &
         condition%itype(TWO_INTEGER) = energy_rate%itype
+      if (option%nflowdof == 3) then
+        condition%sub_condition_ptr(THREE_INTEGER)%ptr => temperature
+        if (temperature%itype == DIRICHLET_BC) then
+          condition%itype(THREE_INTEGER) = temperature%itype
+        else
+          condition%itype(THREE_INTEGER) = NULL_CONDITION
+        endif
+      endif
 
     case(RICHARDS_MODE,RICHARDS_TS_MODE)
       if (.not.associated(pressure) .and. .not.associated(rate) .and. &
