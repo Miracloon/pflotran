@@ -1,0 +1,27 @@
+#Description: test problem for 1D geothermal heat pipe
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE TH
+    /
+    WELL_MODEL well
+      TYPE CLOSED_LOOP_U_SHAPE
+    END
+  /
+END
+
+SUBSURFACE
+
+EXTERNAL_FILE heat_pipe_1d.txt
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+
+  NEWTON_SOLVER
+#    NUMERICAL_JACOBIAN
+  /
+
+END
+
+END_SUBSURFACE

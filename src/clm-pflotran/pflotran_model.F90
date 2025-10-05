@@ -487,7 +487,7 @@ subroutine pflotranModelSetICs(pflotran_model)
       case (RICHARDS_MODE)
         call RichardsUpdateAuxVars(realization,null())
       case (TH_MODE)
-        call THUpdateAuxVars(realization)
+        call THUpdateAuxVars(realization,null())
       case default
         pflotran_model%option%io_buffer='pflotranModelSetICs ' // &
           'not implmented for this mode.'
@@ -2019,7 +2019,7 @@ end subroutine pflotranModelSetICs
         call RichardsUpdateAuxVars(realization,null())
         call pflotranModelGetSaturation(pflotran_model)
       case (TH_MODE)
-        call THUpdateAuxVars(realization)
+        call THUpdateAuxVars(realization,null())
         call pflotranModelGetSaturation(pflotran_model)
         call pflotranModelGetTemperature(pflotran_model)
         call pflotranModelGetEffThermCond(pflotran_model)

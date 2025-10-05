@@ -4,6 +4,7 @@ module PM_Subsurface_Flow_class
   use petscsnes
 
   use PM_Base_class
+  use PM_Well_class
 !geh: using Init_Subsurface_module here fails with gfortran (internal compiler error)
 !  use Init_Subsurface_module
   use Realization_Subsurface_class
@@ -44,7 +45,7 @@ module PM_Subsurface_Flow_class
     PetscReal :: temperature_change_limit
     ! for tracking convergence history to catch and report oscillator behavior
     PetscReal :: norm_history(3,10)
-
+    class(pm_well_type), pointer :: pm_well
   contains
 !geh: commented out subroutines can only be called externally
     procedure, public :: ReadTSBlock => PMSubsurfaceFlowReadTSSelectCase
@@ -111,6 +112,7 @@ subroutine PMSubsurfaceFlowInit(this)
   call PMBaseInit(this)
   nullify(this%realization)
   nullify(this%comm1)
+  nullify(this%pm_well)
   this%store_porosity_for_ts_cut = PETSC_FALSE
   this%store_porosity_for_transport = PETSC_FALSE
   this%check_post_convergence = PETSC_FALSE
@@ -1243,6 +1245,7 @@ subroutine PMSubsurfaceFlowDestroy(this)
   ! destroyed in realization
   nullify(this%realization)
   nullify(this%comm1)
+  nullify(this%pm_well) ! solely nullify
 
 end subroutine PMSubsurfaceFlowDestroy
 

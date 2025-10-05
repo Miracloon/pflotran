@@ -9,6 +9,7 @@ module PM_TH_class
   use Realization_Subsurface_class
   use Communicator_Base_class
   use Option_module
+  use PM_Well_class
 
   use PFLOTRAN_Constants_module
 
@@ -31,6 +32,7 @@ module PM_TH_class
     PetscReal :: residual_scaled_inf_tol(2)
     PetscReal :: abs_update_inf_tol(2)
     PetscReal :: rel_update_inf_tol(2)
+    !TODO(GEH): remove pmwell_ptr from pm and use pm_subsurface%pm_well
   contains
     procedure, public :: Setup => PMTHSetup
     procedure, public :: ReadSimulationOptionsBlock => PMTHReadSimOptionsBlock
@@ -54,8 +56,9 @@ module PM_TH_class
   end type pm_th_type
 
   public :: PMTHCreate, &
-            PMTHDestroy, &
-            PMTHCheckConvergence
+            PMTHSetFlowMode, &
+            PMTHCheckConvergence, &
+            PMTHDestroy
 
 contains
 
@@ -106,6 +109,53 @@ function PMTHCreate()
   PMTHCreate => this
 
 end function PMTHCreate
+
+! ************************************************************************** !
+
+subroutine PMTHSetFlowMode(this,pm_well,option)
+  !
+  ! Reads input file parameters associated with the TH process model
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/29/15
+
+  use Option_module
+  use TH_Aux_module
+
+  implicit none
+
+  class(pm_th_type) :: this
+  class(pm_well_type), pointer :: pm_well
+  type(option_type) :: option
+
+  option%iflowmode = TH_MODE
+  option%nphase = 1
+  option%nflowdof = 2
+  option%nflowspec = 1
+  option%flow%isothermal = PETSC_FALSE
+  option%flow%store_fluxes = PETSC_TRUE
+
+  th_conductance_dof = option%nflowdof + 1
+  if (associated(pm_well)) then
+    if (pm_well%flow_coupling == FULLY_IMPLICIT_WELL) then
+      if (pm_well%well%well_model_type /= WELL_MODEL_U_SHAPE) then
+        option%io_buffer = 'Currently, TH mode can only be &
+                  &used with the CLOSED_LOOP_U_SHAPE well model.'
+        call PrintErrMsg(option)
+      endif
+      option%nflowdof = option%nflowdof + 1
+      option%coupled_well = PETSC_TRUE
+      th_well_dof = option%nflowdof
+      th_well_eq = option%nflowdof
+      th_conductance_dof = th_well_dof + 1
+    else
+      option%io_buffer = 'Currently, only FULLY_IMPLICIT &
+                  &wellbore coupling is implemented for TH Mode.'
+      call PrintErrMsg(option)
+    endif
+  endif
+
+end subroutine PMTHSetFlowMode
 
 ! ************************************************************************** !
 
@@ -183,6 +233,9 @@ subroutine PMTHReadSimOptionsBlock(this,input)
              &or DALL_AMICO.'
             call PrintErrMsg(option)
           end select
+      case('INITIAL_WELL_TEMPERATURE')
+        call InputReadDouble(input,option,th_well_init_well_temperature)
+        call InputErrorMsg(input,option,keyword,error_string)
       case default
         call InputKeywordUnrecognized(input,keyword,error_string,option)
     end select
@@ -335,7 +388,7 @@ subroutine PMTHSetup(this)
          this%realization%patch%aux%Material%material_parameter, &
          this%realization%patch%material_property_array, &
          this%realization%option)
-  call THSetup(this%realization)
+  call THSetup(this%realization,this%pm_well)
   call PMSubsurfaceFlowSetup(this)
 
   ! set up communicator
@@ -348,6 +401,54 @@ subroutine PMTHSetup(this)
   call this%commN%SetDM(this%realization%discretization%dm_nflowdof)
 
 end subroutine PMTHSetup
+
+! ************************************************************************** !
+
+recursive subroutine PMTHInitializeRun(this)
+  !
+  ! Initializes the simulation prior to time stepping
+  !
+  ! Author: Glenn Hammond
+  ! Date: 08/18/25
+
+  implicit none
+
+  class(pm_th_type) :: this
+
+  class(pm_well_type), pointer :: pm_well
+  PetscErrorCode :: ierr
+
+  call PMSubsurfaceFlowInitializeRun(this)
+
+  ! setup coupling in jacobian matrix for the well model
+  if (this%option%coupled_well .and. associated(this%pm_well)) then
+    call MatSetOption(this%solver%M,MAT_NEW_NONZERO_LOCATIONS,PETSC_TRUE, &
+                      ierr);CHKERRQ(ierr)
+    call MatSetOption(this%solver%Mpre,MAT_NEW_NONZERO_LOCATIONS,PETSC_TRUE, &
+                      ierr);CHKERRQ(ierr)
+    pm_well => this%pm_well
+    do
+      if (.not. associated(pm_well)) exit
+      if (any(pm_well%well_grid%h_rank_id == pm_well%option%myrank)) then
+        call PMWellModifyDummyFlowJacobian(pm_well,this%solver%M,ierr)
+        if (this%solver%M /= this%solver%Mpre) then
+          call PMWellModifyDummyFlowJacobian(pm_well,this%solver%Mpre,ierr)
+        endif
+      endif
+      pm_well => pm_well%next_well
+    enddo
+    call MatAssemblyBegin(this%solver%M,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(this%solver%M,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatSetOption(this%solver%M,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
+                      ierr);CHKERRQ(ierr)
+    call MatAssemblyBegin(this%solver%Mpre,MAT_FINAL_ASSEMBLY, &
+                          ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(this%solver%Mpre,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatSetOption(this%solver%Mpre,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
+                      ierr);CHKERRQ(ierr)
+  endif
+
+end subroutine PMTHInitializeRun
 
 ! ************************************************************************** !
 
@@ -370,7 +471,7 @@ subroutine PMTHInitializeTimestep(this)
 
   ! update porosity
 
-  call THInitializeTimestep(this%realization)
+  call THInitializeTimestep(this%realization,this%pm_well)
   call PMSubsurfaceFlowInitializeTimestepB(this)
 
 end subroutine PMTHInitializeTimestep
@@ -508,7 +609,7 @@ subroutine PMTHResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  call THResidual(snes,xx,r,this%realization,ierr)
+  call THResidual(snes,xx,r,this%realization,this%pm_well,ierr)
 
 end subroutine PMTHResidual
 
@@ -532,7 +633,7 @@ subroutine PMTHJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call THJacobian(snes,xx,A,B,this%realization,ierr)
+  call THJacobian(snes,xx,A,B,this%realization,this%pm_well,ierr)
 
 end subroutine PMTHJacobian
 
@@ -990,7 +1091,7 @@ subroutine PMTHTimeCut(this)
   class(pm_th_type) :: this
 
   call PMSubsurfaceFlowTimeCut(this)
-  call THTimeCut(this%realization)
+  call THTimeCut(this%realization,this%pm_well)
 
 end subroutine PMTHTimeCut
 
@@ -1005,6 +1106,7 @@ subroutine PMTHUpdateSolution(this)
   !
 
   use TH_module, only : THUpdateSolution, THMapBCAuxVarsToGlobal
+  use TH_Well_module
 
   implicit none
 
@@ -1013,6 +1115,10 @@ subroutine PMTHUpdateSolution(this)
   call PMSubsurfaceFlowUpdateSolution(this)
   call THUpdateSolution(this%realization)
   call THMapBCAuxVarsToGlobal(this%realization)
+
+  if (associated(this%pm_well)) then
+    call THWellUpdateHeatFlux(this%pm_well)
+  endif
 
 end subroutine PMTHUpdateSolution
 
@@ -1029,7 +1135,7 @@ subroutine PMTHUpdateAuxVars(this)
 
   class(pm_th_type) :: this
 
-  call THUpdateAuxVars(this%realization)
+  call THUpdateAuxVars(this%realization,this%pm_well)
 
 end subroutine PMTHUpdateAuxVars
 

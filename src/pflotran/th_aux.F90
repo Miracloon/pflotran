@@ -14,6 +14,7 @@ module TH_Aux_module
   PetscInt, public :: TH_ts_cut_count
   PetscInt, public :: TH_ts_count
 
+  PetscBool, public :: th_scale_by_volume = PETSC_TRUE
   PetscBool, public :: th_numerical_derivatives = PETSC_FALSE
   PetscReal, public :: th_rel_pert = 1.d-8
   PetscReal, public :: th_pres_min_pert = 1.d-2
@@ -22,9 +23,16 @@ module TH_Aux_module
 
   PetscInt, public :: th_ice_model
 
+  PetscInt, parameter, public :: TH_LIQUID_EQUATION_INDEX = 1
+  PetscInt, parameter, public :: TH_ENERGY_EQUATION_INDEX = 2
+  PetscInt, public :: th_well_eq = UNINITIALIZED_INTEGER
+
   PetscInt, parameter, public :: TH_PRESSURE_DOF = 1
   PetscInt, parameter, public :: TH_TEMPERATURE_DOF = 2
-  PetscInt, parameter, public :: TH_CONDUCTANCE_DOF = 3
+  PetscInt, public :: th_well_dof = UNINITIALIZED_INTEGER
+  PetscInt, public :: th_conductance_dof = UNINITIALIZED_INTEGER
+
+  PetscReal, public :: th_well_init_well_temperature = UNINITIALIZED_DOUBLE
 
   PetscInt, parameter, public :: TH_UPDATE_FOR_FIXED_ACCUM = 0
 
@@ -72,6 +80,9 @@ module TH_Aux_module
     ! for ice
     type(th_ice_type), pointer :: ice
 
+    ! for well model
+    PetscInt :: iwellaux
+
     ! for numerical derivatives
     PetscReal :: pert
     type(th_auxvar_type), pointer :: auxvar_pert(:)
@@ -111,6 +122,23 @@ module TH_Aux_module
     PetscReal :: dpres_fh2o_dT
   end type th_ice_type
 
+  type, public :: th_well_auxvar_type
+    PetscInt :: local_id
+    PetscReal :: temp
+    PetscReal :: u
+    PetscReal :: h
+    PetscReal :: du_dT
+    PetscReal :: dh_dT
+    PetscReal :: volume
+    PetscReal :: surface_area
+    PetscReal :: heat_transfer_coef
+    PetscReal :: well_index
+    PetscReal :: therm_cond_borehole_to_cell
+        ! for numerical derivatives
+    PetscReal :: pert
+    type(th_well_auxvar_type), pointer :: auxvar_pert(:)
+  end type th_well_auxvar_type
+
   type, public :: th_parameter_type
     PetscReal, pointer :: dencpr(:)
     PetscReal, pointer :: ckdry(:) ! Thermal conductivity (dry)
@@ -129,6 +157,9 @@ module TH_Aux_module
     type(th_auxvar_type), pointer :: auxvars_bc(:)
     type(th_auxvar_type), pointer :: auxvars_ss(:)
     type(matrix_zeroing_type), pointer :: matrix_zeroing
+    PetscInt :: num_well_aux, num_well_aux_bc
+    type(th_well_auxvar_type), pointer :: auxvars_well(:)
+    type(th_well_auxvar_type), pointer :: auxvars_well_bc(:)
   end type TH_type
 
   PetscReal, parameter :: epsilon = 1.d-6
@@ -141,6 +172,10 @@ module TH_Aux_module
             THAuxVarCopy, &
             THAuxVarCompute2ndOrderDeriv, &
             THAuxVarPerturb, &
+            THWellAuxVarInit, &
+            THWellAuxVarCompute, &
+            THWellAuxVarPerturb, &
+            THWellAuxVarCopyParamsToPert, &
             THAuxVarDestroy
 
   public :: THAuxVarComputeFreezing
@@ -176,10 +211,16 @@ function THAuxCreate(option)
   aux%num_aux = 0
   aux%num_aux_bc = 0
   aux%num_aux_ss = 0
+  aux%num_aux_bc = 0
+  aux%num_aux_ss = 0
+  aux%num_well_aux = 0
+  aux%num_well_aux_bc = 0
   nullify(aux%auxvars)
   nullify(aux%auxvars_bc)
   nullify(aux%auxvars_ss)
   nullify(aux%matrix_zeroing)
+  nullify(aux%auxvars_well)
+  nullify(aux%auxvars_well_bc)
 
   allocate(aux%th_parameter)
   nullify(aux%th_parameter%dencpr)
@@ -277,6 +318,8 @@ recursive subroutine THAuxVarInit(auxvar,option,allocate_perturbation)
   else
     nullify(auxvar%ice)
   endif
+
+  auxvar%iwellaux = UNINITIALIZED_INTEGER
 
 #if defined(CLM_PFLOTRAN) || defined(CLM_OFFLINE)
   auxvar%bc_alpha      = uninit_value
@@ -1115,8 +1158,8 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
   PetscBool :: update_porosity
 
   PetscInt :: idof
-  PetscReal :: x(2)
-  PetscReal :: x_pert(2)
+  PetscReal :: x(option%nflowdof)
+  PetscReal :: x_pert(option%nflowdof)
   PetscReal :: pert
 
   if (update_porosity) then
@@ -1130,7 +1173,7 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
   do idof = 1, option%nflowdof
     pert = x(idof)*th_rel_pert+th_min_pert(idof)
     th_auxvar%auxvar_pert(idof)%pert = pert
-    x_pert(1:option%nflowdof) = x
+    x_pert = x
     x_pert(idof) = x(idof) + pert
     call THAuxVarComputeNoFreezing(x_pert, &
                                    th_auxvar%auxvar_pert(idof), &
@@ -1141,6 +1184,159 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
   enddo
 
 end subroutine THAuxVarPerturb
+
+! ************************************************************************** !
+
+recursive subroutine THWellAuxVarInit(auxvar,option,allocate_perturbation)
+  !
+  ! Initialize well auxiliary object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/12/25
+  !
+
+  use Option_module
+
+  implicit none
+
+  type(th_well_auxvar_type) :: auxvar
+  type(option_type) :: option
+  PetscBool :: allocate_perturbation
+
+  PetscInt :: i
+
+  auxvar%local_id = 0
+  auxvar%temp = 0.d0
+  auxvar%u = 0.d0
+  auxvar%h = 0.d0
+  auxvar%du_dT = 0.d0
+  auxvar%dh_dT = 0.d0
+  auxvar%volume = 0.d0
+  auxvar%surface_area = 0.d0
+  auxvar%heat_transfer_coef = 0.d0
+  auxvar%well_index = 0.d0
+  auxvar%therm_cond_borehole_to_cell = 0.d0
+
+  auxvar%pert = 0.d0
+  if (allocate_perturbation) then
+    allocate(auxvar%auxvar_pert(option%nflowdof))
+    do i = 1, option%nflowdof
+      call THWellAuxVarInit(auxvar%auxvar_pert(i),option,PETSC_FALSE)
+    enddo
+  else
+    nullify(auxvar%auxvar_pert)
+  endif
+
+end subroutine THWellAuxVarInit
+
+! ************************************************************************** !
+
+recursive subroutine THWellAuxVarCopyParamsToPert(auxvar)
+  !
+  ! Copy static parameters to perturbed well auxvar
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/25/25
+  !
+  implicit none
+
+  type(th_well_auxvar_type) :: auxvar
+
+  PetscInt :: i
+
+  do i = 1, size(auxvar%auxvar_pert)
+    auxvar%auxvar_pert(i)%local_id = auxvar%local_id
+    auxvar%auxvar_pert(i)%volume = auxvar%volume
+    auxvar%auxvar_pert(i)%surface_area = auxvar%surface_area
+    auxvar%auxvar_pert(i)%heat_transfer_coef = auxvar%heat_transfer_coef
+    auxvar%auxvar_pert(i)%well_index = auxvar%well_index
+    auxvar%auxvar_pert(i)%therm_cond_borehole_to_cell = &
+      auxvar%therm_cond_borehole_to_cell
+  enddo
+
+end subroutine THWellAuxVarCopyParamsToPert
+
+! ************************************************************************** !
+
+subroutine THWellAuxVarCompute(liquid_pressure,x,auxvar,natural_id,option)
+  !
+  ! Computes secondary state variables for well auxvar
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/15/25
+  !
+  use Option_module
+  use EOS_Water_module
+
+  implicit none
+
+  PetscReal :: liquid_pressure
+  type(option_type) :: option
+  PetscReal :: x(option%nflowdof)
+  type(th_well_auxvar_type) :: auxvar
+  PetscInt :: natural_id
+
+  PetscReal :: pw, dw_kmol, hw
+  PetscReal :: dw_dT
+  PetscReal :: hw_dp, hw_dT
+  PetscErrorCode :: ierr
+
+  pw = liquid_pressure
+  auxvar%temp = x(th_well_dof)
+
+  dw_kmol = 1.d3 / FMWH2O
+  dw_dT = 0.d0
+  call EOSWaterEnthalpy(auxvar%temp,pw,hw,hw_dp,hw_dT,ierr)
+  auxvar%h = hw
+  auxvar%u = auxvar%h - pw / dw_kmol
+  auxvar%dh_dT = hw_dT
+  auxvar%du_dT = hw_dT + pw/(dw_kmol*dw_kmol)*dw_dT
+
+  ! J/kmol -> whatever units (default of option%scale is 1.e-6)
+  auxvar%h = auxvar%h * option%scale
+  auxvar%u = auxvar%u * option%scale
+  auxvar%dh_dT = auxvar%dh_dT * option%scale
+  auxvar%du_dT = auxvar%du_dT * option%scale
+
+end subroutine THWellAuxVarCompute
+
+! ************************************************************************** !
+
+subroutine THWellAuxVarPerturb(liquid_pressure,auxvar_well, &
+                               natural_id,option)
+  !
+  ! Calculates well auxiliary variables for perturbed TH system
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/15/25
+
+  use Option_module
+
+  implicit none
+
+  PetscReal :: liquid_pressure
+  type(th_well_auxvar_type) :: auxvar_well
+  PetscInt :: natural_id
+  type(option_type) :: option
+
+  PetscInt :: idof
+  PetscReal :: x(option%nflowdof)
+  PetscReal :: x_pert(option%nflowdof)
+  PetscReal :: pert
+
+  x = UNINITIALIZED_DOUBLE
+  x(th_well_dof) = auxvar_well%temp
+  do idof = 1, option%nflowdof
+    pert = x(idof)*th_rel_pert+th_min_pert(idof)
+    auxvar_well%auxvar_pert(idof)%pert = pert
+    x_pert(1:option%nflowdof) = x
+    x_pert(idof) = x(idof) + pert
+    call THWellAuxVarCompute(liquid_pressure,x_pert, &
+                             auxvar_well%auxvar_pert(idof), &
+                             natural_id,option)
+  enddo
+
+end subroutine THWellAuxVarPerturb
 
 ! ************************************************************************** !
 
@@ -1195,7 +1391,28 @@ end subroutine THPrintAuxVars
 
 ! ************************************************************************** !
 
-subroutine THAuxVarDestroy(auxvar)
+recursive subroutine THWellAuxVarStrip(auxvar_well)
+  !
+  ! Deallocates a TH auxiliary object
+  !
+  ! Author: ???
+  ! Date: 02/14/08
+  !
+
+  implicit none
+
+  type(th_well_auxvar_type) :: auxvar_well
+
+  if (associated(auxvar_well%auxvar_pert)) then
+    deallocate(auxvar_well%auxvar_pert)
+    nullify(auxvar_well%auxvar_pert)
+  endif
+
+end subroutine THWellAuxVarStrip
+
+! ************************************************************************** !
+
+recursive subroutine THAuxVarDestroy(auxvar)
   !
   ! Deallocates a TH auxiliary object
   !
@@ -1209,6 +1426,7 @@ subroutine THAuxVarDestroy(auxvar)
 
   if (associated(auxvar%ice)) deallocate(auxvar%ice)
   nullify(auxvar%ice)
+!  call THWellAuxVarDestroy(auxvar%auxvar_well)
 
 end subroutine THAuxVarDestroy
 
@@ -1241,6 +1459,12 @@ subroutine THAuxDestroy(aux)
   do iaux = 1, aux%num_aux_ss
     call THAuxVarDestroy(aux%auxvars_ss(iaux))
   enddo
+  do iaux = 1, aux%num_well_aux
+    call THWellAuxVarStrip(aux%auxvars_well(iaux))
+  enddo
+  do iaux = 1, aux%num_well_aux_bc
+    call THWellAuxVarStrip(aux%auxvars_well_bc(iaux))
+  enddo
 
   if (associated(aux%auxvars)) deallocate(aux%auxvars)
   nullify(aux%auxvars)
@@ -1248,6 +1472,10 @@ subroutine THAuxDestroy(aux)
   nullify(aux%auxvars_bc)
   if (associated(aux%auxvars_ss)) deallocate(aux%auxvars_ss)
   nullify(aux%auxvars_ss)
+  if (associated(aux%auxvars_well)) deallocate(aux%auxvars_well)
+  nullify(aux%auxvars_well)
+  if (associated(aux%auxvars_well_bc)) deallocate(aux%auxvars_well_bc)
+  nullify(aux%auxvars_well_bc)
 
   call MatrixZeroingDestroy(aux%matrix_zeroing)
 

@@ -26,9 +26,7 @@ module PM_TH_TS_class
     procedure, public :: CheckConvergence => PMTHTSCheckConvergence
   end type pm_th_ts_type
 
-  public :: PMTHTSCreate, &
-            PMTHTSUpdateAuxVarsPatch
-
+  public :: PMTHTSCreate
 
 contains
 
@@ -87,23 +85,6 @@ subroutine PMTHTSUpdateAuxVars(this)
   ! Author: Satish Karra
   ! Date: 05/08/19
 
-  implicit none
-
-  class(pm_th_ts_type) :: this
-
-  call PMTHTSUpdateAuxVarsPatch(this%realization)
-
-end subroutine PMTHTSUpdateAuxVars
-
-
-! ************************************************************************** !
-
-subroutine PMTHTSUpdateAuxVarsPatch(realization)
-  !
-  ! Author: Satish Karra
-  ! Date: 05/08/19
-
-
   use Realization_Subsurface_class
   use Field_module
   use Grid_module
@@ -112,7 +93,7 @@ subroutine PMTHTSUpdateAuxVarsPatch(realization)
 
   implicit none
 
-  class(realization_subsurface_type) :: realization
+  class(pm_th_ts_type) :: this
 
   type(option_type), pointer :: option
   type(field_type), pointer :: field
@@ -127,9 +108,9 @@ subroutine PMTHTSUpdateAuxVarsPatch(realization)
   PetscInt :: icc, icct
   PetscErrorCode :: ierr
 
-  option => realization%option
-  field => realization%field
-  patch => realization%patch
+  option => this%realization%option
+  field => this%realization%field
+  patch => this%realization%patch
   grid => patch%grid
   th_auxvars => patch%aux%TH%auxvars
   th_parameter => patch%aux%TH%th_parameter
@@ -137,7 +118,7 @@ subroutine PMTHTSUpdateAuxVarsPatch(realization)
   material_auxvars => patch%aux%Material%auxvars
 
   ! 1. Update auxvars based on new values of pressure, temperature
-  call THUpdateAuxVars(realization)
+  call THUpdateAuxVars(this%realization,this%pm_well)
 
   ! 2. Update auxvars based on new value of dpressure_dtime, mass, and
   !    dmass_dtime
@@ -173,7 +154,7 @@ subroutine PMTHTSUpdateAuxVarsPatch(realization)
                               ierr);CHKERRQ(ierr)
 
 
-end subroutine PMTHTSUpdateAuxVarsPatch
+end subroutine PMTHTSUpdateAuxVars
 
 ! ************************************************************************** !
 
@@ -212,8 +193,7 @@ subroutine PMTHTSIFunction(this,ts,time,U,Udot,F,ierr)
   call DiscretizationGlobalToLocal(discretization,Udot,field%flow_xxdot_loc, &
                                    NFLOWDOF)
 
-  call PMTHTSUpdateAuxVarsPatch(realization)
-
+  call PMTHTSUpdateAuxVars(this)
 
   call THResidualInternalConn(F,realization,ierr)
   call THResidualBoundaryConn(F,realization,ierr)

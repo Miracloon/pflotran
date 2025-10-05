@@ -1,0 +1,141 @@
+#=========================== well model =======================================
+WELLBORE_MODEL well
+
+  WELL
+    SCENARIO 1
+    USE_WELL_INDEX
+    INLET_TEMPERATURE 5.
+    PIPE_DIAMETER 0.1
+    PIPE_WALL_THICKNESS 0. # placeholder
+    PIPE_WALL_THERMAL_CONDUCTIVITY 0. # placeholder
+    PIPE_FLOW_VELOCITY 1.574074d-5 # 1 m/d
+  /
+
+  USE_WELL_COUPLER
+
+END
+
+#=========================== regression =======================================
+REGRESSION
+  CELL_IDS
+    241
+    246
+    250
+    256
+    260
+  /
+END
+
+#===================== Discretization =========================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 20 5 5
+  BOUNDS
+    0.d0 0.d0 0.d0
+    20.d0 5.d0 5.d0
+  /
+END
+
+#========================= fluid properties ===================================
+FLUID_PROPERTY
+  DIFFUSION_COEFFICIENT 1.d-9
+END
+
+#========================= material properties ================================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.01d0
+  TORTUOSITY 1.d0
+  ROCK_DENSITY 2623.
+  SPECIFIC_HEAT 790.
+  THERMAL_CONDUCTIVITY_DRY 3.05
+  THERMAL_CONDUCTIVITY_WET 3.05
+  CHARACTERISTIC_CURVES default
+  PERMEABILITY
+    PERM_ISO 1.d-12
+  /
+END
+
+#========================= saturation functions ===============================
+CHARACTERISTIC_CURVES default
+  DEFAULT
+END
+
+#========================= output options =====================================
+skip
+OUTPUT
+  SNAPSHOT_FILE
+    PERIODIC TIME 1. d
+    FORMAT HDF5
+  /
+END
+noskip
+
+#======================== times ===============================================
+TIME
+  FINAL_TIME 10. d
+  INITIAL_TIMESTEP_SIZE 0.5 d
+  MAXIMUM_TIMESTEP_SIZE 0.5 d
+END
+
+#=========================== regions ==========================================
+REGION all
+  INFINITE
+END
+
+REGION west
+  FACE WEST
+  COORDINATES
+    0.d0 -1.d20 -1.d20
+    0.d0  1.d20  1.d20
+  /
+END
+
+REGION east
+  FACE EAST
+  COORDINATES
+    20.d0 -1.d20 -1.d20
+    20.d0  1.d20  1.d20
+  /
+END
+
+#======================= flow conditions ======================================
+FLOW_CONDITION initial
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+  /
+  LIQUID_PRESSURE 1.d6
+  TEMPERATURE 15.
+END
+
+FLOW_CONDITION inlet
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+  /
+  LIQUID_PRESSURE 1.1d6
+  TEMPERATURE 15.
+END
+
+#========================== initial and boundary conditions ===================
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION all
+END
+
+BOUNDARY_CONDITION inlet
+  FLOW_CONDITION inlet
+  REGION west
+END
+
+BOUNDARY_CONDITION outlet
+  FLOW_CONDITION initial
+  REGION east
+END
+
+#===================== stratigraphy couplers ==================================
+STRATA
+  REGION all
+  MATERIAL soil1
+END

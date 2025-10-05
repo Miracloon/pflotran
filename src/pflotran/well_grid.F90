@@ -75,6 +75,7 @@ type, public :: well_grid_type
     ! list of segment length values [m]
     PetscReal, pointer :: l_list(:)
     PetscBool :: save_well_segment_list
+    PetscBool :: sort
     type(deviated_well_type), pointer :: deviated_well_segment_list
 end type well_grid_type
 
@@ -115,10 +116,13 @@ function WellGridCreate()
 
     ! create the well grid object:
     allocate(well_grid)
+    well_grid%connections_region_name = ''
     nullify(well_grid%connections_region)
     well_grid%connect_via_region = PETSC_FALSE
-    well_grid%nsegments = UNINITIALIZED_INTEGER
+    nullify(well_grid%segment_connected)
+    nullify(well_grid%connection_length)
     well_grid%bottom_seg_index = 1
+    well_grid%nsegments = UNINITIALIZED_INTEGER
     well_grid%nconnections = UNINITIALIZED_INTEGER
     nullify(well_grid%casing)
     nullify(well_grid%dh)
@@ -140,9 +144,10 @@ function WellGridCreate()
     well_grid%dz_peck = 1.0d-2
     well_grid%min_dz = UNINITIALIZED_DOUBLE
     well_grid%well_res_ratio = 1
-    well_grid%save_well_segment_list = PETSC_TRUE
     nullify(well_grid%z_list)
     nullify(well_grid%l_list)
+    well_grid%save_well_segment_list = PETSC_TRUE
+    well_grid%sort = PETSC_TRUE
     nullify(well_grid%deviated_well_segment_list)
 
     WellGridCreate => well_grid
@@ -189,8 +194,11 @@ subroutine WellGridDestroy(well_grid)
     implicit none
 
     type(well_grid_type), pointer :: well_grid
+
     type(deviated_well_type), pointer :: cur_deviated_well
     type(deviated_well_type), pointer :: prev_deviated_well
+
+    if (.not.associated(well_grid)) return
 
     call DeallocateArray(well_grid%segment_connected)
     call DeallocateArray(well_grid%connection_length)
@@ -205,10 +213,13 @@ subroutine WellGridDestroy(well_grid)
     call DeallocateArray(well_grid%dz)
     call DeallocateArray(well_grid%res_dz)
     call DeallocateArray(well_grid%res_z)
+    if (associated(well_grid%h)) then
+      deallocate(well_grid%h)
+      nullify(well_grid%h)
+    endif
     call DeallocateArray(well_grid%z_list)
     call DeallocateArray(well_grid%l_list)
     call DeallocateArray(well_grid%casing)
-    deallocate(well_grid%h)
 
     if (associated(well_grid%deviated_well_segment_list)) then
       cur_deviated_well => well_grid%deviated_well_segment_list

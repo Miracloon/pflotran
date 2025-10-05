@@ -52,7 +52,7 @@ end function MatrixZeroingCreate
 
 ! ************************************************************************** !
 
-subroutine MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows)
+subroutine MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows,option)
   !
   ! Initialize zero arrays in matrix zeroing object
   !
@@ -60,11 +60,16 @@ subroutine MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows)
   ! Date: 12/04/19
 
   use Utility_module, only : DeallocateArray
+  use Option_module, only : option_type
 
   implicit none
 
   type(matrix_zeroing_type), pointer :: matrix_zeroing
   PetscInt :: n_zero_rows
+  type(option_type) :: option
+
+  PetscInt :: iflag
+  PetscErrorCode :: ierr
 
   if (.not.associated(matrix_zeroing)) matrix_zeroing => MatrixZeroingCreate()
   call DeallocateArray(matrix_zeroing%zero_rows_local)
@@ -72,9 +77,16 @@ subroutine MatrixZeroingAllocateArray(matrix_zeroing,n_zero_rows)
 
   matrix_zeroing%n_zero_rows = n_zero_rows
   allocate(matrix_zeroing%zero_rows_local(n_zero_rows))
-  matrix_zeroing%zero_rows_local = 0
   allocate(matrix_zeroing%zero_rows_local_ghosted(n_zero_rows))
-  matrix_zeroing%zero_rows_local_ghosted = 0
+  if (n_zero_rows > 0) then
+    matrix_zeroing%zero_rows_local = 0
+    matrix_zeroing%zero_rows_local_ghosted = 0
+  endif
+
+  iflag = n_zero_rows
+  call MPI_Allreduce(MPI_IN_PLACE,iflag,ONE_INTEGER_MPI,MPIU_INTEGER, &
+                     MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
+  matrix_zeroing%zero_rows_exist = (iflag > 0)
 
 end subroutine MatrixZeroingAllocateArray
 

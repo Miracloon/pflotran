@@ -658,7 +658,7 @@ subroutine HydrostaticUpdateCoupler(coupler,option,grid)
               coupler%flow_aux_real_var(RICHARDS_CONDUCTANCE_DOF,iconn) = &
                 condition%pressure%aux_real(1)
             case(TH_MODE,TH_TS_MODE)
-              coupler%flow_aux_real_var(TH_CONDUCTANCE_DOF,iconn) = &
+              coupler%flow_aux_real_var(th_conductance_dof,iconn) = &
                 condition%pressure%aux_real(1)
           end select
         else
