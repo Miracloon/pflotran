@@ -187,10 +187,12 @@ subroutine GeomechanicsSimulationExecuteRun(this)
       call PrintErrMsg(this%option)
     else
       do
-        time = time + dt
-        if (time + dt*tolerance >= final_time) then
+        dt = this%geomech%realization%dt_coupling
+        if (time + dt*(1.d0+tolerance) >= final_time) then
           dt = final_time-time
           time = final_time
+        else
+          time = time + dt
         endif
         this%geomech%process_model_coupler%timestepper%dt = dt
         call this%RunToTime(time)
