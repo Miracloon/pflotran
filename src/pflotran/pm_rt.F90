@@ -139,6 +139,8 @@ subroutine PMRTInit(pm_rt)
   ! Author: Glenn Hammond
   ! Date: 12/09/19
   !
+  use Reactive_Transport_Aux_module, only : rt_debug_cell_id
+
   implicit none
 
   class(pm_rt_type) :: pm_rt
@@ -179,6 +181,8 @@ subroutine PMRTInit(pm_rt)
   pm_rt%dampen_update = PETSC_FALSE
   pm_rt%dampen_count = 0
   pm_rt%dampening_factor = 1.d0
+
+  rt_debug_cell_id = UNINITIALIZED_INTEGER
 
 end subroutine PMRTInit
 
@@ -290,6 +294,9 @@ subroutine PMRTReadSimOptionsBlock(this,input)
         end select
       case('REFERENCE_TEMPERATURE')
         call InputReadDouble(input,option,this%reference_temperature)
+        call InputErrorMsg(input,option,keyword,error_string)
+      case('DEBUG_CELL_ID')
+        call InputReadInt(input,option,rt_debug_cell_id)
         call InputErrorMsg(input,option,keyword,error_string)
       case default
         call InputKeywordUnrecognized(input,keyword,error_string,option)

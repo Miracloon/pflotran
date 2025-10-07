@@ -25,6 +25,7 @@ module Reactive_Transport_Aux_module
   PetscInt, public :: rt_ts_count
   PetscInt, public :: rt_ni_count
   PetscInt, public :: rt_ts_cut_count
+  PetscInt, public :: rt_debug_cell_id
 
   type, public :: reactive_transport_auxvar_type
     ! molality

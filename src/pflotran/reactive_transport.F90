@@ -46,6 +46,27 @@ module Reactive_Transport_module
 
 contains
 
+#if defined(DEBUG_RT)
+#define DEBUG_RT_RESIDUAL
+#define DEBUG_RT_JACOBIAN
+#endif
+#if defined(DEBUG_RT_RESIDUAL)
+#define DEBUG_RT_RES_ACCUMULATION
+#define DEBUG_RT_RES_INTERNAL_CONNECTION
+#define DEBUG_RT_RES_BOUNDARY_CONNECTION
+#define DEBUG_RT_RES_SOURCE_SINK
+#define DEBUG_RT_RES_CO2_SOURCE
+#define DEBUG_RT_RES_EQUILIBRATE_CO2
+#endif
+#if defined(DEBUG_RT_JACOBIAN)
+#define DEBUG_RT_JAC_ACCUMULATION
+#define DEBUG_RT_JAC_INTERNAL_CONNECTION
+#define DEBUG_RT_JAC_BOUNDARY_CONNECTION
+#define DEBUG_RT_JAC_SOURCE_SINK
+#define DEBUG_RT_JAC_CO2_SOURCE
+#define DEBUG_RT_JAC_EQUILIBRATE_CO2
+#endif
+
 ! ************************************************************************** !
 
 subroutine RTTimeCut(realization)
@@ -2360,6 +2381,14 @@ subroutine RTResidualFlux(snes,xx,r,realization,ierr)
                   global_auxvars(ghosted_id_dn), &
                   coef_up,coef_dn,option,Flux,Res)
 
+#if defined(DEBUG_RT_RES_INTERNAL_CONNECTION)
+      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or.
+          grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
+        print *, 'ric: ', grid%nG2A(ghosted_id_up), ' -> ', &
+          grid%nG2A(ghosted_id_dn), coef_up, coef_dn, Flux, Res
+      endif
+#endif
+
       if (option%transport%use_np) then
         call TNPFlux(reaction, &
               rt_parameter, &
@@ -2430,6 +2459,12 @@ subroutine RTResidualFlux(snes,xx,r,realization,ierr)
                   rt_auxvars(ghosted_id), &
                   global_auxvars(ghosted_id), &
                   coef_up,coef_dn,option,Flux,Res)
+
+#if defined(DEBUG_RT_RES_BOUNDARY_CONNECTION)
+      if (grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
+        print *, 'rbc: ', rt_debug_cell_id, coef_up, coef_dn, Flux, Res
+      endif
+#endif
 
       if (option%transport%use_np) then
         call TNPFluxBC(boundary_condition%tran_condition%itype, &
@@ -2588,6 +2623,12 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
                           reaction,option,Res)
       Res = Res / option%tran_dt
 
+#if defined(DEBUG_RT_RES_ACCUMULATION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'rac: ', grid%nG2A(ghosted_id), Res
+      endif
+#endif
+
       if (option%use_sc) then
         Res = Res*rt_sec_transport_vars(ghosted_id)%epsilon
       endif
@@ -2696,6 +2737,13 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
                                                    cur_constraint_coupler)
       call RTSourceSink(rt_parameter,rt_auxvars(ghosted_id),rt_auxvar_out, &
                         coef_in,coef_out,Res,Qsrc)
+
+#if defined(DEBUG_RT_RES_SOURCE_SINK)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'rss: ', grid%nG2A(ghosted_id), coef_in, coef_out, Res
+      endif
+#endif
+
       istartall = offset + 1
       iendall = offset + reaction%ncomp
       r_p(istartall:iendall) = r_p(istartall:iendall) + Res(1:reaction%ncomp)
@@ -2796,6 +2844,11 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
                 enddo
             end select
           endif
+#if defined(DEBUG_RT_RES_CO2_SOURCE)
+          if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+            print *, 'rcs: ', grid%nG2A(ghosted_id), Res
+          endif
+#endif
         enddo
         source_sink => source_sink%next
       enddo
@@ -2914,7 +2967,12 @@ subroutine RTResidualEquilibrateCO2(r,realization)
       call RCO2CalculateSCO2Solubility(rt_auxvars(ghosted_id), &
                                        global_auxvars(ghosted_id), &
                                        reaction,mco2eq,option)
-
+#if defined(DEBUG_RT_RES_EQUILIBRATE_CO2)
+          if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+            print *, 'rec: ', grid%nG2A(ghosted_id), &
+              rt_auxvars(ghosted_id)%pri_molal(jco2), mco2eq
+          endif
+#endif
       r_p(jco2+(local_id-1)*reaction%ncomp) = &
         rt_auxvars(ghosted_id)%pri_molal(jco2) - mco2eq
     endif
@@ -3143,8 +3201,14 @@ subroutine RTJacobianFlux(snes,xx,A,B,realization,ierr)
               cur_connection_set%area(iconn), &
               option, Jup, Jdn)
       end if
-
-      if (local_id_up>0) then
+#if defined(DEBUG_RT_JAC_INTERNAL_CONNECTION)
+      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or.
+          grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
+        print *, 'jic: ', grid%nG2A(ghosted_id_up), ' -> ', &
+          grid%nG2A(ghosted_id_dn), Jup, Jdn
+      endif
+#endif
+if (local_id_up>0) then
         call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_up-1, &
                                       Jup,ADD_VALUES,ierr);CHKERRQ(ierr)
         call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_dn-1, &
@@ -3202,6 +3266,11 @@ subroutine RTJacobianFlux(snes,xx,A,B,realization,ierr)
                             global_auxvars(ghosted_id), &
                             coef_up,coef_dn,option,Jup,Jdn)
 
+#if defined(DEBUG_RT_JAC_BOUNDARY_CONNECTION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'jbc: ', grid%nG2A(ghosted_id), Jup, Jdn
+      endif
+#endif
       !Jup not needed
       Jdn = -Jdn
 
@@ -3326,7 +3395,11 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
         Jup = Jup - jac_transport
 
       endif
-
+#if defined(DEBUG_RT_JAC_ACCUMULATION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'jac: ', grid%nG2A(ghosted_id), Jup
+      endif
+#endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
     enddo
@@ -3366,6 +3439,11 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
                         coef_in,coef_out)
       call RTSourceSinkDerivative(rt_parameter,rt_auxvars(ghosted_id), &
                                   rt_auxvar_out,coef_in,coef_out,option,Jup)
+#if defined(DEBUG_RT_JAC_SOURCE_SINK)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'jss: ', grid%nG2A(ghosted_id), Jup
+      endif
+#endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
     enddo
@@ -3400,6 +3478,11 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
       if (option%use_sc) then
         Jup = Jup*rt_sec_transport_vars(ghosted_id)%epsilon
       endif
+#if defined(DEBUG_RT_JAC_REACTION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'jrx: ', grid%nG2A(ghosted_id), Jup
+      endif
+#endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
     enddo
