@@ -46,10 +46,13 @@ module Reactive_Transport_module
 
 contains
 
+!#define DEBUG_RT_LITE
 !#define DEBUG_RT
 !#define DEBUG_RT_VERBOSE
-#if defined(DEBUG_RT)
+#if defined(DEBUG_RT_LITE) || defined(DEBUG_RT)
 #define DEBUG_RT_AUXVAR
+#endif
+#if defined(DEBUG_RT)
 #define DEBUG_RT_RESIDUAL
 #define DEBUG_RT_JACOBIAN
 #endif
