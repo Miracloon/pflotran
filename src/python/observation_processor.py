@@ -5,7 +5,11 @@ paths = []
 paths.append('.')
 
 names = []
-names.append('XXX-obs-0.tec')
+if len(sys.argv) > 1:
+  for arg in sys.argv[1:]:
+    names.append(arg)
+else:
+  names.append('XXX-obs-0.tec')
 
 filenames = []
 for ipath in range(len(paths)):
@@ -19,7 +23,11 @@ for ipath in range(len(paths)):
 files = []
 # open files and determine column ids
 for ifilename in range(len(filenames)):
-  files.append(open(filenames[ifilename],'r'))
+  try:
+    file_handle = open(filenames[ifilename],'r')
+  except:
+    sys.exit('Error opening file "{}".'.format(filenames[ifilename]))
+  files.append(file_handle)
   header = files[ifilename].readline()
   if ifilename == 0: # only read header from first file
     while(1):
