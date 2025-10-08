@@ -46,7 +46,10 @@ module Reactive_Transport_module
 
 contains
 
+!#define DEBUG_RT
+!#define DEBUG_RT_VERBOSE
 #if defined(DEBUG_RT)
+#define DEBUG_RT_AUXVAR
 #define DEBUG_RT_RESIDUAL
 #define DEBUG_RT_JACOBIAN
 #endif
@@ -2382,10 +2385,15 @@ subroutine RTResidualFlux(snes,xx,r,realization,ierr)
                   coef_up,coef_dn,option,Flux,Res)
 
 #if defined(DEBUG_RT_RES_INTERNAL_CONNECTION)
-      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or.
+      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or. &
           grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
         print *, 'ric: ', grid%nG2A(ghosted_id_up), ' -> ', &
-          grid%nG2A(ghosted_id_dn), coef_up, coef_dn, Flux, Res
+          grid%nG2A(ghosted_id_dn)
+        print *, ' Res: ', Res
+#if defined(DEBUG_RT_VERBOSE)
+        print *, ' coef_up: ', coef_up
+        print *, ' coef_dn: ', coef_dn
+#endif
       endif
 #endif
 
@@ -2462,7 +2470,12 @@ subroutine RTResidualFlux(snes,xx,r,realization,ierr)
 
 #if defined(DEBUG_RT_RES_BOUNDARY_CONNECTION)
       if (grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
-        print *, 'rbc: ', rt_debug_cell_id, coef_up, coef_dn, Flux, Res
+        print *, 'rbc: ', rt_debug_cell_id
+        print *, ' Res: ', Res
+#if defined(DEBUG_RT_VERBOSE)
+        print *, ' coef_up: ', coef_up
+        print *, ' coef_dn: ', coef_dn
+#endif
       endif
 #endif
 
@@ -2625,7 +2638,8 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
 #if defined(DEBUG_RT_RES_ACCUMULATION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'rac: ', grid%nG2A(ghosted_id), Res
+        print *, 'rac: ', grid%nG2A(ghosted_id)
+        print *, ' Res: ', Res
       endif
 #endif
 
@@ -2740,7 +2754,12 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
 #if defined(DEBUG_RT_RES_SOURCE_SINK)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'rss: ', grid%nG2A(ghosted_id), coef_in, coef_out, Res
+        print *, 'rss: ', grid%nG2A(ghosted_id)
+        print *, ' Res: ', Res
+#if defined(DEBUG_RT_VERBOSE)
+        print *, ' coef_in: ', coef_in
+        print *, ' coef_out: ', coef_out
+#endif
       endif
 #endif
 
@@ -2846,7 +2865,8 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
           endif
 #if defined(DEBUG_RT_RES_CO2_SOURCE)
           if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-            print *, 'rcs: ', grid%nG2A(ghosted_id), Res
+            print *, 'rcs: ', grid%nG2A(ghosted_id)
+            print *, ' Res: ', Res
           endif
 #endif
         enddo
@@ -2881,6 +2901,12 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
       if (option%use_sc) then
         Res = Res*rt_sec_transport_vars(ghosted_id)%epsilon
       endif
+#if defined(DEBUG_RT_RES_ACCUMULATION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'rax: ', grid%nG2A(ghosted_id)
+        print *, ' Res: ', Res
+      endif
+#endif
       r_p(istartall:iendall) = r_p(istartall:iendall) + Res(1:reaction%ncomp)
 
     enddo
@@ -2969,8 +2995,13 @@ subroutine RTResidualEquilibrateCO2(r,realization)
                                        reaction,mco2eq,option)
 #if defined(DEBUG_RT_RES_EQUILIBRATE_CO2)
           if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-            print *, 'rec: ', grid%nG2A(ghosted_id), &
-              rt_auxvars(ghosted_id)%pri_molal(jco2), mco2eq
+            print *, 'rec: ', grid%nG2A(ghosted_id)
+            print *, ' Res: ', rt_auxvars(ghosted_id)%pri_molal(jco2) - mco2eq
+#if defined(DEBUG_RT_VERBOSE)
+            print *, ' pri_molal: ', &
+              rt_auxvars(ghosted_id)%pri_molal(jco2)
+            print *, ' mco2eq: ', mco2eq
+#endif
           endif
 #endif
       r_p(jco2+(local_id-1)*reaction%ncomp) = &
@@ -3202,10 +3233,12 @@ subroutine RTJacobianFlux(snes,xx,A,B,realization,ierr)
               option, Jup, Jdn)
       end if
 #if defined(DEBUG_RT_JAC_INTERNAL_CONNECTION)
-      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or.
+      if (grid%nG2A(ghosted_id_up) == rt_debug_cell_id .or. &
           grid%nG2A(ghosted_id_dn) == rt_debug_cell_id) then
         print *, 'jic: ', grid%nG2A(ghosted_id_up), ' -> ', &
-          grid%nG2A(ghosted_id_dn), Jup, Jdn
+          grid%nG2A(ghosted_id_dn)
+        print *, ' Jup: ', Jup
+        print *, ' Jdn: ', Jdn
       endif
 #endif
 if (local_id_up>0) then
@@ -3268,7 +3301,9 @@ if (local_id_up>0) then
 
 #if defined(DEBUG_RT_JAC_BOUNDARY_CONNECTION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'jbc: ', grid%nG2A(ghosted_id), Jup, Jdn
+        print *, 'jbc: ', grid%nG2A(ghosted_id)
+        print *, ' Jup: ', Jup
+        print *, ' Jdn: ', Jdn
       endif
 #endif
       !Jup not needed
@@ -3397,7 +3432,8 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
       endif
 #if defined(DEBUG_RT_JAC_ACCUMULATION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'jac: ', grid%nG2A(ghosted_id), Jup
+        print *, 'jac: ', grid%nG2A(ghosted_id)
+        print *, ' J: ', Jup
       endif
 #endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
@@ -3441,7 +3477,8 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
                                   rt_auxvar_out,coef_in,coef_out,option,Jup)
 #if defined(DEBUG_RT_JAC_SOURCE_SINK)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'jss: ', grid%nG2A(ghosted_id), Jup
+        print *, 'jss: ', grid%nG2A(ghosted_id)
+        print *, ' J: ', Jup
       endif
 #endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
@@ -3480,7 +3517,8 @@ subroutine RTJacobianNonFlux(snes,xx,A,B,realization,ierr)
       endif
 #if defined(DEBUG_RT_JAC_REACTION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
-        print *, 'jrx: ', grid%nG2A(ghosted_id), Jup
+        print *, 'jrx: ', grid%nG2A(ghosted_id)
+        print *, ' J: ', Jup
       endif
 #endif
       call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
@@ -3828,6 +3866,13 @@ subroutine RTUpdateAuxVars(realization,update_cells,update_bcs, &
                            global_auxvars(ghosted_id), &
                            patch%aux%Material%auxvars(ghosted_id), &
                            reaction,grid%nG2A(ghosted_id),option)
+#if defined(DEBUG_RT_AUXVAR)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'uav: ', grid%nG2A(ghosted_id)
+        print *, ' pri_molal: ', rt_auxvars(ghosted_id)%pri_molal
+        print *, ' total: ', rt_auxvars(ghosted_id)%total(:,1)
+      endif
+#endif
     enddo
 
     call PetscLogEventEnd(logging%event_rt_auxvars,ierr);CHKERRQ(ierr)
