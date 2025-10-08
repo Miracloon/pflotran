@@ -19,6 +19,11 @@ NUMERICAL_METHODS FLOW
     TS_ACCELERATION 0
   /
 
+  NEWTON_SOLVER
+    DEACTIVATE_LEGACY_SCALING
+    SCALE_LINEAR_SYSTEM
+  /
+
 END
 
 #=========================== regression =======================================

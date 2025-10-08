@@ -404,6 +404,8 @@ subroutine PMRTReadNewtonSelectCase(this,input,keyword,found, &
     case('DAMPENING_FACTOR')
       call InputReadDouble(input,option,this%dampening_factor_from_input)
       call InputErrorMsg(input,option,keyword,error_string)
+    case('SCALE_LINEAR_SYSTEM')
+      this%scale_linear_system = PETSC_TRUE
     case default
       found = PETSC_FALSE
 
@@ -432,7 +434,7 @@ subroutine PMRTSetup(this)
   use Reactive_Transport_module
   use Reactive_Transport_Aux_module, only : reactive_transport_param_type
   use Material_module
-  use Variables_module, only : TORTUOSITY
+  use Variables_module, only : TORTUOSITY, VOLUME
 
   implicit none
 
@@ -440,6 +442,7 @@ subroutine PMRTSetup(this)
 
   type(reactive_transport_param_type), pointer :: rt_parameter
   PetscInt :: i
+  PetscInt :: idof, ndof
   PetscInt :: iphase
   PetscBool :: lflag
   PetscReal :: val
@@ -543,6 +546,23 @@ subroutine PMRTSetup(this)
   this%converged_real = 0.d0
 
   call CondControlAssignRTTranInitCond(this%realization)
+
+  if (this%scale_linear_system) then
+    call VecDuplicate(this%solution_vec,this%linear_system_scaling_vec, &
+                      ierr);CHKERRQ(ierr)
+    call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
+                                 this%realization%field%work_loc, &
+                                 VOLUME,ZERO_INTEGER)
+    call this%comm1%LocalToGlobal(this%realization%field%work_loc, &
+                                  this%realization%field%work)
+    call VecReciprocal(this%realization%field%work,ierr);CHKERRQ(ierr)
+    call VecGetBlockSize(this%linear_system_scaling_vec,ndof,ierr);CHKERRQ(ierr)
+    do idof = 1, ndof
+    call VecStrideScatter(this%realization%field%work,idof-1, &
+                          this%linear_system_scaling_vec,INSERT_VALUES, &
+                          ierr);CHKERRQ(ierr)
+    enddo
+  endif
 
 end subroutine PMRTSetup
 

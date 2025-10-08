@@ -26,6 +26,9 @@ module PM_Base_class
     PetscInt :: logging_verbosity
     ! solver now has to originate in the pm to support pm-dependent defaults
     type(solver_type), pointer :: solver
+    ! for scaling linear system prior to solve
+    PetscBool :: scale_linear_system
+    Vec :: linear_system_scaling_vec
     class(realization_base_type), pointer :: realization_base
     class(pm_base_type), pointer :: next
   contains
@@ -41,6 +44,8 @@ module PM_Base_class
     procedure, public :: FinalizeRun => PMBaseThisOnly
     procedure, public :: Residual => PMBaseResidual
     procedure, public :: Jacobian => PMBaseJacobian
+    procedure, public :: ScaleResidual => PMBaseScaleResidual
+    procedure, public :: ScaleJacobian => PMBaseScaleJacobian
     procedure, public :: SetupLinearSystem => PMBaseSetupLinearSystem
     procedure, public :: UpdateTimestep => PMBaseUpdateTimestep
     procedure, public :: InitializeTimestep => PMBaseThisOnly
@@ -102,9 +107,11 @@ subroutine PMBaseInit(this)
   nullify(this%solver)
   PetscObjectNullify(this%solution_vec)
   PetscObjectNullify(this%residual_vec)
+  PetscObjectNullify(this%linear_system_scaling_vec)
   this%print_ekg = PETSC_FALSE
   this%steady_state = PETSC_FALSE
   this%skip_restart = PETSC_FALSE
+  this%scale_linear_system = PETSC_FALSE
   this%logging_verbosity = 0
   nullify(this%next)
 
@@ -259,6 +266,28 @@ end subroutine PMBaseResidual
 
 ! ************************************************************************** !
 
+subroutine PMBaseScaleResidual(this,r)
+  !
+  ! Scales the residual by a specfied quantity (e.g., cell volume)
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/08/25
+  !
+  implicit none
+  class(pm_base_type) :: this
+  Vec :: r
+
+  PetscErrorCode :: ierr
+
+  if (this%scale_linear_system) then
+    call VecPointwiseMult(r,this%linear_system_scaling_vec,r, &
+                          ierr);CHKERRQ(ierr)
+  endif
+
+end subroutine PMBaseScaleResidual
+
+! ************************************************************************** !
+
 subroutine PMBaseJacobian(this,snes,xx,A,B,ierr)
   implicit none
   class(pm_base_type) :: this
@@ -268,6 +297,32 @@ subroutine PMBaseJacobian(this,snes,xx,A,B,ierr)
   PetscErrorCode :: ierr
   call this%PrintErrMsg('PMBaseJacobian')
 end subroutine PMBaseJacobian
+
+! ************************************************************************** !
+
+subroutine PMBaseScaleJacobian(this,A,B)
+  !
+  ! Scales the Jacobian by a specfied quantity (e.g., cell volume)
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/08/25
+  !
+  implicit none
+  class(pm_base_type) :: this
+  Mat :: A, B
+
+  PetscErrorCode :: ierr
+
+  if (this%scale_linear_system) then
+    call MatDiagonalScale(A,this%linear_system_scaling_vec,PETSC_NULL_VEC, &
+                          ierr);CHKERRQ(ierr)
+    if (A /= B) then
+      call MatDiagonalScale(B,this%linear_system_scaling_vec,PETSC_NULL_VEC, &
+                            ierr);CHKERRQ(ierr)
+    endif
+  endif
+
+end subroutine PMBaseScaleJacobian
 
 ! ************************************************************************** !
 
@@ -512,11 +567,16 @@ subroutine PMBaseDestroy(this)
   implicit none
   class(pm_base_type) :: this
 
+  PetscErrorCode :: ierr
+
   nullify(this%option)
   nullify(this%output_option)
   nullify(this%realization_base)
   nullify(this%next)
   call SolverDestroy(this%solver)
+  if (.not.PetscObjectIsNull(this%linear_system_scaling_vec)) then
+    call VecDestroy(this%linear_system_scaling_vec,ierr);CHKERRQ(ierr)
+  endif
 
 end subroutine PMBaseDestroy
 

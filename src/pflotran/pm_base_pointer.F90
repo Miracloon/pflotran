@@ -54,6 +54,8 @@ subroutine PMResidualPtr(snes,xx,r,this,ierr)
   PetscErrorCode :: ierr
 
   call this%pm%Residual(snes,xx,r,ierr)
+  call this%pm%ScaleResidual(r)
+!  call VecView(r,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRQ(ierr)
 
 end subroutine PMResidualPtr
 
@@ -73,6 +75,8 @@ subroutine PMJacobianPtr(snes,xx,A,B,this,ierr)
   PetscErrorCode :: ierr
 
   call this%pm%Jacobian(snes,xx,A,B,ierr)
+  call this%pm%ScaleJacobian(A,B)
+!  call MatView(A,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRQ(ierr)
 
 end subroutine PMJacobianPtr
 

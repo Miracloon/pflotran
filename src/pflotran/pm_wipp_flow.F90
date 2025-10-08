@@ -70,8 +70,8 @@ module PM_WIPP_Flow_class
     PetscReal :: auto_pressure_Pb_0
     PetscReal :: auto_press_shallow_origin(3)
     PetscReal :: linear_system_scaling_factor
-    PetscBool :: scale_linear_system ! Jacobian and residual is scaled
-                                     ! just before the PETSc solver.
+    PetscBool :: wipp_scale_linear_system ! Jacobian and residual is scaled
+                                          ! just before the PETSc solver.
     PetscInt :: newtontrdc_inner_iter_num ! True: inside inner iteration.
     PetscInt :: newtontrdc_prev_iter_num
 
@@ -206,7 +206,7 @@ subroutine PMWIPPFloInitObject(this)
   this%auto_pressure_Pb_0 = UNINITIALIZED_DOUBLE !make user put this in
   this%auto_press_shallow_origin = UNINITIALIZED_DOUBLE !this will default to dip rotation origin later
   this%linear_system_scaling_factor = 1.d7
-  this%scale_linear_system = PETSC_FALSE
+  this%wipp_scale_linear_system = PETSC_FALSE
   this%newtontrdc_inner_iter_num = 0
   this%newtontrdc_prev_iter_num = 0
   PetscObjectNullify(this%scaling_vec)
@@ -629,14 +629,14 @@ subroutine PMWIPPFloReadNewtonSelectCase(this,input,keyword,found, &
       call InputReadDouble(input,option,this%linear_system_scaling_factor)
       call InputErrorMsg(input,option,keyword,error_string)
     case('SCALE_JACOBIAN')
-      this%scale_linear_system = PETSC_TRUE
+      this%wipp_scale_linear_system = PETSC_TRUE
       if (option%flow%scale_all_pressure) then
         option%io_buffer = 'cannot be used with SCALE_PRESSURE, &
                             &solution is already scaled'
         call PrintErrMsg(option)
       endif
     case('DO_NOT_SCALE_JACOBIAN')
-      this%scale_linear_system = PETSC_FALSE
+      this%wipp_scale_linear_system = PETSC_FALSE
     case('SCALE_PRESSURE') ! This option will scale solution, residual, and Jacobian
       option%flow%scale_all_pressure = PETSC_TRUE
       call InputReadDouble(input,option,option%flow%pressure_scaling_factor)
@@ -738,7 +738,7 @@ recursive subroutine PMWIPPFloInitializeRun(this)
 
   gravity = -1.d0*option%gravity(Z_DIRECTION)
 
-  if (this%scale_linear_system .and. option%flow%scale_all_pressure) then
+  if (this%wipp_scale_linear_system .and. option%flow%scale_all_pressure) then
     option%io_buffer = 'cannot be used with SCALE_JACOBIAN, &
                         &Jacobian is already scaled. Please use &
                         &DO_NOT_SCALE_JACOBIAN in NEWTON_SOLVER'
@@ -1437,7 +1437,7 @@ subroutine PMWIPPFloJacobian(this,snes,xx,A,B,ierr)
                           ierr);CHKERRQ(ierr)
   endif
 
-  if (this%scale_linear_system) then
+  if (this%wipp_scale_linear_system) then
     call VecGetLocalSize(this%scaling_vec,matsize,ierr);CHKERRQ(ierr)
     call VecSet(this%scaling_vec,1.d0,ierr);CHKERRQ(ierr)
     call VecGetArray(this%scaling_vec,vec_p,ierr);CHKERRQ(ierr)
@@ -1518,7 +1518,7 @@ subroutine PMWIPPFloCheckUpdatePre(this,snes,X,dX,changed,ierr)
   this%convergence_reals = 0.d0
   changed = PETSC_FALSE
 
-  if (this%scale_linear_system) then
+  if (this%wipp_scale_linear_system) then
     changed = PETSC_TRUE
     call VecStrideScale(dX,ZERO_INTEGER,this%linear_system_scaling_factor, &
                         ierr);CHKERRQ(ierr)

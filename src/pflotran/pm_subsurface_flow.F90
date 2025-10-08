@@ -317,6 +317,9 @@ subroutine PMSubsurfaceFlowReadNewtonSelectCase(this,input,keyword,found, &
     case('USE_EUCLIDEAN_NORM_CONVERGENCE')
       this%check_post_convergence = PETSC_FALSE
 
+    case('SCALE_LINEAR_SYSTEM')
+      this%scale_linear_system = PETSC_TRUE
+
     case default
       found = PETSC_FALSE
   end select
@@ -341,15 +344,19 @@ subroutine PMSubsurfaceFlowSetup(this)
   use Grid_module
   use Init_Subsurface_Flow_module
   use Option_module
+  use Material_module
   use Matrix_Zeroing_module
   use Patch_module
   use Reaction_Mineral_Aux_module
+  use Variables_module, only : VOLUME
 
   implicit none
 
   class(pm_subsurface_flow_type) :: this
 
   class(characteristic_curves_type), pointer :: cur_cc
+  PetscInt :: idof, ndof
+  PetscErrorCode :: ierr
 
   ! assign initial conditionsRealizAssignFlowInitCond
   call CondControlAssignFlowInitCond(this%realization)
@@ -419,6 +426,23 @@ subroutine PMSubsurfaceFlowSetup(this)
       end select
       endif
       cur_cc => cur_cc%next
+    enddo
+  endif
+
+  if (this%scale_linear_system) then
+    call VecDuplicate(this%solution_vec,this%linear_system_scaling_vec, &
+                      ierr);CHKERRQ(ierr)
+    call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
+                                 this%realization%field%work_loc, &
+                                 VOLUME,ZERO_INTEGER)
+    call this%comm1%LocalToGlobal(this%realization%field%work_loc, &
+                                  this%realization%field%work)
+    call VecReciprocal(this%realization%field%work,ierr);CHKERRQ(ierr)
+    call VecGetBlockSize(this%linear_system_scaling_vec,ndof,ierr);CHKERRQ(ierr)
+    do idof = 1, ndof
+    call VecStrideScatter(this%realization%field%work,idof-1, &
+                          this%linear_system_scaling_vec,INSERT_VALUES, &
+                          ierr);CHKERRQ(ierr)
     enddo
   endif
 
