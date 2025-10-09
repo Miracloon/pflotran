@@ -2254,6 +2254,7 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
   type(surface_complexation_type), pointer :: surface_complexation
   type(mineral_type), pointer :: mineral_reaction
   character(len=MAXSTRINGLENGTH) :: string
+  character(len=MAXWORDLENGTH) :: word
   PetscInt :: i, icomp, irxn, j, jj, ncomp, ncplx, ieqrxn
   PetscInt :: icplx, icplx2
   PetscInt :: imnrl,igas
@@ -2556,7 +2557,8 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
       92 format(/)
       134 format(2x,'complex species           percent   molality')
       135 format(2x,'primary species: ',a24,2x,' total conc: ',1pe12.4)
-      136 format(2x,a24,2x,f6.2,2x,1pe12.4,1p2e12.4)
+      136 format(2x,a24,2x,f6.2,2x,1pe13.4e3)
+      141 format(2x,a24,2x,'< 0.01',2x,1pe13.4e3)
       do icomp = 1, reaction%naqcomp
 
         eqcplxsort = 0
@@ -2614,17 +2616,19 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
         write(option%fid_out,90)
         do i = 1, icount
           j = eqcplxsort(i)
-          if (percent(j) < 0.0001d0) cycle
           icplx = eqcplxid(j)
           if (icplx < 0) then
             icplx = abs(icplx)
-            write(option%fid_out,136) reaction%primary_species_names(icplx), &
-                                      percent(j)*100.d0, &
-                                      rt_auxvar%pri_molal(icplx)
+            word = reaction%primary_species_names(icplx)
+            conc = rt_auxvar%pri_molal(icplx)
           else
-            write(option%fid_out,136) reaction%secondary_species_names(icplx), &
-                                      percent(j)*100.d0, &
-                                      rt_auxvar%sec_molal(icplx)
+            word = reaction%secondary_species_names(icplx)
+            conc = rt_auxvar%sec_molal(icplx)
+          endif
+          if (percent(j) >= 1.d-4) then
+            write(option%fid_out,136) word, percent(j)*100.d0, conc
+          else
+            write(option%fid_out,141) word, conc
           endif
         enddo
       enddo
