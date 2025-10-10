@@ -402,6 +402,7 @@ end subroutine XERMSG
       PetscReal :: DEL1, DEL2, DMAX, DMIN, DRAT1, DRAT2, DSAVE, &
             H1, H2, HSUM, HSUMT3, W1, W2
       PetscReal, parameter :: ZERO = 0d0, THREE = 3d0
+      PetscReal :: tempreal
 !
 !  VALIDITY-CHECK ARGUMENTS.
 !
@@ -463,7 +464,15 @@ end subroutine XERMSG
 !        SET D(I)=0 UNLESS DATA ARE STRICTLY MONOTONIC.
 !
          D(1,I) = ZERO
-         IF ( PCHST(DEL1,DEL2) )  42, 41, 45
+!         IF ( PCHST(DEL1,DEL2) )  42, 41, 45
+         tempreal = PCHST(DEL1,DEL2)
+         if (tempreal < 0.d0) then
+           GO TO 42
+         elseif (tempreal > 0.d0) then
+           GO TO 45
+         else
+           GO TO 41
+         endif
 !
 !        COUNT NUMBER OF CHANGES IN DIRECTION OF MONOTONICITY.
 !
