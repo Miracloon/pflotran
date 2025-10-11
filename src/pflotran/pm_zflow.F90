@@ -599,31 +599,24 @@ subroutine PMZFlowResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  PetscViewer :: viewer
   Mat :: M
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PMSubsurfaceFlowUpdatePropertiesNI(this)
   ! calculate residual
   if (zflow_simult_function_evals) then
     call SNESGetJacobian(snes,M,PETSC_NULL_MAT,PETSC_NULL_FUNCTION, &
                          PETSC_NULL_INTEGER,ierr);CHKERRQ(ierr)
-    call ZFlowResidual(snes,xx,r,M,this%realization,ierr)
+    call ZFlowResidual(snes,xx,r,M,this%realization,this%debug,ierr)
   else
-    call ZFlowResidual(snes,xx,r,PETSC_NULL_MAT,this%realization,ierr)
+    call ZFlowResidual(snes,xx,r,PETSC_NULL_MAT,this%realization, &
+                       this%debug,ierr)
   endif
 
-  if (this%realization%debug%vecview_residual) then
-    string = 'ZFresidual'
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_residual) then
+    call DebugVecView(this%debug,r,'ZFresidual.out',this%option)
   endif
-  if (this%realization%debug%vecview_solution) then
-    string = 'ZFxx'
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_solution) then
+    call DebugVecView(this%debug,xx,'ZFxx.out',this%option)
   endif
 
 end subroutine PMZFlowResidual
@@ -646,22 +639,17 @@ subroutine PMZFlowJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  PetscViewer :: viewer
-  character(len=MAXSTRINGLENGTH) :: string
   PetscReal :: norm
 
   ! the Jacobian was already calculated in PMZFlowResidual
 
-  if (this%realization%debug%matview_Matrix) then
-    call DebugWriteFilename(this%realization%debug,string,'ZFjacobian','', &
-                            zflow_ts_count,zflow_ts_cut_count, &
-                            zflow_ni_count)
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%matview_Matrix) then
+    call DebugMatView(this%debug,A,'ZFjacobian','', &
+                      zflow_ts_count,zflow_ts_cut_count, &
+                      zflow_ni_count,this%option)
   endif
 
-  if (this%realization%debug%norm_Matrix) then
+  if (this%debug%norm_Matrix) then
     call MatNorm(A,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(this%option%io_buffer,'("1 norm: ",es11.4)') norm
     call PrintMsg(this%option)

@@ -678,7 +678,8 @@ end subroutine WIPPFloUpdateFixedAccum
 
 ! ************************************************************************** !
 
-subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr,pmwell_ptr)
+subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr, &
+                                        pmwell_ptr,debug)
   !
   ! Computes the a test numerical jacobian
   !
@@ -694,6 +695,7 @@ subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr,pmwell_ptr)
   use PM_WIPP_SrcSink_class
   use PM_Well_class
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
@@ -702,6 +704,7 @@ subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr,pmwell_ptr)
   Mat :: B
   class(pm_wipp_srcsink_type), pointer :: pmwss_ptr
   class(pm_well_type), pointer :: pmwell_ptr
+  type(debug_type) :: debug
 
   Vec :: xx_pert
   Vec :: res
@@ -745,7 +748,7 @@ subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr,pmwell_ptr)
   call VecZeroEntries(res,ierr);CHKERRQ(ierr)
   print *, 'Unperturbed Residual'
   call WIPPFloResidual(PETSC_NULL_SNES,xx,res,realization,pmwss_ptr, &
-                       pmwell_ptr,ierr)
+                       pmwell_ptr,debug,ierr)
 #if 0
   word  = 'num_0.dat'
   call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
@@ -788,7 +791,7 @@ subroutine WIPPFloNumericalJacobianTest(xx,B,realization,pmwss_ptr,pmwell_ptr)
                 &" pert: ",1pe12.5)') &
         icell,2-mod(idof,option%nflowdof),idof,perturbation
       call WIPPFloResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization, &
-                           pmwss_ptr,pmwell_ptr,ierr)
+                           pmwss_ptr,pmwell_ptr,debug,ierr)
 #if 0
       write(word,*) idof
       word  = 'num_' // trim(adjustl(word)) // '.dat'
@@ -836,7 +839,8 @@ end subroutine WIPPFloNumericalJacobianTest
 
 ! ************************************************************************** !
 
-subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr,ierr)
+subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
+                           debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -868,8 +872,8 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr,ierr)
   class(realization_subsurface_type) :: realization
   class(pm_wipp_srcsink_type), pointer :: pmwss_ptr
   class(pm_well_type), pointer :: pmwell_ptr
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
-  PetscViewer :: viewer
 
   Mat, parameter :: null_mat = tMat(0)
   type(discretization_type), pointer :: discretization
@@ -907,7 +911,6 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr,ierr)
   PetscReal, pointer :: vec_p(:)
   PetscBool :: debug_connection
 
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: irow
 
   PetscInt :: icc_up, icc_dn
@@ -1344,28 +1347,23 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr,ierr)
 
   update_upwind_direction = PETSC_FALSE
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'WFresidual','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'WFresidual','', &
+                       wippflo_ts_count,wippflo_ts_cut_count, &
+                       wippflo_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'WFxx','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'WFxx','', &
+                       wippflo_ts_count,wippflo_ts_cut_count, &
+                       wippflo_ni_count,option)
   endif
 
 end subroutine WIPPFloResidual
 
 ! ************************************************************************** !
 
-subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
+subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr, &
+                           debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -1396,8 +1394,8 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
   class(realization_subsurface_type) :: realization
   class(pm_wipp_srcsink_type), pointer :: pmwss_ptr
   class(pm_well_type), pointer :: pmwell_ptr
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
-  PetscViewer :: viewer
 
   Mat :: J
   MatType :: mat_type
@@ -1432,8 +1430,6 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   PetscInt, pointer :: upwind_direction(:,:)
   PetscInt, pointer :: upwind_direction_bc(:,:)
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   patch => realization%patch
   grid => patch%grid
@@ -1486,21 +1482,17 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
                               Jup)
     call WIPPFloConvertUnitsToBRAGFlo(Jup,material_auxvars(ghosted_id), &
                                       option)
-    call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
+    call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                   ADD_VALUES,ierr);CHKERRQ(ierr)
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'WFjacobian_accum','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'WFjacobian_accum','', &
+                      wippflo_ts_count,wippflo_ts_cut_count, &
+                      wippflo_ni_count,option)
   endif
-
   endif
 
   if (wippflo_calc_flux) then
@@ -1557,7 +1549,7 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
         if (wippflo_jacobian_test .and. wippflo_jacobian_test_rdof > 0) then
           print *, 'up-up: ',Jtmp, local_id_up
         endif
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_up-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_up-1,1,ghosted_id_up-1, &
                                       Jtmp,ADD_VALUES,ierr);CHKERRQ(ierr)
         Jtmp = Jdn
         call WIPPFloConvertUnitsToBRAGFlo(Jtmp, &
@@ -1566,7 +1558,7 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
         if (wippflo_jacobian_test .and. wippflo_jacobian_test_rdof > 0) then
           print *, 'up-dn: ',Jtmp, local_id_up
         endif
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_dn-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_up-1,1,ghosted_id_dn-1, &
                                       Jtmp,ADD_VALUES,ierr);CHKERRQ(ierr)
       endif
       if (local_id_dn > 0) then
@@ -1579,7 +1571,7 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
         if (wippflo_jacobian_test) then
           print *, 'dn-dn: ',Jtmp, local_id_dn
         endif
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_dn-1,1,ghosted_id_dn-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_dn-1,1,ghosted_id_dn-1, &
                                       Jtmp,ADD_VALUES,ierr);CHKERRQ(ierr)
         Jtmp = Jup
         call WIPPFloConvertUnitsToBRAGFlo(Jtmp, &
@@ -1588,24 +1580,20 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
         if (wippflo_jacobian_test) then
           print *, 'dn-up: ',Jtmp, local_id_dn
         endif
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_dn-1,1,ghosted_id_up-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_dn-1,1,ghosted_id_up-1, &
                                       Jtmp,ADD_VALUES,ierr);CHKERRQ(ierr)
       endif
     enddo
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'WFjacobian_flux','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'WFjacobian_flux','', &
+                      wippflo_ts_count,wippflo_ts_cut_count, &
+                      wippflo_ni_count,option)
   endif
-
   endif
 
   if (wippflo_calc_bcflux) then
@@ -1645,23 +1633,19 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
       Jdn = -Jdn
       call WIPPFloConvertUnitsToBRAGFlo(Jdn,material_auxvars(ghosted_id), &
                                         option)
-      call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jdn, &
+      call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jdn, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
     enddo
     boundary_condition => boundary_condition%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'WFjacobian_bcflux','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'WFjacobian_bcflux','', &
+                      wippflo_ts_count,wippflo_ts_cut_count, &
+                      wippflo_ni_count,option)
   endif
-
   endif
 
   ! Source/sinks
@@ -1694,25 +1678,20 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
 
       call WIPPFloConvertUnitsToBRAGFlo(Jup,material_auxvars(ghosted_id), &
                                         option)
-      call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
+      call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
 
     enddo
     source_sink => source_sink%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'WFjacobian_srcsink','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'WFjacobian_srcsink','', &
+                      wippflo_ts_count,wippflo_ts_cut_count, &
+                      wippflo_ni_count,option)
   endif
-
-
 
   if (wippflo_calc_chem) then
   ! WIPP gas/brine generation process model source/sinks
@@ -1734,7 +1713,7 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
             if (pm_well%well_force_ts_cut == ZERO_INTEGER) then
               call pm_well%UpdateFlowRates(TWO_INTEGER,TWO_INTEGER,-999,ierr)
               if (pm_well%well_force_ts_cut == ZERO_INTEGER) then
-                call pm_well%ModifyFlowJacobian(A,ierr)
+                call pm_well%ModifyFlowJacobian(J,ierr)
               endif
             endif
           endif
@@ -1744,20 +1723,17 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
   call WIPPFloSSSandbox(null_vec,A,PETSC_TRUE,grid,material_auxvars, &
                         wippflo_auxvars,option)
 
-  call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-  call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+  call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+  call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
 
   call MatrixZeroingZeroMatEntries(patch%aux%WIPPFlo%matrix_zeroing,A)
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'WFjacobian','', &
-                            wippflo_ts_count,wippflo_ts_cut_count, &
-                            wippflo_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'WFjacobian','', &
+                      wippflo_ts_count,wippflo_ts_cut_count, &
+                      wippflo_ni_count,option)
   endif
-  if (realization%debug%norm_Matrix) then
+  if (debug%norm_Matrix) then
     option => realization%option
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
@@ -1773,7 +1749,8 @@ subroutine WIPPFloJacobian(snes,xx,A,B,realization,pmwss_ptr,pmwell_ptr,ierr)
 
   if (wippflo_jacobian_test) then
     wippflo_jacobian_test_active = PETSC_TRUE
-    call WIPPFloNumericalJacobianTest(xx,A,realization,pmwss_ptr,pmwell_ptr)
+    call WIPPFloNumericalJacobianTest(xx,A,realization,pmwss_ptr, &
+                                      pmwell_ptr,debug)
     wippflo_jacobian_test_active = PETSC_FALSE
   endif
 

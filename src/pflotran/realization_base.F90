@@ -30,7 +30,6 @@ module Realization_Base_class
 
     type(option_type), pointer :: option
     type(field_type), pointer :: field
-    type(debug_type), pointer :: debug
     type(output_option_type), pointer :: output_option
     class(data_mediator_base_type), pointer :: flow_data_mediator_list
     class(data_mediator_base_type), pointer :: tran_data_mediator_list
@@ -75,7 +74,6 @@ subroutine RealizationBaseInit(realization_base,option)
   realization_base%discretization => DiscretizationCreate()
   nullify(realization_base%comm1)
   realization_base%field => FieldCreate()
-  realization_base%debug => DebugCreate()
   nullify(realization_base%output_option)
 
   nullify(realization_base%reaction_base)
@@ -284,8 +282,6 @@ subroutine RealizationBaseStrip(this)
     deallocate(this%comm1)
   endif
   nullify(this%comm1)
-
-  call DebugDestroy(this%debug)
 
   call DataMediatorDestroy(this%flow_data_mediator_list)
   call DataMediatorDestroy(this%tran_data_mediator_list)

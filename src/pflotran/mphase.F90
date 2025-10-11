@@ -1902,7 +1902,7 @@ end subroutine MphaseBCFlux
 
 ! ************************************************************************** !
 
-subroutine MphaseResidual(snes,xx,r,realization,ierr)
+subroutine MphaseResidual(snes,xx,r,realization,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -1919,6 +1919,7 @@ subroutine MphaseResidual(snes,xx,r,realization,ierr)
   use Material_module
   use Variables_module, only : PERMEABILITY_X, PERMEABILITY_Y, PERMEABILITY_Z
   use Global_module
+  use Debug_module
 
   implicit none
 
@@ -1926,6 +1927,7 @@ subroutine MphaseResidual(snes,xx,r,realization,ierr)
   Vec :: xx
   Vec :: r
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   type(discretization_type), pointer :: discretization
@@ -1988,7 +1990,7 @@ subroutine MphaseResidual(snes,xx,r,realization,ierr)
   call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
                                PERMEABILITY_Z,ZERO_INTEGER)
 
-  call MphaseResidualPatch(snes,xx,r,realization,ierr)
+  call MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
 
 end subroutine MphaseResidual
 
@@ -2317,7 +2319,7 @@ end subroutine MphaseVarSwitchPatch
 
 ! ************************************************************************** !
 
-subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
+subroutine MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
   !
   ! Computes the residual equation at patch level
   !
@@ -2337,6 +2339,7 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
   use Secondary_Continuum_module
   use Material_Aux_module
   use Matrix_Zeroing_module
+  use Debug_module
 
   implicit none
 
@@ -2344,6 +2347,7 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
   Vec, intent(inout) :: xx
   Vec, intent(inout) :: r
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
   PetscInt :: local_id, ghosted_id, local_id_up, local_id_dn, ghosted_id_up, ghosted_id_dn
@@ -2363,8 +2367,6 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
   PetscReal :: Res(realization%option%nflowdof), v_darcy(realization%option%nphase)
   PetscReal :: xxbc(realization%option%nflowdof)
   PetscReal :: psrc(1:realization%option%nphase)
-  PetscViewer :: viewer
-
 
   type(grid_type), pointer :: grid
   type(patch_type), pointer :: patch
@@ -2400,8 +2402,6 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
   ! secondary continuum variables
   PetscReal :: sec_dencpr
   PetscReal :: res_sec_heat
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   patch => realization%patch
   grid => patch%grid
@@ -2936,23 +2936,18 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,ierr)
 
   call MatrixZeroingZeroVecEntries(mphase%matrix_zeroing,r)
 
-  if (realization%debug%vecview_residual) then
-    string = 'MPHresidual'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'MPHresidual',option)
   endif
-  if (realization%debug%vecview_solution) then
-    string = 'MPHxx'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'MPHxx',option)
   endif
+
 end subroutine MphaseResidualPatch
 
 ! ************************************************************************** !
 
-subroutine MphaseJacobian(snes,xx,A,B,realization,ierr)
+subroutine MphaseJacobian(snes,xx,A,B,realization,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -2972,14 +2967,15 @@ subroutine MphaseJacobian(snes,xx,A,B,realization,ierr)
   Vec :: xx
   Mat :: A, B
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   MatType :: mat_type
-  PetscViewer :: viewer
   type(option_type), pointer :: option
   PetscReal :: norm
-  character(len=MAXSTRINGLENGTH) :: string
+
+  option => realization%option
 
   call MatGetType(A,mat_type,ierr);CHKERRQ(ierr)
   if (mat_type == MATMFFD) then
@@ -2992,16 +2988,12 @@ subroutine MphaseJacobian(snes,xx,A,B,realization,ierr)
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
-  call MphaseJacobianPatch(snes,xx,J,J,realization,ierr)
+  call MphaseJacobianPatch(snes,xx,J,J,realization,debug,ierr)
 
-  if (realization%debug%matview_Matrix) then
-    string = 'MPHjacobian'
-    call DebugCreateViewer(realization%debug,string,realization%option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'MPHjacobian',option)
   endif
-  if (realization%debug%norm_Matrix) then
-    option => realization%option
+  if (debug%norm_Matrix) then
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
     call PrintMsg(option)
@@ -3017,7 +3009,7 @@ end subroutine MphaseJacobian
 
 ! ************************************************************************** !
 
-subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
+subroutine MphaseJacobianPatch(snes,xx,A,B,realization,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -3038,6 +3030,7 @@ subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
   use Secondary_Continuum_module
   use Matrix_Zeroing_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
@@ -3045,6 +3038,7 @@ subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
   Vec :: xx
   Mat :: A, B
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
   PetscInt :: nvar,neq
@@ -3098,14 +3092,10 @@ subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
   PetscReal :: psrc(1:realization%option%nphase)
   PetscInt :: iphasebc
   PetscInt :: nsrcpara
-
-  PetscViewer :: viewer
   PetscReal :: vol_frac_prim
 
   ! secondary continuum variables
   PetscReal :: jac_sec_heat
-
-  character(len=MAXSTRINGLENGTH) :: string
 
 !-----------------------------------------------------------------------
 ! R stand for residual
@@ -3395,13 +3385,10 @@ subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
                                   ADD_VALUES,ierr);CHKERRQ(ierr)
   end do
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_srcsink'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_srcsink',option)
   endif
 #if 1
   ! Interior Flux Terms -----------------------------------
@@ -3532,25 +3519,12 @@ subroutine MphaseJacobianPatch(snes,xx,A,B,realization,ierr)
     cur_connection_set => cur_connection_set%next
   enddo
 #endif
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
  ! print *,'end inter flux'
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_flux'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_flux',option)
   endif
-#if 0
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call PetscViewerASCIIOpen(option%mycomm,'jacobian_bcflux.out',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-  endif
-#endif
 
   call VecRestoreArray(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)
 

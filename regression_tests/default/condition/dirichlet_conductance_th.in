@@ -5,6 +5,12 @@ SIMULATION
   PROCESS_MODELS
     SUBSURFACE_FLOW flow
       MODE TH
+      OPTIONS
+        DEBUG
+          PRINT_RESIDUAL
+          PRINT_SOLUTION
+        /
+      /
     /
   /
 END
@@ -18,11 +24,6 @@ NUMERICAL_METHODS FLOW
     SOLVER DIRECT
   /
 
-END
-
-DEBUG
-  PRINT_RESIDUAL
-  PRINT_SOLUTION
 END
 
 #=========================== regression =======================================

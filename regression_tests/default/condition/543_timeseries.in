@@ -59,12 +59,6 @@ REGRESSION
   /
 END
 
-#=========================== flow mode ========================================
-
-DEBUG
-!  PRINT_COUPLERS west south
-END
-
 #=========================== chemistry ========================================
 CHEMISTRY
   PRIMARY_SPECIES

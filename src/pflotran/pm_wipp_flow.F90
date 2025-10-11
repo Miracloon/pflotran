@@ -1301,8 +1301,6 @@ subroutine PMWIPPFloResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  PetscViewer :: viewer
-  character(len=MAXSTRINGLENGTH) :: string
   type(grid_type), pointer :: grid
   PetscReal, pointer :: r_p(:)
   PetscInt :: i
@@ -1313,7 +1311,7 @@ subroutine PMWIPPFloResidual(this,snes,xx,r,ierr)
 
   ! calculate residual
   call WIPPFloResidual(snes,xx,r,this%realization,this%pmwss_ptr, &
-                       this%pmwell_ptr,ierr)
+                       this%pmwell_ptr,this%debug,ierr)
 
   ! cell-centered dirichlet BCs
   if (associated(this%dirichlet_dofs_local)) then
@@ -1326,17 +1324,11 @@ subroutine PMWIPPFloResidual(this,snes,xx,r,ierr)
 
   call VecCopy(r,this%stored_residual_vec,ierr);CHKERRQ(ierr)
 
-  if (this%realization%debug%vecview_residual) then
-    string = 'WFresidual'
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_residual) then
+    call DebugVecView(this%debug,r,'WFresidual.out',this%option)
   endif
-  if (this%realization%debug%vecview_solution) then
-    string = 'WFxx'
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_solution) then
+    call DebugVecView(this%debug,xx,'WFxx.out',this%option)
   endif
 
   call this%PostSolve()
@@ -1368,7 +1360,6 @@ subroutine PMWIPPFloJacobian(this,snes,xx,A,B,ierr)
   type(field_type), pointer :: field
   type(option_type), pointer :: option
 
-  PetscViewer :: viewer
   character(len=MAXSTRINGLENGTH) :: string
   Vec :: residual_vec
   Vec :: diagonal_vec
@@ -1383,7 +1374,7 @@ subroutine PMWIPPFloJacobian(this,snes,xx,A,B,ierr)
   field => this%realization%field
 
   call WIPPFloJacobian(snes,xx,A,B,this%realization,this%pmwss_ptr, &
-                       this%pmwell_ptr,ierr)
+                       this%pmwell_ptr,this%debug,ierr)
 
   ! cell-centered dirichlet BCs
   if (associated(this%dirichlet_dofs_ghosted)) then
@@ -1414,11 +1405,8 @@ subroutine PMWIPPFloJacobian(this,snes,xx,A,B,ierr)
     deallocate(diagonal_values)
   endif
 
-  if (this%realization%debug%matview_Matrix) then
-    string = 'WFjacobian'
-    call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%matview_Matrix) then
+    call DebugMatView(this%debug,A,'WFjacobian.out',this%option)
   endif
 
   call SNESGetFunction(snes,residual_vec,PETSC_NULL_FUNCTION, &
@@ -1457,25 +1445,19 @@ subroutine PMWIPPFloJacobian(this,snes,xx,A,B,ierr)
     call VecPointwiseMult(residual_vec,residual_vec,this%scaling_vec, &
                           ierr);CHKERRQ(ierr)
 
-    if (this%realization%debug%matview_Matrix) then
+    if (this%debug%matview_Matrix) then
       string = 'WFscale_vec'
-      call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-      call VecView(this%scaling_vec,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+      call DebugVecView(this%debug,this%scaling_vec,string,this%option)
       string = 'WFjacobian_scaled'
-      call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-      call MatView(A,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+      call DebugMatView(this%debug,A,string,this%option)
     endif
-    if (this%realization%debug%vecview_residual) then
+    if (this%debug%vecview_residual) then
       string = 'WFresidual_scaled'
-      call DebugCreateViewer(this%realization%debug,string,this%option,viewer)
-      call VecView(residual_vec,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+      call DebugVecView(this%debug,residual_vec,string,this%option)
     endif
   endif
 
-  if (this%realization%debug%norm_Matrix) then
+  if (this%debug%norm_Matrix) then
     call MatNorm(A,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(this%option%io_buffer,'("1 norm: ",es11.4)') norm
     call PrintMsg(this%option)

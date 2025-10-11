@@ -1,17 +1,13 @@
 module Debug_module
 
-#include "petsc/finclude/petscsys.h"
-  use petscsys
+#include "petsc/finclude/petscmat.h"
+  use petscmat
   use PFLOTRAN_Constants_module
+  use Petsc_Utility_module
 
   implicit none
 
   private
-
-  PetscInt, parameter, public :: DEBUG_ASCII_FORMAT = 1
-  PetscInt, parameter, public :: DEBUG_BINARY_FORMAT = 2
-  PetscInt, parameter, public :: DEBUG_MATLAB_FORMAT = 3
-  PetscInt, parameter, public :: DEBUG_NATIVE_FORMAT = 4
 
   type, public :: debug_type
     PetscBool :: vecview_residual
@@ -30,11 +26,21 @@ module Debug_module
     PetscBool :: print_waypoints
   end type debug_type
 
+  interface DebugMatView
+    module procedure DebugMatView1
+    module procedure DebugMatView2
+  end interface
+
+  interface DebugVecView
+    module procedure DebugVecView1
+    module procedure DebugVecView2
+  end interface
+
   public :: DebugCreate, &
             DebugRead, &
-            DebugCreateViewer, &
             DebugWriteFilename, &
-            DebugViewerDestroy, &
+            DebugMatView, &
+            DebugVecView, &
             DebugDestroy
 
 contains
@@ -63,7 +69,7 @@ function DebugCreate()
   debug%matview_Matrix_detailed = PETSC_FALSE
   debug%norm_Matrix = PETSC_FALSE
 
-  debug%output_format = DEBUG_ASCII_FORMAT
+  debug%output_format = VIEWER_ASCII_FORMAT
   debug%verbose_filename = PETSC_FALSE
 
   debug%print_couplers = PETSC_FALSE
@@ -145,13 +151,13 @@ subroutine DebugRead(debug,input,option)
         call StringToUpper(keyword)
         select case(keyword)
           case('ASCII')
-            debug%output_format = DEBUG_ASCII_FORMAT
+            debug%output_format = VIEWER_ASCII_FORMAT
           case('BINARY')
-            debug%output_format = DEBUG_BINARY_FORMAT
+            debug%output_format = VIEWER_BINARY_FORMAT
           case('MATLAB')
-            debug%output_format = DEBUG_MATLAB_FORMAT
+            debug%output_format = VIEWER_MATLAB_FORMAT
           case('NATIVE','PARALLEL')
-            debug%output_format = DEBUG_NATIVE_FORMAT
+            debug%output_format = VIEWER_NATIVE_FORMAT
         end select
       case default
         call InputKeywordUnrecognized(input,keyword,'DEBUG',option)
@@ -161,55 +167,6 @@ subroutine DebugRead(debug,input,option)
   call InputPopBlock(input,option)
 
 end subroutine DebugRead
-
-! ************************************************************************** !
-
-subroutine DebugCreateViewer(debug,viewer_name_prefix,option,viewer)
-  !
-  ! Creates a PETSc viewer for saving PETSc vector or matrix in ASCII or
-  ! binary format
-  !
-  ! Author: Gautam Bisht
-  ! Date: 09/23/14
-  !
-
-  use Option_module
-
-  implicit none
-
-  type(debug_type), pointer :: debug
-  character(len=MAXSTRINGLENGTH), intent(in) :: viewer_name_prefix
-  type(option_type) :: option
-  PetscViewer, intent (inout) :: viewer
-
-  character(len=MAXWORDLENGTH) :: viewer_name
-  PetscErrorCode :: ierr
-
-
-  select case(debug%output_format)
-    case(DEBUG_ASCII_FORMAT)
-      viewer_name = trim(viewer_name_prefix) // '.out'
-      call PetscViewerASCIIOpen(option%mycomm,viewer_name,viewer, &
-                                ierr);CHKERRQ(ierr)
-    case(DEBUG_BINARY_FORMAT)
-      viewer_name = trim(adjustl(viewer_name_prefix)) // '.bin'
-      call PetscViewerBinaryOpen(option%mycomm,viewer_name,FILE_MODE_WRITE, &
-                                 viewer,ierr);CHKERRQ(ierr)
-    case(DEBUG_MATLAB_FORMAT)
-      viewer_name = trim(viewer_name_prefix) // '.mat'
-      call PetscViewerASCIIOpen(option%mycomm,viewer_name,viewer, &
-                                ierr);CHKERRQ(ierr)
-      call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_MATLAB, &
-                                 ierr);CHKERRQ(ierr)
-    case(DEBUG_NATIVE_FORMAT)
-      viewer_name = trim(viewer_name_prefix) // '.bin'
-      call PetscViewerBinaryOpen(option%mycomm,viewer_name,FILE_MODE_WRITE, &
-                                 viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerPushFormat(viewer,PETSC_VIEWER_NATIVE, &
-                                 ierr);CHKERRQ(ierr)
-  end select
-
-end subroutine DebugCreateViewer
 
 ! ************************************************************************** !
 
@@ -251,33 +208,105 @@ end subroutine DebugWriteFilename
 
 ! ************************************************************************** !
 
-subroutine DebugViewerDestroy(debug,viewer)
+subroutine DebugMatView1(debug,A,prefix,suffix,ts,ts_cut,ni,option)
   !
-  ! Deallocates PETSc Viewer
+  ! Dumps a PETSc Mat through a viewer object
   !
-  ! Author: Heeho Park
-  ! Date: 11/08/18
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
   !
+  use Option_module
+
   implicit none
 
   type(debug_type) :: debug
-  PetscViewer :: viewer
-  PetscErrorCode :: ierr
+  Mat :: A
+  character(len=*) :: prefix
+  character(len=*) :: suffix
+  PetscInt :: ts
+  PetscInt :: ts_cut
+  PetscInt :: ni
+  type(option_type) :: option
 
-  !geh: must use an 'or' operation since new formats greater than
-  !     DEBUG_NATIVE_FORMAT may not require PopFormat()
-  if (debug%output_format == DEBUG_MATLAB_FORMAT .or. &
-      debug%output_format == DEBUG_NATIVE_FORMAT) then
-  !  DEBUG_ASCII_FORMAT = 1
-  !  DEBUG_BINARY_FORMAT = 2
-  !  DEBUG_MATLAB_FORMAT = 3  popformat required
-  !  DEBUG_NATIVE_FORMAT = 4  popformat required
-    call PetscViewerPopFormat(viewer,ierr);CHKERRQ(ierr)
-  endif
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  character(len=MAXSTRINGLENGTH) :: string
 
+  call DebugWriteFilename(debug,string,prefix,suffix,ts,ts_cut,ni)
+  call PUMatView(A,string,debug%output_format,option)
 
-end subroutine DebugViewerDestroy
+end subroutine DebugMatView1
+
+! ************************************************************************** !
+
+subroutine DebugMatView2(debug,A,filename,option)
+  !
+  ! Dumps a PETSc Mat through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  type(debug_type) :: debug
+  Mat :: A
+  character(len=*) :: filename
+  type(option_type) :: option
+
+  call PUMatView(A,filename,debug%output_format,option)
+
+end subroutine DebugMatView2
+
+! ************************************************************************** !
+
+subroutine DebugVecView1(debug,v,prefix,suffix,ts,ts_cut,ni,option)
+  !
+  ! Dumps a PETSc Vec through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  type(debug_type) :: debug
+  Vec :: v
+  character(len=*) :: prefix
+  character(len=*) :: suffix
+  PetscInt :: ts
+  PetscInt :: ts_cut
+  PetscInt :: ni
+  type(option_type) :: option
+
+  character(len=MAXSTRINGLENGTH) :: string
+
+  call DebugWriteFilename(debug,string,prefix,suffix,ts,ts_cut,ni)
+  call PUVecView(v,string,debug%output_format,option)
+
+end subroutine DebugVecView1
+
+! ************************************************************************** !
+
+subroutine DebugVecView2(debug,v,filename,option)
+  !
+  ! Dumps a PETSc Vec through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  type(debug_type) :: debug
+  Vec :: v
+  character(len=*) :: filename
+  type(option_type) :: option
+
+  call PUVecView(v,filename,debug%output_format,option)
+
+end subroutine DebugVecView2
 
 ! ************************************************************************** !
 

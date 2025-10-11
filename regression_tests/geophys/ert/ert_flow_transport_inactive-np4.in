@@ -24,14 +24,6 @@ END
 
 SUBSURFACE
 
-skip
-DEBUG
-  PRINT_MATRIX
-  PRINT_RESIDUAL
-  PRINT_SOLUTION
-END
-noskip
-
 #=========================== numerical methods ================================
 NUMERICAL_METHODS FLOW
   NEWTON_SOLVER FLOW

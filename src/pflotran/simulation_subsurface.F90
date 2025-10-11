@@ -402,6 +402,7 @@ subroutine SimSubsurfJumpStart(this)
   use Output_Aux_module
   use String_module
   use Timestepper_Base_class
+  use Debug_module
 
   implicit none
 
@@ -410,6 +411,7 @@ subroutine SimSubsurfJumpStart(this)
   class(timestepper_base_type), pointer :: master_timestepper
   class(timestepper_base_type), pointer :: flow_timestepper
   class(timestepper_base_type), pointer :: tran_timestepper
+  type(debug_type), pointer :: debug
   type(option_type), pointer :: option
   type(output_option_type), pointer :: output_option
   PetscBool :: snapshot_plot_flag, observation_plot_flag, massbal_plot_flag
@@ -438,11 +440,14 @@ subroutine SimSubsurfJumpStart(this)
 
   ! first time stepper is master
   master_timestepper => this%process_model_coupler_list%timestepper
+  nullify(debug)
   if (associated(this%flow_process_model_coupler)) then
     flow_timestepper => this%flow_process_model_coupler%timestepper
+    debug => this%flow_process_model_coupler%pm_list%debug
   endif
   if (associated(this%tran_process_model_coupler)) then
     tran_timestepper => this%tran_process_model_coupler%timestepper
+    debug => this%tran_process_model_coupler%pm_list%debug
   endif
 
   ! check whether there is geophysic survey at time 0
@@ -544,13 +549,15 @@ subroutine SimSubsurfJumpStart(this)
   if (associated(tran_timestepper)) &
     tran_timestepper%start_time_step = tran_timestepper%steps + 1
 
-  call OutputPrintRegions(this%realization)
 
-  if (this%realization%debug%print_couplers) then
-    call OutputPrintCouplers(this%realization,ZERO_INTEGER)
-    if (this%realization%discretization%itype == UNSTRUCTURED_GRID .and. &
-        this%realization%patch%grid%itype == IMPLICIT_UNSTRUCTURED_GRID) then
-      call OutputPrintCouplersH5(this%realization,ZERO_INTEGER)
+  if (associated(debug)) then
+    call OutputPrintRegions(this%realization,debug)
+    if (debug%print_couplers) then
+      call OutputPrintCouplers(this%realization,debug,ZERO_INTEGER)
+      if (this%realization%discretization%itype == UNSTRUCTURED_GRID .and. &
+          this%realization%patch%grid%itype == IMPLICIT_UNSTRUCTURED_GRID) then
+        call OutputPrintCouplersH5(this%realization,debug,ZERO_INTEGER)
+      endif
     endif
   endif
 

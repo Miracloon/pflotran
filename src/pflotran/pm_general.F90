@@ -987,7 +987,7 @@ subroutine PMGeneralResidual(this,snes,xx,r,ierr)
   PetscErrorCode :: ierr
 
   call PMSubsurfaceFlowUpdatePropertiesNI(this)
-  call GeneralResidual(snes,xx,r,this%realization,ierr)
+  call GeneralResidual(snes,xx,r,this%realization,this%debug,ierr)
 
 end subroutine PMGeneralResidual
 
@@ -1009,7 +1009,7 @@ subroutine PMGeneralJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call GeneralJacobian(snes,xx,A,B,this%realization,ierr)
+  call GeneralJacobian(snes,xx,A,B,this%realization,this%debug,ierr)
 
 end subroutine PMGeneralJacobian
 

@@ -762,7 +762,7 @@ end subroutine ZFlowUpdateFixedAccum
 
 ! ************************************************************************** !
 
-subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
+subroutine ZFlowResidual(snes,xx,r,A,realization,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -776,7 +776,6 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
   use Discretization_module
   use Option_module
   use Debug_module
-
   use Connection_module
   use Grid_module
   use Coupler_module
@@ -792,8 +791,8 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
   Vec :: r
   Mat :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
-  PetscViewer :: viewer
 
   type(discretization_type), pointer :: discretization
   type(grid_type), pointer :: grid
@@ -825,8 +824,6 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
   PetscReal, pointer :: accum_p(:), accum_p2(:)
   PetscReal, pointer :: xx_loc_p(:)
   PetscReal, pointer :: vec_p(:)
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   PetscInt :: icc_up, icc_dn
   PetscReal :: Res(ZFLOW_MAX_DOF)
@@ -1142,13 +1139,10 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
 
     call MatrixZeroingZeroMatEntries(patch%aux%ZFlow%matrix_zeroing,A)
 
-    if (realization%debug%matview_Matrix) then
-      call DebugWriteFilename(realization%debug,string,'ZFjacobian','', &
-                              zflow_ts_count,zflow_ts_cut_count, &
-                              zflow_ni_count)
-      call DebugCreateViewer(realization%debug,string,option,viewer)
-      call MatView(A,viewer,ierr);CHKERRQ(ierr)
-      call DebugViewerDestroy(realization%debug,viewer)
+    if (debug%matview_Matrix) then
+      call DebugMatView(debug,A,'ZFjacobian','', &
+                        zflow_ts_count,zflow_ts_cut_count, &
+                        zflow_ni_count,option)
     endif
   endif
 
@@ -1173,21 +1167,15 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,ierr)
 !    call VecAXPY(r,-1.d0,field%flow_mass_transfer,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'ZFresidual','', &
-                            zflow_ts_count,zflow_ts_cut_count, &
-                            zflow_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'ZFresidual','', &
+                      zflow_ts_count,zflow_ts_cut_count, &
+                      zflow_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'ZFxx','', &
-                            zflow_ts_count,zflow_ts_cut_count, &
-                            zflow_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'ZFxx','', &
+                      zflow_ts_count,zflow_ts_cut_count, &
+                      zflow_ni_count,option)
   endif
 
 end subroutine ZFlowResidual

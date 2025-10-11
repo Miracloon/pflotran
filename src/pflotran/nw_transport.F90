@@ -622,7 +622,7 @@ end subroutine NWTInitializeTimestep
 
 ! ************************************************************************** !
 
-subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,ierr)
+subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -641,6 +641,7 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,ierr)
   use WIPP_Flow_Aux_module
   use WIPP_Well_class
   use PM_Well_class
+  use Debug_module
 
   implicit none
 
@@ -649,6 +650,7 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,ierr)
   Vec :: r
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pmwell_ptr
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   PetscReal, pointer :: xx_p(:), log_xx_p(:)
@@ -680,9 +682,6 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,ierr)
   PetscReal :: Res_up(realization%reaction_nw%params%nspecies)
   PetscReal :: Res_dn(realization%reaction_nw%params%nspecies)
   PetscReal :: area
-  PetscViewer :: viewer
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PetscLogEventBegin(logging%event_nwt_residual,ierr);CHKERRQ(ierr)
 
@@ -1045,17 +1044,11 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,ierr)
     call VecAXPY(r,-1.d0,field%tran_mass_transfer,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%vecview_residual) then
-    string = 'NWTresidual'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'NWTresidual',option)
   endif
-  if (realization%debug%vecview_solution) then
-    string = 'NWTxx'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(field%tran_xx,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,field%tran_xx,'NWTxx',option)
   endif
 
   call PetscLogEventEnd(logging%event_nwt_residual,ierr);CHKERRQ(ierr)
@@ -1520,7 +1513,7 @@ end subroutine NWTResidualFlux
 
 ! ************************************************************************** !
 
-subroutine NWTJacobian(snes,xx,A,B,realization,ierr)
+subroutine NWTJacobian(snes,xx,A,B,realization,debug,ierr)
   !
   ! Computes the Jacobian matrix for Nuclear Waste Transport.
   !
@@ -1537,6 +1530,7 @@ subroutine NWTJacobian(snes,xx,A,B,realization,ierr)
   use Coupler_module
   use WIPP_Flow_Aux_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
@@ -1544,11 +1538,11 @@ subroutine NWTJacobian(snes,xx,A,B,realization,ierr)
   Vec :: xx
   Mat :: A, B
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   MatType :: mat_type
-  PetscViewer :: viewer
   PetscReal, pointer :: work_loc_p(:)
   type(option_type), pointer :: option
   type(grid_type),  pointer :: grid
@@ -1565,7 +1559,6 @@ subroutine NWTJacobian(snes,xx,A,B,realization,ierr)
   type(connection_set_type), pointer :: cur_connection_set
   type(connection_set_list_type), pointer :: connection_set_list
   type(coupler_type), pointer :: boundary_condition
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: istart, iend, offset
   PetscInt :: nspecies
   PetscInt :: local_id, ghosted_id
@@ -1808,11 +1801,8 @@ subroutine NWTJacobian(snes,xx,A,B,realization,ierr)
     call MatDiagonalScaleLocal(J,realization%field%tran_work_loc, &
                                ierr);CHKERRQ(ierr)
 
-    if (realization%debug%matview_Matrix) then
-      string = 'NWTjacobianAN'
-      call DebugCreateViewer(realization%debug,string,realization%option,viewer)
-      call MatView(J,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    if (debug%matview_Matrix) then
+      call DebugMatView(debug,J,'NWTjacobianAN',option)
     endif
   endif
 

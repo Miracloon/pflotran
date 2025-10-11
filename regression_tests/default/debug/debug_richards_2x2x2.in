@@ -6,9 +6,27 @@ SIMULATION
   PROCESS_MODELS
     SUBSURFACE_FLOW flow
       MODE RICHARDS
+      OPTIONS
+        DEBUG
+          PRINT_SOLUTION
+          PRINT_RESIDUAL
+          PRINT_JACOBIAN
+          FORMAT MATLAB
+          APPEND_COUNTS_TO_FILENAMES
+        /
+      /
     /
     SUBSURFACE_TRANSPORT transport
       MODE GIRT
+      OPTIONS
+        DEBUG
+          PRINT_SOLUTION
+          PRINT_RESIDUAL
+          PRINT_JACOBIAN
+          FORMAT MATLAB
+          APPEND_COUNTS_TO_FILENAMES
+        /
+      /
     /
   /
 END
@@ -22,15 +40,6 @@ NUMERICAL_METHODS FLOW
     MAXIMUM_NUMBER_OF_TIMESTEPS 2
   /
 
-END
-
-#=========================== debug ==== =======================================
-DEBUG
-  PRINT_SOLUTION
-  PRINT_RESIDUAL
-  PRINT_JACOBIAN
-  FORMAT MATLAB
-  APPEND_COUNTS_TO_FILENAMES
 END
 
 #=========================== regression =======================================

@@ -334,7 +334,7 @@ end subroutine HydrateTimeCut
 
 ! ************************************************************************** !
 
-subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,B)
+subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,debug,B)
   !
   ! Computes the a test numerical jacobian
   !
@@ -349,19 +349,20 @@ subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,B)
   use Field_module
   use PM_Well_class
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Vec :: xx
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   Mat :: B
 
   Vec :: xx_pert
   Vec :: res
   Vec :: res_pert
   Mat :: A
-  PetscViewer :: viewer
   PetscErrorCode :: ierr
 
   PetscReal, pointer :: vec_p(:), vec2_p(:)
@@ -398,13 +399,7 @@ subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,B)
                     ierr);CHKERRQ(ierr)
 
   call VecZeroEntries(res,ierr);CHKERRQ(ierr)
-  call HydrateResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,ierr)
-#if 0
-  word  = 'num_0.dat'
-  call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-  call VecView(res,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
+  call HydrateResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,debug,ierr)
   call VecGetArray(res,vec2_p,ierr);CHKERRQ(ierr)
   do icell = 1,grid%nlmax
     if (patch%imat(grid%nL2G(icell)) <= 0) cycle
@@ -416,14 +411,7 @@ subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,B)
       call VecRestoreArray(xx_pert,vec_p,ierr);CHKERRQ(ierr)
       call VecZeroEntries(res_pert,ierr);CHKERRQ(ierr)
       call HydrateResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization, &
-                           pm_well,ierr)
-#if 0
-      write(word,*) idof
-      word  = 'num_' // trim(adjustl(word)) // '.dat'
-      call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-      call VecView(res_pert,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
+                           pm_well,debug,ierr)
       call VecGetArray(res_pert,vec_p,ierr);CHKERRQ(ierr)
       do idof2 = 1, grid%nlmax*option%nflowdof
         derivative = (vec_p(idof2)-vec2_p(idof2))/perturbation
@@ -443,9 +431,7 @@ subroutine HydrateNumericalJacobianTest(xx,realization,pm_well,B)
 #if 1
   write(word,*) icall
   word = 'numerical_jacobian-' // trim(adjustl(word)) // '.out'
-  call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-  call MatView(A,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call PUMatView(A,word,option)
 #endif
 
 !geh: uncomment to overwrite numerical Jacobian
@@ -1209,7 +1195,7 @@ end subroutine HydrateUpdateFixedAccum
 
 ! ************************************************************************** !
 
-subroutine HydrateResidual(snes,xx,r,realization,pm_well,ierr)
+subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -1233,6 +1219,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,ierr)
   use PM_Well_class
   use Matrix_Zeroing_module
   use Petsc_Utility_module, only : PUCast
+  use Debug_module
 
   implicit none
 
@@ -1241,8 +1228,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,ierr)
   Vec :: r
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
-  class(pm_well_type), pointer :: cur_well
-  PetscViewer :: viewer
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat, parameter :: null_mat = tMat(0)
@@ -1263,7 +1249,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,ierr)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(connection_set_list_type), pointer :: connection_set_list
   type(connection_set_type), pointer :: cur_connection_set
-  character(len=MAXSTRINGLENGTH) :: string
+  class(pm_well_type), pointer :: cur_well
 
   PetscInt :: iconn
   PetscReal :: scale
@@ -1658,21 +1644,15 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,ierr)
     call VecRestoreArrayRead(r,r_p,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'Gresidual','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'Gresidual','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'Gxx','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'Gxx','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
 
   update_upwind_direction = PETSC_FALSE
@@ -1681,7 +1661,7 @@ end subroutine HydrateResidual
 
 ! ************************************************************************** !
 
-subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
+subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -1703,6 +1683,7 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
   use PM_Well_class
   use Matrix_Zeroing_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
@@ -1711,13 +1692,13 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
   Mat :: A, B
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   class(pm_well_type), pointer :: cur_well
   Mat :: J
   MatType :: mat_type
   PetscReal :: norm
-  PetscViewer :: viewer
 
   PetscInt :: icc_up,icc_dn
   PetscReal :: qsrc, scale
@@ -1746,7 +1727,6 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:), global_auxvars_bc(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
 
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: well_ndof
   PetscInt :: deactivate_row
   PetscReal, parameter :: epsilon = 1.d-30
@@ -1820,15 +1800,12 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
                                   ADD_VALUES,ierr);CHKERRQ(ierr)
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_accum','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_accum','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
 
 
@@ -1885,15 +1862,12 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_flux','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_flux','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
 
   ! Boundary Flux Terms -----------------------------------
@@ -1942,15 +1916,12 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
     boundary_condition => boundary_condition%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_bcflux','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_bcflux','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
 
   ! Source/sinks
@@ -2019,15 +1990,12 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
 !  call HydrateSSSandbox(null_vec,A,PETSC_TRUE,grid,material_auxvars, &
 !                        hyd_auxvars,option)
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_srcsink','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_srcsink','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
 
   call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
@@ -2067,15 +2035,12 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
     endif
   endif
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'Gjacobian','', &
-                            hydrate_ts_count,hydrate_ts_cut_count, &
-                            hydrate_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,A,'Gjacobian','', &
+                      hydrate_ts_count,hydrate_ts_cut_count, &
+                      hydrate_ni_count,option)
   endif
-  if (realization%debug%norm_Matrix) then
+  if (debug%norm_Matrix) then
     option => realization%option
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
@@ -2087,8 +2052,6 @@ subroutine HydrateJacobian(snes,xx,A,B,realization,pm_well,ierr)
     write(option%io_buffer,'("inf norm: ",es11.4)') norm
     call PrintMsg(option)
   endif
-
-!  call MatView(J,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
 #if 0
   imat = 1

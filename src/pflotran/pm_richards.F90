@@ -360,8 +360,8 @@ recursive subroutine PMRichardsInitializeRun(this)
     call MatAssemblyEnd(this%solver%M,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatSetOption(this%solver%M,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
                       ierr);CHKERRQ(ierr)
-    call MatAssemblyBegin(this%solver%Mpre,MAT_FINAL_ASSEMBLY,ierr); &
-                         CHKERRQ(ierr)
+    call MatAssemblyBegin(this%solver%Mpre,MAT_FINAL_ASSEMBLY, &
+                          ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(this%solver%Mpre,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatSetOption(this%solver%Mpre,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
                       ierr);CHKERRQ(ierr)
@@ -525,7 +525,8 @@ subroutine PMRichardsResidual(this,snes,xx,r,ierr)
   PetscErrorCode :: ierr
 
   call PMSubsurfaceFlowUpdatePropertiesNI(this)
-  call RichardsResidual(snes,xx,r,this%realization,this%pmwell_ptr,ierr)
+  call RichardsResidual(snes,xx,r,this%realization,this%pmwell_ptr, &
+                        this%debug,ierr)
 
 end subroutine PMRichardsResidual
 
@@ -547,7 +548,8 @@ subroutine PMRichardsJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call RichardsJacobian(snes,xx,A,B,this%realization,this%pmwell_ptr,ierr)
+  call RichardsJacobian(snes,xx,A,B,this%realization,this%pmwell_ptr, &
+                        this%debug,ierr)
 
 end subroutine PMRichardsJacobian
 

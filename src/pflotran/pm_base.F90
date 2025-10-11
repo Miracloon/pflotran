@@ -6,7 +6,7 @@ module PM_Base_class
   use Output_Aux_module
   use Realization_Base_class
   use Solver_module
-
+  use Debug_module
   use PFLOTRAN_Constants_module
 
   implicit none
@@ -30,6 +30,7 @@ module PM_Base_class
     PetscBool :: scale_linear_system
     Vec :: linear_system_scaling_vec
     class(realization_base_type), pointer :: realization_base
+    type(debug_type), pointer :: debug
     class(pm_base_type), pointer :: next
   contains
     procedure, public :: Setup => PMBaseSetup
@@ -105,6 +106,7 @@ subroutine PMBaseInit(this)
   nullify(this%output_option)
   nullify(this%realization_base)
   nullify(this%solver)
+  this%debug => DebugCreate()
   PetscObjectNullify(this%solution_vec)
   PetscObjectNullify(this%residual_vec)
   PetscObjectNullify(this%linear_system_scaling_vec)
@@ -195,10 +197,11 @@ subroutine PMBaseReadSimOptionsSelectCase(this,input,keyword,found, &
                                           error_string,option)
 
   use Input_Aux_module
+  use Debug_module
 
   implicit none
   class(pm_base_type) :: this
-  type(input_type) :: input
+  type(input_type), pointer :: input
 
   character(len=MAXWORDLENGTH) :: keyword
   PetscBool :: found
@@ -214,6 +217,8 @@ subroutine PMBaseReadSimOptionsSelectCase(this,input,keyword,found, &
     case('LOGGING_VERBOSITY')
       call InputReadInt(input,option,this%logging_verbosity)
       call InputErrorMsg(input,option,keyword,error_string)
+    case('DEBUG')
+      call DebugRead(this%debug,input,option)
     case default
       found = PETSC_FALSE
   end select
@@ -574,6 +579,7 @@ subroutine PMBaseDestroy(this)
   nullify(this%realization_base)
   nullify(this%next)
   call SolverDestroy(this%solver)
+  call DebugDestroy(this%debug)
   if (.not.PetscObjectIsNull(this%linear_system_scaling_vec)) then
     call VecDestroy(this%linear_system_scaling_vec,ierr);CHKERRQ(ierr)
   endif

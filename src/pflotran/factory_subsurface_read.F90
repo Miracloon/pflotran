@@ -897,7 +897,6 @@ subroutine FactorySubsurfReadInput(simulation,input)
   use Observation_module
   use Integral_Flux_module
   use Waypoint_module
-  use Debug_module
   use Patch_module
   use Reaction_module
   use Reaction_Aux_module
@@ -1172,8 +1171,10 @@ subroutine FactorySubsurfReadInput(simulation,input)
 
 !....................
       case ('DEBUG')
-        call DebugRead(realization%debug,input,option)
-
+        option%io_buffer = 'DEBUG blocks are now specific to each process &
+          &model. Please enter the same block under SIMULATION PROCESS_MODEL &
+          &OPTIONs.'
+        call PrintErrMsg(option)
 !....................
       case ('PROC')
 

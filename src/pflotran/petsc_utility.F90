@@ -12,6 +12,11 @@ module Petsc_Utility_module
 
   private
 
+  PetscInt, parameter, public :: VIEWER_ASCII_FORMAT = 1
+  PetscInt, parameter, public :: VIEWER_BINARY_FORMAT = 2
+  PetscInt, parameter, public :: VIEWER_MATLAB_FORMAT = 3
+  PetscInt, parameter, public :: VIEWER_NATIVE_FORMAT = 4
+
   interface PetUtilLoadVec
     module procedure PetUtilLoadVecInt
     module procedure PetUtilLoadVecReal
@@ -38,6 +43,16 @@ module Petsc_Utility_module
     module procedure PUCastBoolean
   end interface
 
+  interface PUVecView
+    module procedure PUVecView1
+    module procedure PUVecView2
+  end interface
+
+  interface PUMatView
+    module procedure PUMatView1
+    module procedure PUMatView2
+  end interface
+
   public :: PetUtilMatSVBL, &
             PetUtilVecSVBL, &
             PetUtilLoadVec, &
@@ -49,6 +64,11 @@ module Petsc_Utility_module
             PUMSetValuesLocal, &
             PUMSetValuesBlocked, &
             PUMSetValuesBlockedLocal
+
+  public :: PUCreateViewer, &
+            PUVecView, &
+            PUMatView, &
+            PUViewerDestroy
 
   public :: PUTestFile, &
             PUCast
@@ -552,5 +572,172 @@ function PUCastBoolean(flag)
   PUCastBoolean = flag
 
 end function PUCastBoolean
+
+! ************************************************************************** !
+
+subroutine PUCreateViewer(viewer_name_prefix,iformat,viewer,option)
+  !
+  ! Creates a PETSc viewer for saving PETSc vector or matrix in ASCII or
+  ! binary format
+  !
+  ! Author: Gautam Bisht
+  ! Date: 09/23/14, moved to PETSc Ubility 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  character(len=*), intent(in) :: viewer_name_prefix
+  PetscInt :: iformat
+  type(option_type) :: option
+  PetscViewer, intent (inout) :: viewer
+
+  character(len=MAXWORDLENGTH) :: viewer_name
+  PetscErrorCode :: ierr
+
+  select case(iformat)
+    case(VIEWER_ASCII_FORMAT)
+      viewer_name = trim(viewer_name_prefix) // '.out'
+      call PetscViewerASCIIOpen(option%mycomm,viewer_name,viewer, &
+                                ierr);CHKERRQ(ierr)
+    case(VIEWER_BINARY_FORMAT)
+      viewer_name = trim(adjustl(viewer_name_prefix)) // '.bin'
+      call PetscViewerBinaryOpen(option%mycomm,viewer_name,FILE_MODE_WRITE, &
+                                 viewer,ierr);CHKERRQ(ierr)
+    case(VIEWER_MATLAB_FORMAT)
+      viewer_name = trim(viewer_name_prefix) // '.mat'
+      call PetscViewerASCIIOpen(option%mycomm,viewer_name,viewer, &
+                                ierr);CHKERRQ(ierr)
+      call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_MATLAB, &
+                                 ierr);CHKERRQ(ierr)
+    case(VIEWER_NATIVE_FORMAT)
+      viewer_name = trim(viewer_name_prefix) // '.bin'
+      call PetscViewerBinaryOpen(option%mycomm,viewer_name,FILE_MODE_WRITE, &
+                                 viewer,ierr);CHKERRQ(ierr)
+      call PetscViewerPushFormat(viewer,PETSC_VIEWER_NATIVE, &
+                                 ierr);CHKERRQ(ierr)
+  end select
+
+end subroutine PUCreateViewer
+
+! ************************************************************************** !
+
+subroutine PUMatView1(A,filename,option)
+  !
+  ! Dumps a PETSc Mat through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  Mat :: A
+  character(len=*) :: filename
+  type(option_type) :: option
+
+  call PUMatView(A,filename,VIEWER_ASCII_FORMAT,option)
+
+end subroutine PUMatView1
+
+! ************************************************************************** !
+
+subroutine PUMatView2(A,filename,iformat,option)
+  !
+  ! Dumps a PETSc Mat through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  Mat :: A
+  character(len=*) :: filename
+  PetscInt :: iformat
+  type(option_type) :: option
+
+  PetscViewer :: viewer
+  PetscErrorCode :: ierr
+
+  call PUCreateViewer(filename,iformat,viewer,option)
+  call MatView(A,viewer,ierr);CHKERRQ(ierr)
+  call PUViewerDestroy(viewer,iformat)
+
+end subroutine PUMatView2
+
+! ************************************************************************** !
+
+subroutine PUVecView1(v,filename,option)
+  !
+  ! Dumps a PETSc Vec through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  Vec :: v
+  character(len=*) :: filename
+  type(option_type) :: option
+
+  call PUVecView(v,filename,VIEWER_ASCII_FORMAT,option)
+
+end subroutine PUVecView1
+
+! ************************************************************************** !
+
+subroutine PUVecView2(v,filename,iformat,option)
+  !
+  ! Dumps a PETSc Vec through a viewer object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/10/25
+  !
+  use Option_module
+
+  implicit none
+
+  Vec :: v
+  character(len=*) :: filename
+  PetscInt :: iformat
+  type(option_type) :: option
+
+  PetscViewer :: viewer
+  PetscErrorCode :: ierr
+
+  call PUCreateViewer(filename,iformat,viewer,option)
+  call VecView(v,viewer,ierr);CHKERRQ(ierr)
+  call PUViewerDestroy(viewer,iformat)
+
+end subroutine PUVecView2
+
+! ************************************************************************** !
+
+subroutine PUViewerDestroy(viewer,iformat)
+  !
+  ! Deallocates PETSc Viewer
+  !
+  ! Author: Heeho Park
+  ! Date: 11/08/18
+  !
+  implicit none
+
+  PetscViewer :: viewer
+  PetscInt :: iformat
+  PetscErrorCode :: ierr
+
+  !     DEBUG_NATIVE_FORMAT may not require PopFormat()
+  select case(iformat)
+    case(VIEWER_MATLAB_FORMAT,VIEWER_NATIVE_FORMAT)
+      call PetscViewerPopFormat(viewer,ierr);CHKERRQ(ierr)
+  end select
+  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+
+end subroutine PUViewerDestroy
 
 end module Petsc_Utility_module

@@ -159,7 +159,7 @@ subroutine PMSubsurfFlowReadSimOptionsSC(this,input,keyword,found, &
   implicit none
 
   class(pm_subsurface_flow_type) :: this
-  type(input_type) :: input
+  type(input_type), pointer :: input
   character(len=MAXWORDLENGTH) :: keyword
   PetscBool :: found
   character(len=MAXSTRINGLENGTH) :: error_string

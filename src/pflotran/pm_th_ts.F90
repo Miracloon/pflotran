@@ -353,7 +353,6 @@ subroutine PMTHTSIJacobian(this,ts,time,U,Udot,shift,A,B,ierr)
   PetscReal :: shift
   Mat :: A, B
   PetscErrorCode :: ierr
-  PetscViewer :: viewer
 
   type(field_type), pointer :: field
   type(discretization_type), pointer :: discretization
@@ -370,9 +369,9 @@ subroutine PMTHTSIJacobian(this,ts,time,U,Udot,shift,A,B,ierr)
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
-  call THJacobianInternalConn(J,realization,ierr)
-  call THJacobianBoundaryConn(J,realization,ierr)
-  call THJacobianSourceSink(J,realization,ierr)
+  call THJacobianInternalConn(J,realization,this%debug,ierr)
+  call THJacobianBoundaryConn(J,realization,this%debug,ierr)
+  call THJacobianSourceSink(J,realization,this%debug,ierr)
   call IJacobianAccumulation(J,shift,realization,ierr)
 
   if (A /= B) then
@@ -380,13 +379,9 @@ subroutine PMTHTSIJacobian(this,ts,time,U,Udot,shift,A,B,ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
   endif
 
-
-  call PetscViewerASCIIOpen(option%mycomm,'THTSjacobian.out',viewer, &
-                            ierr);CHKERRQ(ierr)
-  call MatView(J,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-
-
+  if (this%debug%matview_Matrix) then
+    call DebugMatView(this%debug,J,'THTSjacobian.out',this%option)
+  endif
 
 end subroutine PMTHTSIJacobian
 

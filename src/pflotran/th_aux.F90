@@ -10,9 +10,9 @@ module TH_Aux_module
 
   private
 
-  PetscInt, public :: TH_ni_count
-  PetscInt, public :: TH_ts_cut_count
-  PetscInt, public :: TH_ts_count
+  PetscInt, public :: th_ni_count
+  PetscInt, public :: th_ts_cut_count
+  PetscInt, public :: th_ts_count
 
   PetscBool, public :: th_scale_by_volume = PETSC_TRUE
   PetscBool, public :: th_numerical_derivatives = PETSC_FALSE
