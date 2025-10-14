@@ -29,6 +29,7 @@ module PM_Auxiliary_class
   end type pm_auxiliary_type
 
   type :: pm_auxiliary_salinity_type
+    PetscBool :: forbid_hydrostatic
     PetscInt :: nspecies
     character(len=MAXWORDLENGTH) :: species_names(6)
     PetscInt :: ispecies(6)
@@ -127,22 +128,24 @@ subroutine PMAuxiliarySetup(this)
 
   select case(this%ctype)
     case('SALINITY')
-      ! check if any boundary conditions are hydrostatic, as hydrostatic are
-      ! currently not supported
-      boundary_condition => &
-        this%realization%patch%boundary_condition_list%first
-      do
-        if (.not.associated(boundary_condition)) exit
-        if (associated(boundary_condition%flow_condition)) then
-          if (FlowConditionIsHydrostatic(boundary_condition% &
-                                           flow_condition)) then
-            this%option%io_buffer = 'Hydrostatic flow conditions are &
-              &currently not supported by the SALINITY process model.'
-            call PrintErrMsg(this%option)
+      if (this%salinity%forbid_hydrostatic) then
+        ! check if any boundary conditions are hydrostatic, as hydrostatic are
+        ! currently not supported
+        boundary_condition => &
+          this%realization%patch%boundary_condition_list%first
+        do
+          if (.not.associated(boundary_condition)) exit
+          if (associated(boundary_condition%flow_condition)) then
+            if (FlowConditionIsHydrostatic(boundary_condition% &
+                                             flow_condition)) then
+              this%option%io_buffer = 'Hydrostatic flow conditions are &
+                &currently not supported by the SALINITY process model.'
+              call PrintErrMsg(this%option)
+            endif
           endif
-        endif
-        boundary_condition => boundary_condition%next
-      enddo
+          boundary_condition => boundary_condition%next
+        enddo
+      endif
       ! set up species names
       do i =1, this%salinity%nspecies
         this%salinity%ispecies(i) = &
@@ -222,6 +225,7 @@ subroutine PMAuxiliaryRead(input, option, this)
     case('SALINITY')
       option%flow%density_depends_on_salinity = PETSC_TRUE
       allocate(this%salinity)
+      this%salinity%forbid_hydrostatic = PETSC_TRUE
       this%salinity%nspecies = 0
       this%salinity%species_names = ''
       this%salinity%ispecies = UNINITIALIZED_INTEGER
@@ -255,6 +259,8 @@ subroutine PMAuxiliaryRead(input, option, this)
               ! read from database later.
               call InputErrorMsg(input,option,'molecular weight',error_string)
             endif
+          case('ALLOW_HYDROSTATIC')
+            this%salinity%forbid_hydrostatic = PETSC_FALSE
           case default
             error_string = trim(error_string) // 'SALINITY'
             call InputKeywordUnrecognized(input,word,error_string,option)
