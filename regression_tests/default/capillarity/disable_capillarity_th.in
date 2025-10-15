@@ -1,0 +1,29 @@
+#Description: 1D variably saturated flow problem
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE TH
+      OPTIONS
+        DISABLE_CAPILLARITY
+      /
+    /
+  /
+END
+
+SUBSURFACE
+
+EXTERNAL_FILE disable_capillarity.txt
+
+#=========================== regression =======================================
+REGRESSION
+  CELLS_PER_PROCESS 5
+  VARIABLES
+    LIQUID_PRESSURE
+    LIQUID_SATURATION
+    TEMPERATURE
+  /
+END
+
+END_SUBSURFACE

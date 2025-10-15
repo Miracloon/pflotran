@@ -32,6 +32,7 @@ module Option_Flow_module
     PetscBool :: only_energy_eq
     PetscBool :: store_state_variables_in_global
     PetscBool :: isothermal
+    PetscBool :: disable_capillarity
 
     PetscBool :: full_perm_tensor
     PetscBool :: steady_state
@@ -161,6 +162,7 @@ subroutine OptionFlowInitRealization(option)
   option%full_perm_tensor = PETSC_FALSE
   option%store_state_variables_in_global = PETSC_FALSE
   option%isothermal = PETSC_FALSE
+  option%disable_capillarity = PETSC_FALSE
 
   option%set_secondary_init_temp = PETSC_FALSE
   option%update_flow_perm = PETSC_FALSE

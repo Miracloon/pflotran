@@ -236,6 +236,8 @@ subroutine PMTHReadSimOptionsBlock(this,input)
       case('INITIAL_WELL_TEMPERATURE')
         call InputReadDouble(input,option,th_well_init_well_temperature)
         call InputErrorMsg(input,option,keyword,error_string)
+      case('DISABLE_CAPILLARITY')
+        option%flow%disable_capillarity = PETSC_TRUE
       case default
         call InputKeywordUnrecognized(input,keyword,error_string,option)
     end select

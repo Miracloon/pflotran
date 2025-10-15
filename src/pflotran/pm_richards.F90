@@ -211,6 +211,8 @@ subroutine PMRichardsReadSimOptionsBlock(this,input)
         option%flow%inline_surface_Mannings_coeff = tempreal
       case('USE_MASS_DENSITY')
         richards_density_kmol_to_kg = 1.d0
+      case('DISABLE_CAPILLARITY')
+        option%flow%disable_capillarity = PETSC_TRUE
       case default
         call InputKeywordUnrecognized(input,keyword,error_string,option)
     end select

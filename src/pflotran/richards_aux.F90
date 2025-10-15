@@ -291,6 +291,10 @@ subroutine RichardsAuxVarCompute(x,auxvar,global_auxvar,material_auxvar, &
   auxvar%pc = min(option%flow%reference_pressure - global_auxvar%pres(1), &
                   characteristic_curves%saturation_function%pcmax)
 
+  if (option%flow%disable_capillarity) then
+    auxvar%pc = 0.d0
+  endif
+
 !***************  Liquid phase properties **************************
   pw = option%flow%reference_pressure
   ds_dp = 0.d0

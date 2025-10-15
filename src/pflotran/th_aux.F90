@@ -498,6 +498,10 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
   auxvar%pc = min(option%flow%reference_pressure - auxvar%pres, &
                   characteristic_curves%saturation_function%pcmax)
 
+  if (option%flow%disable_capillarity) then
+    auxvar%pc = 0.d0
+  endif
+
 !***************  Liquid phase properties **************************
   auxvar%avgmw = FMWH2O
 
