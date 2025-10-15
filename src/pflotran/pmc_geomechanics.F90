@@ -228,6 +228,17 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
                                       snapshot_plot_flag, &
                                       observation_plot_flag, &
                                       massbal_plot_flag,checkpoint_flag)
+
+  ! overwrites target time and dt for geomech when flow is the master pm
+  select case(this%option%geomechanics%split_scheme)
+    case(GEOMECH_FIXED_STRAIN_SPLIT)
+      this%timestepper%dt = this%option%flow_dt
+      this%timestepper%target_time = this%option%time
+    case default
+      this%option%dt = this%timestepper%dt
+      this%option%time = this%timestepper%target_time-this%timestepper%dt
+  end select
+
   call this%timestepper%StepDT(this%pm_list,local_stop_flag)
 
   ! Check if it is initial solve
