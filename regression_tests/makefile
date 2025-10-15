@@ -63,6 +63,7 @@ STANDARD_CFG = \
 	default/anisothermal/anisothermal.cfg \
 	default/batch/batch.cfg \
 	default/batch/nucleation/nucleation.cfg \
+	default/capillarity/capillarity.cfg \
 	default/carbon_sandbox/carbon_sandbox.cfg \
 	default/column/column.cfg \
 	default/constraint/constraint.cfg \
