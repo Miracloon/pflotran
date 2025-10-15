@@ -3195,7 +3195,7 @@ subroutine EOSWaterEnthalpyIF97(T,P,calculate_derivatives,hw, &
   pi = P/p_ref
   tao = T_ref/T_temp
 
-  if (Tf <= 623.15d0) then
+  if (T_temp <= 623.15d0) then
     ! Region 1: Valid from 273.15 K to 623.15 K, Ps(T) to 100MPa
     g_tao = sum((n_i*(7.1d0-pi)**(I_i))*J_i*(tao-1.222d0)**(J_i-1))
 
