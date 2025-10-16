@@ -484,7 +484,7 @@ recursive subroutine PMSubsurfaceFlowInitializeRun(this)
           &fractions.'
         call PrintErrMsg(this%option)
       else if (.not.this%option%restart_flag) then
-        call RealizationCalcMineralPorosity(this%realization)
+        call RealizationUpdateMineralPorosity(this%realization)
         call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                      this%realization%field%work_loc, &
                                      POROSITY,POROSITY_BASE)
