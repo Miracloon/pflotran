@@ -3271,6 +3271,9 @@ subroutine ReactionReadOutput(reaction,input,option)
       case('MINERAL_VOLUME_FRACTION')
         print_something = PETSC_TRUE
         reaction%mineral%print_volume_fraction = PETSC_TRUE
+      case('SUM_MINERAL_VOLUME_FRACTION')
+        print_something = PETSC_TRUE
+        reaction%mineral%print_sum_volume_fraction = PETSC_TRUE
       case('MINERAL_RATE')
         print_something = PETSC_TRUE
         reaction%mineral%print_rate = PETSC_TRUE
@@ -6265,6 +6268,13 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
                                      MINERAL_VOLUME_FRACTION,i)
       endif
     enddo
+  endif
+
+  if (reaction%mineral%print_sum_volume_fraction) then
+    name = 'Sum Mineral VF'
+    units = 'm^3 mnrl/m^3 bulk'
+    call OutputVariableAddToList(list,name,OUTPUT_VOLUME_FRACTION,units, &
+                                  SUM_MINERAL_VOLUME_FRACTION,i)
   endif
 
   if (reaction%mineral%print_rate) then
