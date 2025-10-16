@@ -41,12 +41,25 @@ for ifilename in range(len(filenames)):
       columns = []
       columns.append(int(0))
       for i in range(len(w)):
-        if not w[i].isdigit():
-          print('Entry %s not a recognized integer' % w[i])
+        ww = w[i].split('-')
+        if len(ww) > 1:
+          error = False
+          if not ww[0].isdigit():
+            print('First entry %s not a recognized integer' % ww[0])
+            error = True
+          if not ww[1].isdigit():
+            print('Second entry %s not a recognized integer' % ww[1])
+            error = True
+          if not error:
+            for ii in range(int(ww[0])-1,int(ww[1])):
+              columns.append(ii)
         else:
-          icol = int(w[i])-1
-          if icol > 0:
-            columns.append(int(w[i])-1)
+          if not ww[0].isdigit():
+            print('Entry %s not a recognized integer' % ww[0])
+          else:
+            icol = int(w[i])-1
+            if icol > 0:
+              columns.append(int(w[i])-1)
       print('Desired columns include:')
       for i in range(len(columns)):
         print('%d: %s' % (i+1,headings[columns[i]]))
@@ -72,11 +85,13 @@ for ifile in range(len(files)):
   fout.write('\t')
 fout.write('\n')
 # write out variable header
+i = 0
 for ifile in range(len(files)):
   for icol in range(len(columns)):
+    if i > 0:
+      fout.write(',\t')
     fout.write(headings[columns[icol]])
-    fout.write('\t')
-  fout.write('\t')
+    i += 1
 fout.write('\n')
 while(1):
   end_of_all_files_found = 1

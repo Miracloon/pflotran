@@ -6281,7 +6281,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     do i=1,reaction%mineral%nkinmnrl
       if (reaction%mineral%kinmnrl_print(i)) then
         name = trim(reaction%mineral%kinmnrl_names(i)) // ' Rate'
-        units = 'mol/m^3/sec'
+        units = 'mol/m^3 bulk/sec'
         call OutputVariableAddToList(list,name,OUTPUT_RATE,units, &
                                      MINERAL_RATE,i)
       endif
@@ -6303,7 +6303,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     do i=1,reaction%mineral%nkinmnrl
       if (reaction%mineral%kinmnrl_print(i)) then
         name = trim(reaction%mineral%kinmnrl_names(i)) // ' Area'
-        units = 'm^2/m^3'
+        units = 'm^2 mnrl/m^3 bulk'
         call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                      MINERAL_SURFACE_AREA,i,i)
       endif
@@ -6313,7 +6313,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
   do i=1,reaction%immobile%nimmobile
     if (reaction%immobile%print_me(i)) then
       name = trim(reaction%immobile%names(i))
-      units = 'mol/m^3'
+      units = 'mol/m^3 bulk'
       call OutputVariableAddToList(list,name,OUTPUT_CONCENTRATION,units, &
                                    IMMOBILE_SPECIES,i)
     endif
@@ -6387,7 +6387,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     do i=1,reaction%naqcomp
       if (reaction%total_sorb_print(i)) then
         name = 'Total Sorbed ' // trim(reaction%primary_species_names(i))
-        units = 'mol/m^3'
+        units = 'mol/m^3 bulk'
         call  OutputVariableAddToList(list,name,OUTPUT_CONCENTRATION,units, &
                                       TOTAL_SORBED,i)
       endif
