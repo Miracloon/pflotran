@@ -124,6 +124,15 @@
        41:   9.9997479011596E-06
        61:   9.9997911772988E-06
        81:   9.9996372004927E-06
+-- VOLUME_FRACTION: Sum Mineral VF --
+      Max:   7.4999999979186E-01
+      Min:   7.4999000000000E-01
+     Mean:   7.4999659831368E-01
+        1:   7.4999000000000E-01
+       21:   7.4999000000000E-01
+       41:   7.4999999974790E-01
+       61:   7.4999999979118E-01
+       81:   7.4999999963720E-01
 -- RATE: Quartz Rate --
       Max:   0.0000000000000E+00
       Min:   0.0000000000000E+00
@@ -152,7 +161,7 @@
        61:         1
        81:         1
 -- SOLUTION: Flow --
-   Time (seconds):   7.5906588999942E-02
+   Time (seconds):   8.1344336999109E-02
    Time Steps:          111
    Newton Iterations:          214
    Linear Solver Iterations:          214
@@ -160,7 +169,7 @@
    Solution 2-Norm:   2.0273838662527E+06
    Residual 2-Norm:   1.1202000063464E-17
 -- SOLUTION: Transport --
-   Time (seconds):   5.5361551500005E-01
+   Time (seconds):   5.4976314799865E-01
    Time Steps:          144
    Newton Iterations:          694
    Linear Solver Iterations:          694

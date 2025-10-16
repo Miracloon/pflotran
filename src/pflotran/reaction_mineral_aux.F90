@@ -119,6 +119,7 @@ module Reaction_Mineral_Aux_module
     PetscBool :: print_saturation_index
     PetscBool :: print_rate
     PetscBool :: print_volume_fraction
+    PetscBool :: print_sum_volume_fraction
     PetscBool :: print_surface_area
     character(len=MAXWORDLENGTH), pointer :: mineral_names(:)
 
@@ -235,6 +236,7 @@ function ReactionMnrlCreateAux()
   nullify(mineral%mineral_list)
   mineral%print_all = PETSC_FALSE
   mineral%print_volume_fraction = PETSC_TRUE
+  mineral%print_sum_volume_fraction = PETSC_FALSE
   mineral%print_rate = PETSC_TRUE
   mineral%print_saturation_index = PETSC_FALSE
   mineral%print_surface_area = PETSC_FALSE

@@ -27,7 +27,8 @@ module Reaction_Mineral_module
             ReactionMnrlUpdateTempDepCoefs, &
             ReactionMnrlUpdateSpecSurfArea, &
             ReactionMnrlUpdateKineticState, &
-            ReactionMnrlReportZeroSurfArea
+            ReactionMnrlReportZeroSurfArea, &
+            ReactionMnrlCalcSumVolFrac
 
 contains
 
@@ -2251,5 +2252,35 @@ subroutine ReactionMnrlReportZeroSurfArea(imnrl,surface_area,mineral, &
   endif
 
 end subroutine ReactionMnrlReportZeroSurfArea
+
+! ************************************************************************** !
+
+function ReactionMnrlCalcSumVolFrac(rt_auxvar,mineral)
+  !
+  ! Calculates porosity based on the sum of mineral volume fractions
+  !
+  ! Author: Glenn Hammond
+  ! Date: 11/03/14
+  !
+  use Reactive_Transport_Aux_module
+
+  implicit none
+
+  type(mineral_type), pointer :: mineral
+  type(reactive_transport_auxvar_type) :: rt_auxvar
+
+  PetscReal :: ReactionMnrlCalcSumVolFrac
+
+  PetscInt :: imnrl
+  PetscReal :: sum
+
+  sum = 0.d0
+  do imnrl = 1, mineral%nkinmnrl
+    sum = sum + rt_auxvar%mnrl_volfrac(imnrl)
+  enddo
+
+  ReactionMnrlCalcSumVolFrac = sum
+
+end function ReactionMnrlCalcSumVolFrac
 
 end module Reaction_Mineral_module

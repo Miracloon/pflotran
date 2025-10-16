@@ -586,7 +586,7 @@ recursive subroutine PMRTInitializeRun(this)
   call RealizUnInitializedVarsTran(this%realization)
 
   if (this%transient_porosity) then
-    call RealizationCalcMineralPorosity(this%realization)
+    call RealizationUpdateMineralPorosity(this%realization)
     call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                  this%realization%field%work_loc, &
                                  POROSITY,POROSITY_BASE)
