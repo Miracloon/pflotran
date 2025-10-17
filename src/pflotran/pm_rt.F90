@@ -1388,7 +1388,6 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
   PetscInt :: i
   PetscReal :: inorm_residual
   PetscReal :: tempreal
-  PetscReal :: temp_array(100)
   PetscReal, parameter :: tol = 1.d-2
   PetscReal, parameter :: pert = 1.d-40
   PetscBool :: found
@@ -1545,27 +1544,37 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
     call PrintMsg(option,out_string)
 
     if (this%logging_verbosity > 0 .and. it > 0) then
+      out_string = '    iru:'
       do i = 1, option%ntrandof
         if (this%converged_real(i,POS_REL_UPDATE_INDEX) + &
             this%converged_real(i,NEG_REL_UPDATE_INDEX) > 0.d0) then
-          temp_array(i) = this%converged_real(i,POS_REL_UPDATE_INDEX)
+          tempreal = this%converged_real(i,POS_REL_UPDATE_INDEX)
         else
-          temp_array(i) = this%converged_real(i,NEG_REL_UPDATE_INDEX)
+          tempreal = this%converged_real(i,NEG_REL_UPDATE_INDEX)
+        endif
+        if (option%comm%size == 1) then
+          out_string = trim(out_string) // ' ' // &
+            StringWrite(this%converged_cell(i,ABS_REL_UPDATE_INDEX))
+        endif
+        if (tempreal > 0.d0) then
+          out_string = trim(out_string) // '  ' // &
+            StringWrite('(es10.2)',tempreal)
+        else
+          out_string = trim(out_string) // ' ' // &
+            StringWrite('(es10.2)',tempreal)
         endif
       enddo
-      if (option%comm%size > 1) then
-        ! only absolute change can be handled in parallel due to limitation
-        ! in calculating maximum positive or negative values in parallel
-        write(out_string,'(4x,*(es10.2))') (temp_array,i=1,option%ntrandof)
-      else if (this%realization%patch%grid%nmax > 9999) then
-        write(out_string,'(4x,*(i8,es10.2))') &
-          (this%converged_cell(i,ABS_REL_UPDATE_INDEX), &
-           temp_array(i),i=1,option%ntrandof)
-      else
-        write(out_string,'(4x,*(i5,es10.2))') &
-          (this%converged_cell(i,ABS_REL_UPDATE_INDEX), &
-           temp_array(i),i=1,option%ntrandof)
-      endif
+      call PrintMsg(option,out_string)
+      out_string = '    isr:'
+      do i = 1, option%ntrandof
+        if (option%comm%size == 1) then
+          out_string = trim(out_string) // ' ' // &
+            StringWrite(this%converged_cell(i,ABS_SCALED_RESIDUAL_INDEX))
+        endif
+        out_string = trim(out_string) // '  ' // &
+          StringWrite('(es10.2)', &
+                      this%converged_real(i,ABS_SCALED_RESIDUAL_INDEX))
+      enddo
       call PrintMsg(option,out_string)
     endif
   else

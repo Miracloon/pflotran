@@ -61,6 +61,7 @@ contains
 #define DEBUG_RT_RES_INTERNAL_CONNECTION
 #define DEBUG_RT_RES_BOUNDARY_CONNECTION
 #define DEBUG_RT_RES_SOURCE_SINK
+#define DEBUG_RT_RES_REACTION
 #define DEBUG_RT_RES_CO2_SOURCE
 #define DEBUG_RT_RES_EQUILIBRATE_CO2
 #endif
@@ -69,6 +70,7 @@ contains
 #define DEBUG_RT_JAC_INTERNAL_CONNECTION
 #define DEBUG_RT_JAC_BOUNDARY_CONNECTION
 #define DEBUG_RT_JAC_SOURCE_SINK
+#define DEBUG_RT_JAC_REACTION
 #define DEBUG_RT_JAC_CO2_SOURCE
 #define DEBUG_RT_JAC_EQUILIBRATE_CO2
 #endif
@@ -2904,7 +2906,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
       if (option%use_sc) then
         Res = Res*rt_sec_transport_vars(ghosted_id)%epsilon
       endif
-#if defined(DEBUG_RT_RES_ACCUMULATION)
+#if defined(DEBUG_RT_RES_REACTION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'rax: ', grid%nG2A(ghosted_id)
         print *, ' Res: ', Res
