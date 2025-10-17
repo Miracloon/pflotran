@@ -1003,6 +1003,7 @@ subroutine FactSubLinkAddPMCWell(simulation,pm_well_list,pmc_name,input)
   type(option_type), pointer :: option
   PetscBool :: found
   PetscInt :: num_wells
+  PetscInt :: iwell
   PetscInt :: i,j
 
   realization => simulation%realization
@@ -1063,9 +1064,11 @@ subroutine FactSubLinkAddPMCWell(simulation,pm_well_list,pmc_name,input)
   nullify(simulation%temp_well_process_model_list)
 
   pm_well => pm_well_list
+  iwell = 0
   do
     if (.not. associated(pm_well)) exit
 
+    iwell = iwell + 1
     string = 'WELL_MODEL_OUTPUT'
     call InputFindStringInFile(input,option,string)
     if (.not. well_output) then
@@ -1095,7 +1098,12 @@ subroutine FactSubLinkAddPMCWell(simulation,pm_well_list,pmc_name,input)
     pm_well%realization => realization
 
     pmc_well => PMCThirdPartyCreate()
-    call pmc_well%SetName(pmc_name)
+    string = trim(pmc_name)
+    if (associated(pm_well_list%next_well)) then
+      ! multiple wells
+      string = trim(string) // StringWrite(iwell)
+    endif
+    call pmc_well%SetName(string)
     call pmc_well%SetOption(option)
     call pmc_well%SetWaypointList(simulation%waypoint_list_subsurface)
     pmc_well%pm_list => pm_well

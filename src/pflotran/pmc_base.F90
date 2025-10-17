@@ -1808,7 +1808,7 @@ subroutine SetName(this, name)
   class(pmc_base_type) :: this
   character(len=*) :: name
 
-  this%name = name
+  this%name = trim(name)
 
 end subroutine SetName
 
