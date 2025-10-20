@@ -363,6 +363,8 @@ subroutine SCO2InitializeTimestep(realization)
   update_upwind_direction = PETSC_TRUE
   call SCO2UpdateFixedAccum(realization)
 
+  sco2_ts_count = sco2_ts_count + 1
+  sco2_ts_cut_count = 0
   sco2_ni_count = 0
 
 end subroutine SCO2InitializeTimestep
@@ -454,10 +456,6 @@ subroutine SCO2UpdateSolution(realization)
     endif
 
   enddo
-
-  sco2_ts_count = sco2_ts_count + 1
-  sco2_ts_cut_count = 0
-  sco2_ni_count = 0
 
 end subroutine SCO2UpdateSolution
 

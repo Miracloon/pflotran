@@ -65,7 +65,9 @@ module PM_RT_class
     PetscBool :: dampen_oscillatory_updates
     PetscBool :: dampen_update
     PetscInt :: dampen_count
+    PetscInt :: dampen_start_iteration
     PetscReal :: dampening_factor
+    PetscReal :: dampening_factor_from_input
   contains
     procedure, public :: Setup => PMRTSetup
     procedure, public :: ReadSimulationOptionsBlock => PMRTReadSimOptionsBlock
@@ -185,7 +187,9 @@ subroutine PMRTInit(pm_rt)
   pm_rt%dampen_oscillatory_updates = PETSC_FALSE
   pm_rt%dampen_update = PETSC_FALSE
   pm_rt%dampen_count = 0
+  pm_rt%dampen_start_iteration = UNINITIALIZED_INTEGER
   pm_rt%dampening_factor = 1.d0
+  pm_rt%dampening_factor_from_input = UNINITIALIZED_DOUBLE
 
   rt_debug_cell_id = UNINITIALIZED_INTEGER
 
@@ -394,6 +398,12 @@ subroutine PMRTReadNewtonSelectCase(this,input,keyword,found, &
       this%check_post_convergence = PETSC_TRUE
     case('DAMPEN_OSCILLATION')
       this%dampen_oscillatory_updates = PETSC_TRUE
+    case('DAMPEN_START_ITERATION')
+      call InputReadInt(input,option,this%dampen_start_iteration)
+      call InputErrorMsg(input,option,keyword,error_string)
+    case('DAMPENING_FACTOR')
+      call InputReadDouble(input,option,this%dampening_factor_from_input)
+      call InputErrorMsg(input,option,keyword,error_string)
     case default
       found = PETSC_FALSE
 
@@ -1624,6 +1634,13 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
     if (this%dampen_update) this%dampen_count = this%dampen_count + 1
   endif
 
+  if (Initialized(this%dampen_start_iteration)) then
+    if (this%dampen_start_iteration <= it) then
+      this%dampen_update = PETSC_TRUE
+      this%dampening_factor = this%dampening_factor_from_input
+    endif
+  endif
+
 end subroutine PMRTCheckConvergence
 
 ! ************************************************************************** !
@@ -1678,8 +1695,6 @@ subroutine PMRTUpdateSolution2(this,update_kinetics)
   use Reactive_Transport_module
   use Condition_module
   use Integral_Flux_module
-  use Reactive_Transport_Aux_module, only : rt_ts_count, rt_ni_count, &
-                                            rt_ts_cut_count
 
   implicit none
 
@@ -1716,10 +1731,6 @@ subroutine PMRTUpdateSolution2(this,update_kinetics)
                             this%realization%patch%boundary_tran_fluxes, &
                             INTEGRATE_TRANSPORT,this%option)
   endif
-
-  rt_ts_count = rt_ts_count + 1
-  rt_ni_count = 0
-  rt_ts_cut_count = 0
 
 end subroutine PMRTUpdateSolution2
 

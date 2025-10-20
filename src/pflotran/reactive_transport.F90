@@ -907,6 +907,10 @@ subroutine RTInitializeTimestep(realization)
   ! geh: never use transport coefs evaluated at time k
 !  call RTUpdateTransportCoefs(realization)
 
+  rt_ts_count = rt_ts_count + 1
+  rt_ni_count = 0
+  rt_ts_cut_count = 0
+
 end subroutine RTInitializeTimestep
 
 ! ************************************************************************** !
@@ -3875,7 +3879,9 @@ subroutine RTUpdateAuxVars(realization,update_cells,update_bcs, &
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'uav: ', grid%nG2A(ghosted_id)
         print *, ' pri_molal: ', rt_auxvars(ghosted_id)%pri_molal
-        print *, ' total: ', rt_auxvars(ghosted_id)%total(:,1)
+        print *, ' sec_molal: ', rt_auxvars(ghosted_id)%sec_molal
+        print *, '     total: ', rt_auxvars(ghosted_id)%total(:,1)
+        print *, '    dtotal: ', rt_auxvars(ghosted_id)%aqueous%dtotal(:,:,1)
       endif
 #endif
     enddo
