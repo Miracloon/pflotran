@@ -2594,6 +2594,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
   PetscReal :: Jup(realization%reaction%ncomp,realization%reaction%ncomp)
   PetscInt :: sum_connection
   PetscInt :: nphase
+  PetscBool :: scale_rate
 
   ! CO2-specific
   PetscReal :: msrc(1:realization%option%nflowspec)
@@ -2806,6 +2807,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
         cur_connection_set => source_sink%connection_set
 
+        scale_rate = PETSC_FALSE
         if (associated(source_sink%flow_condition%well)) then
           if (dabs(source_sink%flow_condition%well%aux_real(1)) < 1.d-30 .and. &
               dabs(source_sink%flow_condition%well%aux_real(2)) < 1.d-30) then
@@ -2829,6 +2831,10 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
                   msrc(:) = source_sink%flow_condition%sco2%rate%dataset% &
                             rarray(:)
               end select
+              select case(source_sink%flow_condition%itype(1))
+                case(SCALED_MASS_RATE_SS)
+                  scale_rate = PETSC_TRUE
+              end select
             case default
               option%io_buffer = 'Unsupported CO2 flow condition in &
                 &RTResidualNonFlux'
@@ -2839,6 +2845,8 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
         msrc(1) =  msrc(1) / FMWH2O*1D3
         msrc(2) =  msrc(2) / FMWCO2*1D3
+
+        scale = 1.d0
         do iconn = 1, cur_connection_set%num_connections
           local_id = cur_connection_set%id_dn(iconn)
           ghosted_id = grid%nL2G(local_id)
@@ -2846,11 +2854,9 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
           if (patch%imat(ghosted_id) <= 0) cycle
 
-          scale = 1.d0
-          select case(source_sink%flow_condition%itype(1))
-            case(SCALED_MASS_RATE_SS)
-              scale = source_sink%flow_aux_real_var(ONE_INTEGER,iconn)
-          end select
+          if (scale_rate) then
+            scale = source_sink%flow_aux_real_var(ONE_INTEGER,iconn)
+          endif
 
           offset = (local_id-1)*option%ntrandof
           icomp = reaction%gas%acteqspecid(1,iactgas)
