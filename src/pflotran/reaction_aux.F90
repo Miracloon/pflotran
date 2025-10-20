@@ -35,8 +35,8 @@ module Reaction_Aux_module
     PetscInt :: pri_co2_id
     PetscInt :: co2_aq_id
     PetscInt :: tracer_aq_id
-    PetscInt :: co2_gas_id
-    PetscInt :: o2_gas_id
+    PetscInt :: act_co2_gas_id
+    PetscInt :: pas_o2_gas_id
     PetscInt :: water_age_id
     PetscInt :: tracer_age_id
   end type species_idx_type
@@ -582,8 +582,8 @@ function ReactionAuxCreateAqSpeciesIndex()
   species_idx%pri_co2_id = 0
   species_idx%co2_aq_id = 0
   species_idx%tracer_aq_id = 0
-  species_idx%co2_gas_id = 0
-  species_idx%o2_gas_id = 0
+  species_idx%act_co2_gas_id = 0
+  species_idx%pas_o2_gas_id = 0
   species_idx%tracer_age_id = 0
   species_idx%water_age_id = 0
 

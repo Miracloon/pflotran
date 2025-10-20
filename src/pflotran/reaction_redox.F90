@@ -133,7 +133,7 @@ subroutine ReactionRedoxCalcLnFO2(rt_auxvar,global_auxvar,reaction, &
   PetscInt :: jcomp
   PetscInt :: comp_id
 
-  io2gas = reaction%species_idx%o2_gas_id
+  io2gas = reaction%species_idx%pas_o2_gas_id
     ! compute gas partial pressure
   lnQKo2 = -reaction%gas%paseqlogK(io2gas)*LOG_TO_LN
   ! activity of water
