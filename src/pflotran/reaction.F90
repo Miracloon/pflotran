@@ -1604,7 +1604,7 @@ subroutine ReactionEquilibrateConstraint(rt_auxvar,global_auxvar, &
         ! check that H+ is present and O2 is a passive gas
         if (associated(reaction%species_idx)) then
           if (reaction%species_idx%h_ion_id == 0 .or. &
-              reaction%species_idx%o2_gas_id == 0) then
+              reaction%species_idx%pas_o2_gas_id == 0) then
             flag = PETSC_TRUE
           endif
         else
@@ -1823,7 +1823,7 @@ subroutine ReactionEquilibrateConstraint(rt_auxvar,global_auxvar, &
 
         case(CONSTRAINT_PE)
           ! icomp should be O2(aq)
-          io2gas = reaction%species_idx%o2_gas_id
+          io2gas = reaction%species_idx%pas_o2_gas_id
           Res(icomp) = 0.d0
           Jac(icomp,:) = 0.d0
           call ReactionRedoxCalcEhpe(rt_auxvar,global_auxvar,reaction,eh,pe,option)
@@ -1912,7 +1912,7 @@ subroutine ReactionEquilibrateConstraint(rt_auxvar,global_auxvar, &
           igas = constraint_id(icomp)
 
           ! compute secondary species concentration
-          if (abs(reaction%species_idx%co2_gas_id) == igas) then
+          if (abs(reaction%species_idx%act_co2_gas_id) == igas) then
 
             global_auxvar%pres(2) = conc(icomp)*1.d5
             call RCO2CalculateSCO2Solubility(rt_auxvar,global_auxvar, &
@@ -1921,6 +1921,10 @@ subroutine ReactionEquilibrateConstraint(rt_auxvar,global_auxvar, &
             Res(icomp) = rt_auxvar%pri_molal(icomp) - gas_solubility
             Jac(icomp,:) = 0.d0
             Jac(icomp,icomp) = 1.d0
+         else
+           option%io_buffer = 'igas in does not mach co2_gas_id in &
+             &ReactionEquilibrateConstraint for CONSTRAINT_SUPERCRIT_CO2.'
+           call PrintErrMsg(option)
          endif
         ! end CO2-specific
       end select
@@ -2365,7 +2369,7 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
             if (aq_species_constraint%constraint_type(i) == &
                 CONSTRAINT_SUPERCRIT_CO2) then
               igas = aq_species_constraint%constraint_spec_id(i)
-              if (abs(reaction%species_idx%co2_gas_id) == igas) then
+              if (abs(reaction%species_idx%act_co2_gas_id) == igas) then
                 option%io_buffer = 'Adding "scco2_eq_logK" to &
                   &global_auxvar_type solely so you can set reaction%&
                   &%gas%paseqlogK(igas) within ReactionPrintConstraint&
@@ -2393,7 +2397,7 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
       if (reaction%species_idx%h_ion_id /= 0) then
         call ReactionRedoxCalcpH(rt_auxvar,global_auxvar,reaction,ph,option)
         write(option%fid_out,203) '              pH: ',ph
-        if (reaction%species_idx%o2_gas_id > 0) then
+        if (reaction%species_idx%pas_o2_gas_id > 0) then
           call ReactionRedoxCalcEhpe(rt_auxvar,global_auxvar,reaction,eh,pe, &
                               option)
           write(option%fid_out,203) '              pe: ',pe
@@ -6119,7 +6123,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
       call PrintErrMsg(option)
     endif
     if ((reaction%print_EH .or. reaction%print_pe .or. &
-         reaction%print_O2) .and. reaction%species_idx%o2_gas_id == 0) then
+         reaction%print_O2) .and. reaction%species_idx%pas_o2_gas_id == 0) then
       option%io_buffer = 'logfO2, Eh or pe may not be printed when O2(g) &
           &is not defined as a species.'
       call PrintErrMsg(option)
@@ -6146,7 +6150,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
       name = 'logfO2'
       units = 'bars'
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units,O2, &
-                                  reaction%species_idx%o2_gas_id)
+                                  reaction%species_idx%pas_o2_gas_id)
     endif
   endif
 

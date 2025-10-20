@@ -1647,15 +1647,14 @@ subroutine RTCalculateRHS_t1(realization,rhs_vec)
 
           if (patch%imat(ghosted_id) <= 0) cycle
 
+          offset = (local_id-1)*reaction%ncomp
           select case(source_sink%flow_condition%itype(1))
             case(MASS_RATE_SS)
               do iactgas = 1, reaction%gas%nactive_gas
-                if (abs(reaction%species_idx%co2_gas_id) == iactgas) then
-                  icomp = reaction%gas%paseqspecid(1,iactgas)
-                  iendall = local_id*reaction%ncomp
-                  istartall = iendall-reaction%ncomp
+                if (reaction%species_idx%act_co2_gas_id == iactgas) then
+                  icomp = reaction%gas%acteqspecid(1,iactgas)
                   Res(icomp) = -msrc(2)
-                  rhs_p(istartall+icomp) = rhs_p(istartall+icomp) - Res(icomp)
+                  rhs_p(offset+icomp) = rhs_p(offset+icomp) - Res(icomp)
 !                 print *,'RT SC source', iactgas,icomp, res(icomp)
                 endif
               enddo
@@ -2591,6 +2590,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
   PetscInt :: iconn
   PetscReal :: qsrc_flow(2)
   PetscReal :: coef_in(2), coef_out(2)
+  PetscReal :: scale
   PetscReal :: Jup(realization%reaction%ncomp,realization%reaction%ncomp)
   PetscInt :: sum_connection
   PetscInt :: nphase
@@ -2799,6 +2799,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
   ! CO2-specific
   if (option%transport%couple_co2) then
+      iactgas = reaction%species_idx%act_co2_gas_id
       source_sink => patch%source_sink_list%first
       do
         if (.not.associated(source_sink)) exit
@@ -2820,7 +2821,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
           endif
         else
           select case(source_sink%flow_condition%itype(1))
-            case(MASS_RATE_SS)
+            case(MASS_RATE_SS,SCALED_MASS_RATE_SS)
               select case(option%iflowmode)
                 case (MPH_MODE)
                   msrc(:) = source_sink%flow_condition%rate%dataset%rarray(:)
@@ -2829,13 +2830,15 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
                             rarray(:)
               end select
             case default
+              option%io_buffer = 'Unsupported CO2 flow condition in &
+                &RTResidualNonFlux'
+              call PrintErrMsg(option)
               msrc(:) = 0.d0
           end select
         endif
 
         msrc(1) =  msrc(1) / FMWH2O*1D3
         msrc(2) =  msrc(2) / FMWCO2*1D3
-        ! print *,'RT SC source'
         do iconn = 1, cur_connection_set%num_connections
           local_id = cur_connection_set%id_dn(iconn)
           ghosted_id = grid%nL2G(local_id)
@@ -2843,35 +2846,16 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
           if (patch%imat(ghosted_id) <= 0) cycle
 
-          if (associated(source_sink%flow_condition%well)) then
-            select case(option%iflowmode)
-              case (SCO2_MODE)
-                do iactgas = 1, reaction%gas%nactive_gas
-                  if (abs(reaction%species_idx%co2_gas_id) == iactgas) then
-                    icomp = reaction%gas%paseqspecid(1,iactgas)
-                    iendall = local_id*reaction%ncomp
-                    istartall = iendall-reaction%ncomp
-                    Res(icomp) = -msrc(2)
-                    r_p(istartall+icomp) = r_p(istartall+icomp) + Res(icomp)
-                  ! print *,'RT SC source', iactgas,icomp, res(icomp)
-                  endif
-                enddo
-            end select
-          else
-            select case(source_sink%flow_condition%itype(1))
-              case(MASS_RATE_SS)
-                do iactgas = 1, reaction%gas%nactive_gas
-                  if (abs(reaction%species_idx%co2_gas_id) == iactgas) then
-                    icomp = reaction%gas%paseqspecid(1,iactgas)
-                    iendall = local_id*reaction%ncomp
-                    istartall = iendall-reaction%ncomp
-                    Res(icomp) = -msrc(2)
-                    r_p(istartall+icomp) = r_p(istartall+icomp) + Res(icomp)
-                  ! print *,'RT SC source', iactgas,icomp, res(icomp)
-                  endif
-                enddo
-            end select
-          endif
+          scale = 1.d0
+          select case(source_sink%flow_condition%itype(1))
+            case(SCALED_MASS_RATE_SS)
+              scale = source_sink%flow_aux_real_var(ONE_INTEGER,iconn)
+          end select
+
+          offset = (local_id-1)*option%ntrandof
+          icomp = reaction%gas%acteqspecid(1,iactgas)
+          Res(icomp) = -msrc(2)*scale
+          r_p(offset+icomp) = r_p(offset+icomp) + Res(icomp)
 #if defined(DEBUG_RT_RES_CO2_SOURCE)
           if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
             print *, 'rcs: ', grid%nG2A(ghosted_id)

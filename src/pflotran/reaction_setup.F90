@@ -797,83 +797,74 @@ subroutine ReactionSetupSpecificSpecies(reaction,option)
   type(option_type) :: option
 
   character(len=MAXWORDLENGTH) :: word
+  character(len=MAXWORDLENGTH) :: species_name
   PetscInt :: ispec
 
   ! locate specific species
   reaction%species_idx => ReactionAuxCreateAqSpeciesIndex()
   do ispec = 1, reaction%naqcomp
+    species_name = reaction%primary_species_names(ispec)
     if (reaction%species_idx%h_ion_id == 0) then
       word = 'H+'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%h_ion_id = ispec
       endif
     endif
     if (reaction%species_idx%na_ion_id == 0) then
       word = 'Na+'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%na_ion_id = ispec
       endif
     endif
     if (reaction%species_idx%cl_ion_id == 0) then
       word = 'Cl-'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%cl_ion_id = ispec
       endif
     endif
     ! this can be CO2(aq), HCO3-, CO3-2
     if (reaction%species_idx%pri_co2_id == 0) then
       word = 'CO2(aq)'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%pri_co2_id = ispec
       endif
       word = 'HCO3-'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%pri_co2_id = ispec
       endif
       word = 'CO3--'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%pri_co2_id = ispec
       endif
     endif
     if (reaction%species_idx%co2_aq_id == 0) then
       word = 'CO2(aq)'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%co2_aq_id = ispec
       endif
     endif
     if (reaction%species_idx%tracer_aq_id == 0) then
       word = 'Tracer'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%tracer_aq_id = ispec
       endif
     endif
     if (reaction%species_idx%h2o_aq_id == 0) then
       word = 'H2O'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%h2o_aq_id = ispec
       endif
     endif
     if (reaction%species_idx%tracer_age_id == 0) then
       word = 'Tracer_Age'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%tracer_age_id = ispec
         reaction%calculate_tracer_age = PETSC_TRUE
       endif
     endif
     if (reaction%species_idx%water_age_id == 0) then
       word = 'Water_Age'
-      if (StringCompareIgnoreCase(reaction%primary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%water_age_id = ispec
         reaction%calculate_water_age = PETSC_TRUE
       endif
@@ -881,59 +872,56 @@ subroutine ReactionSetupSpecificSpecies(reaction,option)
   enddo
 
   do ispec = 1, reaction%neqcplx
+    species_name = reaction%secondary_species_names(ispec)
     if (reaction%species_idx%h_ion_id == 0) then
       word = 'H+'
-      if (StringCompareIgnoreCase(reaction%secondary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%h_ion_id = -ispec
       endif
     endif
     if (reaction%species_idx%na_ion_id == 0) then
       word = 'Na+'
-      if (StringCompareIgnoreCase(reaction%secondary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%na_ion_id = -ispec
       endif
     endif
     if (reaction%species_idx%cl_ion_id == 0) then
       word = 'Cl-'
-      if (StringCompareIgnoreCase(reaction%secondary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%cl_ion_id = -ispec
       endif
     endif
     if (reaction%species_idx%co2_aq_id == 0) then
       word = 'CO2(aq)'
-      if (StringCompareIgnoreCase(reaction%secondary_species_names(ispec), &
-                                  word)) then
+      if (StringCompareIgnoreCase(species_name,word)) then
         reaction%species_idx%co2_aq_id = -ispec
+      endif
+    endif
+  enddo
+
+  do ispec = 1, reaction%gas%nactive_gas
+    species_name = reaction%gas%active_names(ispec)
+    if (reaction%species_idx%act_co2_gas_id == 0) then
+      word = 'CO2(g)'
+      if (StringCompareIgnoreCase(species_name,word)) then
+        reaction%species_idx%act_co2_gas_id = ispec
+      endif
+      word = 'CO2(g)*'
+      if (StringCompareIgnoreCase(species_name,word)) then
+        reaction%species_idx%act_co2_gas_id = ispec
       endif
     endif
   enddo
 
   ! these are passive gases used in CONSTRAINTS
   do ispec = 1, reaction%gas%npassive_gas
-    if (reaction%species_idx%o2_gas_id == 0) then
+    species_name = reaction%gas%passive_names(ispec)
+    if (reaction%species_idx%pas_o2_gas_id == 0) then
       word = 'O2(g)'
-      if (StringCompareIgnoreCase(reaction%gas%passive_names(ispec), &
-                                  word)) then
-        reaction%species_idx%o2_gas_id = ispec
+      if (StringCompareIgnoreCase(species_name,word)) then
+        reaction%species_idx%pas_o2_gas_id = ispec
       endif
     endif
-    if (reaction%species_idx%co2_gas_id == 0) then
-      word = 'CO2(g)'
-      if (StringCompareIgnoreCase(reaction%gas%passive_names(ispec), &
-                                  word)) then
-        reaction%species_idx%co2_gas_id = ispec
-      endif
-      word = 'CO2(g)*'
-      if (StringCompareIgnoreCase(reaction%gas%passive_names(ispec), &
-                                  word)) then
-        reaction%species_idx%co2_gas_id = ispec
-      endif
-
-    endif
-
   enddo
 
   select case(option%iflowmode)

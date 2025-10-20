@@ -283,7 +283,7 @@ subroutine RCO2TotalCO2(rt_auxvar,global_auxvar,reaction,option)
 !            global_auxvar%fugacoeff(1) = xphico2
 
 
-      if (abs(reaction%species_idx%co2_gas_id) == iactgas ) then
+      if (abs(reaction%species_idx%act_co2_gas_id) == iactgas ) then
 
         if (option%transport%couple_co2_salinity) then
           m_na = rt_auxvar%pri_molal(reaction%species_idx%na_ion_id)
