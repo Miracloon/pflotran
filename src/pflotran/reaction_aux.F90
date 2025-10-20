@@ -139,6 +139,7 @@ module Reaction_Aux_module
     PetscBool :: print_total_bulk ! total in aq and sorbed phases
     PetscBool :: initialize_with_molality
     PetscBool :: print_age
+    PetscBool :: print_ionic_strength
     PetscBool :: print_auxiliary
     PetscBool :: print_verbose_constraints
     PetscBool :: use_geothermal_hpt
@@ -393,6 +394,7 @@ function ReactionAuxCreateAux()
   reaction%calculate_tracer_age = PETSC_FALSE
   reaction%calculate_water_age = PETSC_FALSE
   reaction%print_age = PETSC_FALSE
+  reaction%print_ionic_strength = PETSC_FALSE
   reaction%print_auxiliary = PETSC_FALSE
   reaction%print_verbose_constraints = PETSC_FALSE
   reaction%print_total_component = PETSC_FALSE

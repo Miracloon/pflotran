@@ -246,6 +246,7 @@ noskip
     TOTAL
     TOTAL_SORBED
     KD
+    IONIC_STRENGTH
   /
 END
 

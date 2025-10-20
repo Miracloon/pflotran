@@ -57,7 +57,8 @@ module Reaction_module
             RTSetPlotVariables, &
             RUpdateKineticState, &
             RUpdateTempDependentCoefs, &
-            RTotalSorb
+            RTotalSorb, &
+            RIonicStrength
 
 contains
 
@@ -2406,23 +2407,12 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
       endif
     endif
 
-    ionic_strength = 0.d0
+    ionic_strength = RIonicStrength(rt_auxvar,reaction)
     charge_balance = 0.d0
     do icomp = 1, reaction%naqcomp
       charge_balance = charge_balance + rt_auxvar%total(icomp,1)* &
                                         reaction%primary_spec_Z(icomp)
-      ionic_strength = ionic_strength + rt_auxvar%pri_molal(icomp)* &
-        reaction%primary_spec_Z(icomp)*reaction%primary_spec_Z(icomp)
     enddo
-
-    if (reaction%neqcplx > 0) then
-      do i = 1, reaction%neqcplx
-        ionic_strength = ionic_strength + rt_auxvar%sec_molal(i)* &
-                                          reaction%eqcplx_Z(i)* &
-                                          reaction%eqcplx_Z(i)
-      enddo
-    endif
-    ionic_strength = 0.5d0 * ionic_strength
 
     write(option%fid_out,'(a20,es12.4,a8)') '  ionic strength: ', &
       ionic_strength,' [mol/L]'
@@ -3040,28 +3030,22 @@ subroutine ReactionDoubleLayer(constraint_coupler,reaction,option)
 
     fac = sqrt(epsilon*epsilon0*IDEAL_GAS_CONSTANT*tempk)
 
-    ionic_strength = 0.d0
+    ionic_strength = RIonicStrength(rt_auxvar,reaction)
     charge_balance = 0.d0
     dbl_charge = 0.d0
     do icomp = 1, reaction%naqcomp
       charge_balance = charge_balance + reaction%primary_spec_Z(icomp)* &
                        rt_auxvar%total(icomp,1)
-
-      ionic_strength = ionic_strength + reaction%primary_spec_Z(icomp)**2* &
-                       rt_auxvar%pri_molal(icomp)
       dbl_charge = dbl_charge + rt_auxvar%pri_molal(icomp)* &
                    (boltzmann**reaction%primary_spec_Z(icomp) - 1.d0)
     enddo
 
     if (reaction%neqcplx > 0) then
       do i = 1, reaction%neqcplx
-        ionic_strength = ionic_strength + reaction%eqcplx_Z(i)**2* &
-                         rt_auxvar%sec_molal(i)
         dbl_charge = dbl_charge + rt_auxvar%sec_molal(i)* &
                      (boltzmann**reaction%eqcplx_Z(i) - 1.d0)
       enddo
     endif
-    ionic_strength = 0.5d0*ionic_strength
     if (dbl_charge > 0.d0) then
       dbl_charge = fac*sqrt(2.d0*dbl_charge)
     else
@@ -3290,6 +3274,9 @@ subroutine ReactionReadOutput(reaction,input,option)
       case('PH')
         print_something = PETSC_TRUE
         reaction%print_pH = PETSC_TRUE
+      case('IONIC_STRENGTH')
+        print_something = PETSC_TRUE
+        reaction%print_ionic_strength = PETSC_TRUE
       case('EH')
         print_something = PETSC_TRUE
         reaction%print_Eh = PETSC_TRUE
@@ -4571,19 +4558,7 @@ subroutine RActivityCoefficients(rt_auxvar,global_auxvar,reaction,option)
   else
 
   ! compute ionic strength
-  ! primary species
-    I = 0.d0
-    do icomp = 1, reaction%naqcomp
-      I = I + rt_auxvar%pri_molal(icomp)*reaction%primary_spec_Z(icomp)* &
-                                       reaction%primary_spec_Z(icomp)
-    enddo
-
-  ! secondary species
-    do icplx = 1, reaction%neqcplx ! for each secondary species
-      I = I + rt_auxvar%sec_molal(icplx)*reaction%eqcplx_Z(icplx)* &
-                                       reaction%eqcplx_Z(icplx)
-    enddo
-    I = 0.5d0*I
+    I = RIonicStrength(rt_auxvar,reaction)
     sqrt_I = sqrt(I)
 
   ! compute activity coefficients
@@ -4630,6 +4605,44 @@ subroutine RActivityCoefficients(rt_auxvar,global_auxvar,reaction,option)
   endif
 
 end subroutine RActivityCoefficients
+
+! ************************************************************************** !
+
+function RIonicStrength(rt_auxvar,reaction)
+  !
+  ! Computes the ionic strength of the solution
+  !
+  ! Author: Glenn Hammond
+  ! Date: 10/20/25
+  !
+
+  use Option_module
+
+  implicit none
+
+  type(reactive_transport_auxvar_type) :: rt_auxvar
+  class(reaction_rt_type) :: reaction
+
+  PetscReal :: RIonicStrength
+
+  PetscReal :: I
+  PetscReal :: Z
+  PetscInt :: icomp, icplx
+
+  ! primary species
+  I = 0.d0
+  do icomp = 1, reaction%naqcomp
+    Z = reaction%primary_spec_Z(icomp)
+    I = I + rt_auxvar%pri_molal(icomp)*Z*Z
+  enddo
+  ! secondary species
+  do icplx = 1, reaction%neqcplx ! for each secondary species
+    Z = reaction%eqcplx_Z(icplx)
+    I = I + rt_auxvar%sec_molal(icplx)*Z*Z
+  enddo
+  RIonicStrength = 0.5d0*I
+
+end function RIonicStrength
 
 ! ************************************************************************** !
 
@@ -6406,6 +6419,13 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
                                    AGE,reaction%species_idx%tracer_age_id, &
                                    reaction%species_idx%tracer_aq_id)
     endif
+  endif
+
+  if (reaction%print_ionic_strength) then
+    name = 'Ionic Strength'
+    units = ''
+    call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
+                                 IONIC_STRENGTH)
   endif
 
   if (reaction%print_auxiliary) then
