@@ -18,9 +18,14 @@ module PM_RT_class
   private
 
   PetscInt, parameter :: ABS_UPDATE_INDEX = 1
-  PetscInt, parameter :: REL_UPDATE_INDEX = 2
-  PetscInt, parameter :: SCALED_RESIDUAL_INDEX = 3
-  PetscInt, parameter :: MAX_INDEX = SCALED_RESIDUAL_INDEX
+  PetscInt, parameter :: ABS_REL_UPDATE_INDEX = 2
+  PetscInt, parameter :: ABS_SCALED_RESIDUAL_INDEX = 3
+  PetscInt, parameter :: MAX_ABS_INDEX = ABS_SCALED_RESIDUAL_INDEX
+  PetscInt, parameter :: POS_UPDATE_INDEX = 4
+  PetscInt, parameter :: NEG_UPDATE_INDEX = 5
+  PetscInt, parameter :: POS_REL_UPDATE_INDEX = 6
+  PetscInt, parameter :: NEG_REL_UPDATE_INDEX = 7
+  PetscInt, parameter :: MAX_INDEX = NEG_REL_UPDATE_INDEX
 
   ! flags reactive transport temperature dependence
   PetscInt, parameter, public :: RT_TEMPERATURE_FOLLOW_FLOW = 1
@@ -60,7 +65,9 @@ module PM_RT_class
     PetscBool :: dampen_oscillatory_updates
     PetscBool :: dampen_update
     PetscInt :: dampen_count
+    PetscInt :: dampen_start_iteration
     PetscReal :: dampening_factor
+    PetscReal :: dampening_factor_from_input
   contains
     procedure, public :: Setup => PMRTSetup
     procedure, public :: ReadSimulationOptionsBlock => PMRTReadSimOptionsBlock
@@ -180,7 +187,9 @@ subroutine PMRTInit(pm_rt)
   pm_rt%dampen_oscillatory_updates = PETSC_FALSE
   pm_rt%dampen_update = PETSC_FALSE
   pm_rt%dampen_count = 0
+  pm_rt%dampen_start_iteration = UNINITIALIZED_INTEGER
   pm_rt%dampening_factor = 1.d0
+  pm_rt%dampening_factor_from_input = UNINITIALIZED_DOUBLE
 
   rt_debug_cell_id = UNINITIALIZED_INTEGER
 
@@ -389,6 +398,12 @@ subroutine PMRTReadNewtonSelectCase(this,input,keyword,found, &
       this%check_post_convergence = PETSC_TRUE
     case('DAMPEN_OSCILLATION')
       this%dampen_oscillatory_updates = PETSC_TRUE
+    case('DAMPEN_START_ITERATION')
+      call InputReadInt(input,option,this%dampen_start_iteration)
+      call InputErrorMsg(input,option,keyword,error_string)
+    case('DAMPENING_FACTOR')
+      call InputReadDouble(input,option,this%dampening_factor_from_input)
+      call InputErrorMsg(input,option,keyword,error_string)
     case default
       found = PETSC_FALSE
 
@@ -520,8 +535,8 @@ subroutine PMRTSetup(this)
            this%realization%reaction%ncomp))
   allocate(this%max_volfrac_change( &
            this%realization%reaction%mineral%nkinmnrl))
-  allocate(this%converged_flag(MAX_INDEX))
-  allocate(this%converged_cell(this%option%ntrandof,MAX_INDEX))
+  allocate(this%converged_flag(MAX_ABS_INDEX))
+  allocate(this%converged_cell(this%option%ntrandof,MAX_ABS_INDEX))
   allocate(this%converged_real(this%option%ntrandof,MAX_INDEX))
   this%converged_flag = PETSC_FALSE
   this%converged_cell = 0
@@ -1242,13 +1257,15 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
   PetscReal, pointer :: dC_p(:)
   PetscReal, pointer :: r_p(:)
   PetscReal, pointer :: accum_p(:)
+  PetscReal :: original_concentration
+  PetscReal :: change
   PetscReal :: absolute_change
-  PetscReal :: relative_change
+  PetscReal :: abs_relative_change
   PetscReal :: scaled_residual
   PetscMPIInt :: mpi_int
+  PetscInt :: i
   PetscInt :: local_id, offset, idof, index
   PetscInt :: natural_id
-  PetscReal :: tempreal
 
   grid => this%realization%patch%grid
   option => this%realization%option
@@ -1263,7 +1280,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
   this%converged_real = 0.d0
 
   if (this%check_post_convergence .or. this%print_ekg) then
-    relative_change = 0.d0
+    abs_relative_change = 0.d0
     scaled_residual = 0.d0
     call VecGetArrayRead(dX,dC_p,ierr);CHKERRQ(ierr)
     call VecGetArrayRead(X0,C0_p,ierr);CHKERRQ(ierr)
@@ -1276,27 +1293,40 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
         index = offset+idof
         ! relative change in concentration
         if (this%realization%reaction%use_log_formulation) then
-          tempreal = exp(C0_p(index))
-          absolute_change = abs(exp(C0_p(index)-dC_p(index))-tempreal)
-          relative_change = absolute_change/tempreal
+          original_concentration = exp(C0_p(index))
+          change = exp(C0_p(index)-dC_p(index))-original_concentration
         else
-          absolute_change = abs(dC_p(index))
-          relative_change = absolute_change/C0_p(index)
+          original_concentration = C0_p(index)
+          change = dC_p(index)
         endif
+        absolute_change = abs(change)
+        abs_relative_change = absolute_change/original_concentration
         if (absolute_change > this%converged_real(idof,ABS_UPDATE_INDEX)) then
+          if (change > 0.d0) then
+            this%converged_real(idof,POS_UPDATE_INDEX) = change
+          else
+            this%converged_real(idof,NEG_UPDATE_INDEX) = change
+          endif
           this%converged_real(idof,ABS_UPDATE_INDEX) = absolute_change
           this%converged_cell(idof,ABS_UPDATE_INDEX) = natural_id
         endif
-        if (relative_change > this%converged_real(idof,REL_UPDATE_INDEX)) then
-          this%converged_real(idof,REL_UPDATE_INDEX) = relative_change
-          this%converged_cell(idof,REL_UPDATE_INDEX) = natural_id
+        if (abs_relative_change > &
+            this%converged_real(idof,ABS_REL_UPDATE_INDEX)) then
+          if (change > 0.d0) then
+            this%converged_real(idof,POS_REL_UPDATE_INDEX) = abs_relative_change
+          else
+            this%converged_real(idof,NEG_REL_UPDATE_INDEX) = &
+              -abs_relative_change
+          endif
+          this%converged_real(idof,ABS_REL_UPDATE_INDEX) = abs_relative_change
+          this%converged_cell(idof,ABS_REL_UPDATE_INDEX) = natural_id
         endif
         ! scaled residual
         scaled_residual = dabs(r_p(index)/accum_p(index))
         if (scaled_residual > &
-            this%converged_real(idof,SCALED_RESIDUAL_INDEX)) then
-          this%converged_real(idof,SCALED_RESIDUAL_INDEX) = scaled_residual
-          this%converged_cell(idof,SCALED_RESIDUAL_INDEX) = natural_id
+            this%converged_real(idof,ABS_SCALED_RESIDUAL_INDEX)) then
+          this%converged_real(idof,ABS_SCALED_RESIDUAL_INDEX) = scaled_residual
+          this%converged_cell(idof,ABS_SCALED_RESIDUAL_INDEX) = natural_id
         endif
       enddo
     enddo
@@ -1304,10 +1334,18 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
     call VecRestoreArrayRead(X0,C0_p,ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(field%tran_r,r_p,ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
-    mpi_int = option%ntrandof
+    i = NEG_UPDATE_INDEX
+    this%converged_real(:,i) = -this%converged_real(:,i)
+    i = NEG_REL_UPDATE_INDEX
+    this%converged_real(:,i) = -this%converged_real(:,i)
+    mpi_int = option%ntrandof*MAX_INDEX
     call MPI_Allreduce(MPI_IN_PLACE,this%converged_real,mpi_int, &
                        MPI_DOUBLE_PRECISION,MPI_MAX, &
                        this%realization%option%mycomm,ierr);CHKERRQ(ierr)
+    i = NEG_UPDATE_INDEX
+    this%converged_real(:,i) = -this%converged_real(:,i)
+    i = NEG_REL_UPDATE_INDEX
+    this%converged_real(:,i) = -this%converged_real(:,i)
   endif
 
   if (option%use_sc) then
@@ -1323,7 +1361,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
   if (this%print_ekg) then
     if (OptionPrintToFile(option)) then
 100 format("REACTIVE TRANSPORT  NEWTON_ITERATION ",30es16.8)
-      write(IUNIT_EKG,100) this%converged_real(:,REL_UPDATE_INDEX)
+      write(IUNIT_EKG,100) this%converged_real(:,ABS_REL_UPDATE_INDEX)
     endif
   endif
 
@@ -1390,12 +1428,14 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
         (maxval(this%converged_real(:,ABS_UPDATE_INDEX)) < rt_itol_abs_update)
     endif
     if (Initialized(rt_itol_rel_update)) then
-      this%converged_flag(REL_UPDATE_INDEX) = &
-        (maxval(this%converged_real(:,REL_UPDATE_INDEX)) < rt_itol_rel_update)
+      this%converged_flag(ABS_REL_UPDATE_INDEX) = &
+        (maxval(this%converged_real(:,ABS_REL_UPDATE_INDEX)) < &
+         rt_itol_rel_update)
     endif
     if (Initialized(rt_itol_scaled_res)) then
-      this%converged_flag(SCALED_RESIDUAL_INDEX) = &
-        (maxval(this%converged_real(:,SCALED_RESIDUAL_INDEX)) < rt_itol_scaled_res)
+      this%converged_flag(ABS_SCALED_RESIDUAL_INDEX) = &
+        (maxval(this%converged_real(:,ABS_SCALED_RESIDUAL_INDEX)) < &
+         rt_itol_scaled_res)
     endif
   endif
 
@@ -1431,13 +1471,13 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
     endif
 
     if (Initialized(rt_itol_scaled_res) .and. &
-        this%converged_flag(SCALED_RESIDUAL_INDEX)) then
+        this%converged_flag(ABS_SCALED_RESIDUAL_INDEX)) then
       local_reason_flag = 12
       reason = SNES_CONVERGED_USER
     endif
 
     if (Initialized(rt_itol_rel_update) .and. &
-        this%converged_flag(REL_UPDATE_INDEX)) then
+        this%converged_flag(ABS_REL_UPDATE_INDEX)) then
       local_reason_flag = 11
       reason = SNES_CONVERGED_USER
     endif
@@ -1492,7 +1532,7 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
         StringWrite('(es9.2)',tempreal)
       icount = icount - 1
       if (it > 0) then
-        tempreal = maxval(this%converged_real(:,REL_UPDATE_INDEX))
+        tempreal = maxval(this%converged_real(:,ABS_REL_UPDATE_INDEX))
       else
         tempreal = 0.d0
       endif
@@ -1514,18 +1554,37 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
     call PrintMsg(option,out_string)
 
     if (this%logging_verbosity > 0 .and. it > 0) then
-      if (option%comm%size > 1) then
-        write(out_string,'(4x,*(es10.2))') &
-          (this%converged_real(i,REL_UPDATE_INDEX),i=1,option%ntrandof)
-      else if (this%realization%patch%grid%nmax > 9999) then
-        write(out_string,'(4x,*(i8,es10.2))') &
-          (this%converged_cell(i,REL_UPDATE_INDEX), &
-           this%converged_real(i,REL_UPDATE_INDEX),i=1,option%ntrandof)
-      else
-        write(out_string,'(4x,*(i5,es10.2))') &
-          (this%converged_cell(i,REL_UPDATE_INDEX), &
-           this%converged_real(i,REL_UPDATE_INDEX),i=1,option%ntrandof)
-      endif
+      out_string = '    iru:'
+      do i = 1, option%ntrandof
+        if (this%converged_real(i,POS_REL_UPDATE_INDEX) + &
+            this%converged_real(i,NEG_REL_UPDATE_INDEX) > 0.d0) then
+          tempreal = this%converged_real(i,POS_REL_UPDATE_INDEX)
+        else
+          tempreal = this%converged_real(i,NEG_REL_UPDATE_INDEX)
+        endif
+        if (option%comm%size == 1) then
+          out_string = trim(out_string) // ' ' // &
+            StringWrite(this%converged_cell(i,ABS_REL_UPDATE_INDEX))
+        endif
+        if (tempreal > 0.d0) then
+          out_string = trim(out_string) // '  ' // &
+            StringWrite('(es10.2)',tempreal)
+        else
+          out_string = trim(out_string) // ' ' // &
+            StringWrite('(es10.2)',tempreal)
+        endif
+      enddo
+      call PrintMsg(option,out_string)
+      out_string = '    isr:'
+      do i = 1, option%ntrandof
+        if (option%comm%size == 1) then
+          out_string = trim(out_string) // ' ' // &
+            StringWrite(this%converged_cell(i,ABS_SCALED_RESIDUAL_INDEX))
+        endif
+        out_string = trim(out_string) // '  ' // &
+          StringWrite('(es10.2)', &
+                      this%converged_real(i,ABS_SCALED_RESIDUAL_INDEX))
+      enddo
       call PrintMsg(option,out_string)
     endif
   else
@@ -1573,6 +1632,13 @@ subroutine PMRTCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
       endif
     endif
     if (this%dampen_update) this%dampen_count = this%dampen_count + 1
+  endif
+
+  if (Initialized(this%dampen_start_iteration)) then
+    if (this%dampen_start_iteration <= it) then
+      this%dampen_update = PETSC_TRUE
+      this%dampening_factor = this%dampening_factor_from_input
+    endif
   endif
 
 end subroutine PMRTCheckConvergence
@@ -1629,8 +1695,6 @@ subroutine PMRTUpdateSolution2(this,update_kinetics)
   use Reactive_Transport_module
   use Condition_module
   use Integral_Flux_module
-  use Reactive_Transport_Aux_module, only : rt_ts_count, rt_ni_count, &
-                                            rt_ts_cut_count
 
   implicit none
 
@@ -1667,10 +1731,6 @@ subroutine PMRTUpdateSolution2(this,update_kinetics)
                             this%realization%patch%boundary_tran_fluxes, &
                             INTEGRATE_TRANSPORT,this%option)
   endif
-
-  rt_ts_count = rt_ts_count + 1
-  rt_ni_count = 0
-  rt_ts_cut_count = 0
 
 end subroutine PMRTUpdateSolution2
 

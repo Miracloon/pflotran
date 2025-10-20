@@ -61,6 +61,7 @@ contains
 #define DEBUG_RT_RES_INTERNAL_CONNECTION
 #define DEBUG_RT_RES_BOUNDARY_CONNECTION
 #define DEBUG_RT_RES_SOURCE_SINK
+#define DEBUG_RT_RES_REACTION
 #define DEBUG_RT_RES_CO2_SOURCE
 #define DEBUG_RT_RES_EQUILIBRATE_CO2
 #endif
@@ -69,6 +70,7 @@ contains
 #define DEBUG_RT_JAC_INTERNAL_CONNECTION
 #define DEBUG_RT_JAC_BOUNDARY_CONNECTION
 #define DEBUG_RT_JAC_SOURCE_SINK
+#define DEBUG_RT_JAC_REACTION
 #define DEBUG_RT_JAC_CO2_SOURCE
 #define DEBUG_RT_JAC_EQUILIBRATE_CO2
 #endif
@@ -904,6 +906,10 @@ subroutine RTInitializeTimestep(realization)
   call RTUpdateFixedAccumulation(realization)
   ! geh: never use transport coefs evaluated at time k
 !  call RTUpdateTransportCoefs(realization)
+
+  rt_ts_count = rt_ts_count + 1
+  rt_ni_count = 0
+  rt_ts_cut_count = 0
 
 end subroutine RTInitializeTimestep
 
@@ -2904,7 +2910,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
       if (option%use_sc) then
         Res = Res*rt_sec_transport_vars(ghosted_id)%epsilon
       endif
-#if defined(DEBUG_RT_RES_ACCUMULATION)
+#if defined(DEBUG_RT_RES_REACTION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'rax: ', grid%nG2A(ghosted_id)
         print *, ' Res: ', Res
@@ -3873,7 +3879,9 @@ subroutine RTUpdateAuxVars(realization,update_cells,update_bcs, &
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'uav: ', grid%nG2A(ghosted_id)
         print *, ' pri_molal: ', rt_auxvars(ghosted_id)%pri_molal
-        print *, ' total: ', rt_auxvars(ghosted_id)%total(:,1)
+        print *, ' sec_molal: ', rt_auxvars(ghosted_id)%sec_molal
+        print *, '     total: ', rt_auxvars(ghosted_id)%total(:,1)
+        print *, '    dtotal: ', rt_auxvars(ghosted_id)%aqueous%dtotal(:,:,1)
       endif
 #endif
     enddo
