@@ -7706,7 +7706,8 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
          KIN_SURFACE_CMPLX,KIN_SURFACE_CMPLX_FREE, PRIMARY_ACTIVITY_COEF, &
          SECONDARY_ACTIVITY_COEF,PRIMARY_KD,TOTAL_SORBED,TOTAL_SORBED_MOBILE, &
          AGE,TOTAL_BULK,IMMOBILE_SPECIES,WATER_ACTIVITY_COEFFICIENT, &
-         GAS_CONCENTRATION,GAS_PARTIAL_PRESSURE,REACTION_AUXILIARY)
+         GAS_CONCENTRATION,GAS_PARTIAL_PRESSURE,REACTION_AUXILIARY, &
+         IONIC_STRENGTH)
 
       select case(ivar)
         case(PH)
@@ -7995,6 +7996,12 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
                 patch%aux%RT%auxvars(ghosted_id)%pri_molal(isubvar2) / &
                 output_option%tconv
             endif
+          enddo
+        case(IONIC_STRENGTH)
+          do local_id=1,grid%nlmax
+            ghosted_id = grid%nL2G(local_id)
+            vec_ptr(local_id) = &
+              RIonicStrength(patch%aux%RT%auxvars(ghosted_id),reaction)
           enddo
         case(REACTION_AUXILIARY)
           do local_id=1,grid%nlmax
@@ -9286,7 +9293,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
          TOTAL_SORBED_MOBILE,AGE,TOTAL_BULK, &
          WATER_ACTIVITY_COEFFICIENT, &
          IMMOBILE_SPECIES,GAS_CONCENTRATION,GAS_PARTIAL_PRESSURE, &
-         REACTION_AUXILIARY)
+         REACTION_AUXILIARY,IONIC_STRENGTH)
 
       select case(ivar)
         case(PH)
@@ -9444,6 +9451,8 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
             patch%aux%RT%auxvars(ghosted_id)%pri_molal(isubvar2) / &
             output_option%tconv
           endif
+        case(IONIC_STRENGTH)
+          value = RIonicStrength(patch%aux%RT%auxvars(ghosted_id),reaction)
         case(REACTION_AUXILIARY)
           value = patch%aux%RT%auxvars(ghosted_id)%auxiliary_data(isubvar)
         case default
