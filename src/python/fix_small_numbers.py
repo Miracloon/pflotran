@@ -18,7 +18,7 @@ if not os.path.isfile(filename):
 
 f2 = open(filename+'.tmp','w')
 for line in open(filename,'r'):
-    f2.write(swap.sub('\g<pre>E\g<post>',line))
+    f2.write(swap.sub(r'\g<pre>E\g<post>',line))
 f2.close()
 
 shutil.copy(filename+'.tmp',filename)
