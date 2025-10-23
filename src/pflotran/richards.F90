@@ -1176,7 +1176,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
     if (patch%imat(ghosted_id) <= 0) cycle
 
     option%iflag = RICHARDS_UPDATE_FOR_FIXED_ACCUM
-    call RichardsAuxVarCompute(xx_p(local_id:local_id), &
+    call RichardsAuxVarCompute(xx_p(istart:istart), &
                    rich_auxvars(ghosted_id),global_auxvars(ghosted_id), &
                    material_auxvars(ghosted_id), &
                    patch%characteristic_curves_array( &
