@@ -653,6 +653,7 @@ subroutine RealProcessMatPropAndSatFunc(realization)
   use String_module
   use Dataset_Common_HDF5_class
   use Dataset_module
+  use Characteristic_Curves_module
   use Characteristic_Curves_Thermal_module
   use TH_Aux_module, only : th_ice_model
 
@@ -664,6 +665,7 @@ subroutine RealProcessMatPropAndSatFunc(realization)
   PetscInt :: i, num_mat_prop
   type(option_type), pointer :: option
   type(material_property_type), pointer :: cur_material_property
+  type(characteristic_curves_type), pointer :: cur_characteristic_curve
   PetscReal, allocatable :: check_thermal_conductivity(:,:)
   type(patch_type), pointer :: patch
   character(len=MAXSTRINGLENGTH) :: verify_string, mat_string
@@ -827,6 +829,14 @@ subroutine RealProcessMatPropAndSatFunc(realization)
   ! create mapping of internal to external material id
   call MaterialCreateIntToExtMapping(patch%material_property_array, &
                                      patch%imat_internal_to_external)
+
+  ! verify characteristic curves
+  cur_characteristic_curve => realization%characteristic_curves
+  do
+    if (.not.associated(cur_characteristic_curve)) exit
+    call CharacteristicCurvesVerify(cur_characteristic_curve,option)
+    cur_characteristic_curve => cur_characteristic_curve%next
+  enddo
 
   cur_material_property => realization%material_properties
   do

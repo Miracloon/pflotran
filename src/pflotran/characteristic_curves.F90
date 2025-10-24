@@ -14,7 +14,6 @@ module Characteristic_Curves_module
 
   private
 
-
   type, public :: characteristic_curves_type
     character(len=MAXWORDLENGTH) :: name
     PetscBool :: print_me
@@ -32,6 +31,7 @@ module Characteristic_Curves_module
 
   public :: CharacteristicCurvesCreate, &
             CharacteristicCurvesRead, &
+            CharacteristicCurvesVerify, &
             CharacteristicCurvesAddToList, &
             CharCurvesConvertListToArray, &
             CharacteristicCurvesGetID, &
@@ -363,8 +363,6 @@ subroutine CharacteristicCurvesRead(this,input,option)
     end select
   enddo
   call InputPopBlock(input,option)
-
-  call CharacteristicCurvesVerify(this,option)
 
 end subroutine CharacteristicCurvesRead
 
