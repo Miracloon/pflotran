@@ -179,11 +179,8 @@ GEOMECHANICS_CFG = \
 	geomech/uniaxial_strain/uniaxial_strain.cfg \
 	geomech/uniaxial_strain_tets/uniaxial_strain_tets.cfg \
 	geomech/terzaghi/terzaghi.cfg \
-<<<<<<< HEAD
 	geomech/spatially_varying/spatially_varying.cfg \
-=======
 	geomech/thin_plate/thin_plate.cfg \
->>>>>>> a6d38f7b4 (Add missing thin plate test)
 	multiphysics/hm/hm.cfg \
 	multiphysics/thm/thm.cfg
 
