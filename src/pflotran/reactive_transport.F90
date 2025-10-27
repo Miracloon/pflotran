@@ -167,6 +167,8 @@ subroutine RTSetup(realization)
   PetscInt :: flag(10)
   PetscBool, allocatable :: dof_is_active(:)
   PetscBool :: allocate_perturbation_auxvars
+  PetscBool :: error_found
+  PetscErrorCode :: ierr
 
   option => realization%option
   patch => realization%patch
@@ -215,6 +217,7 @@ subroutine RTSetup(realization)
 
   rt_parameter%anisotropic_tortuosity = option%transport%anisotropic_tortuosity
   material_auxvars => patch%aux%Material%auxvars
+  error_found = PETSC_FALSE
   flag = 0
   !TODO(geh): change to looping over ghosted ids once the legacy code is
   !           history and the communicator can be passed down.
@@ -275,7 +278,10 @@ subroutine RTSetup(realization)
     endif
   enddo
 
-  if (maxval(flag) > 0) then
+  error_found = error_found .or. (maxval(flag) > 0)
+  call MPI_Allreduce(MPI_IN_PLACE,error_found,ONE_INTEGER_MPI,MPI_C_BOOL, &
+                     MPI_LOR,option%mycomm,ierr);CHKERRQ(ierr)
+  if (error_found) then
     option%io_buffer = &
       'Material property errors found in RTSetup (reactive transport).'
     call PrintErrMsg(option)
