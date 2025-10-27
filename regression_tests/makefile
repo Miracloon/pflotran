@@ -113,6 +113,7 @@ STANDARD_CFG = \
 	geomech/terzaghi/terzaghi.cfg \
 	geomech/simple_tet_cube/simple_tet_cube.cfg \
 	geomech/spatially_varying/spatially_varying.cfg \
+	geomech/thin_plate/thin_plate.cfg \
 	geophys/ert/ert.cfg \
 	geothermal_hpt/1D_Calcite/calcite_hpt.cfg\
 	inversion/inversion.cfg \
@@ -179,6 +180,7 @@ GEOMECHANICS_CFG = \
 	geomech/uniaxial_strain_tets/uniaxial_strain_tets.cfg \
 	geomech/terzaghi/terzaghi.cfg \
 	geomech/spatially_varying/spatially_varying.cfg \
+	geomech/thin_plate/thin_plate.cfg \
 	multiphysics/hm/hm.cfg \
 	multiphysics/thm/thm.cfg
 
