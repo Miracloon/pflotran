@@ -1428,7 +1428,7 @@ subroutine InputFindStringInFile3(input, option, string, print_warning,found)
     call InputReadPflotranString(input,option)
     if (InputError(input)) exit
     call InputReadWord(input,option,word,PETSC_TRUE)
-    if (InputError(input)) exit
+    if (InputError(input)) cycle
     length2 = len_trim(word)
     if (length1 == length2 .and. StringCompare(string,word,length1)) then
       found = PETSC_TRUE
@@ -1446,7 +1446,7 @@ subroutine InputFindStringInFile3(input, option, string, print_warning,found)
       call InputReadPflotranString(input,option)
       if (InputError(input)) exit
       call InputReadWord(input,option,word,PETSC_TRUE)
-      if (InputError(input)) exit
+      if (InputError(input)) cycle
       length2 = len_trim(word)
       if (length1 == length2 .and. StringCompare(string,word,length1)) then
         found = PETSC_TRUE

@@ -4038,7 +4038,7 @@ subroutine PMWellReadGrid(well_grid,input,option,keyword,error_string,found)
                   call InputErrorMsg(input,option, &
                                      'SEGMENT_RADIUS_TO_HORIZONTAL_Y', &
                                      error_string)
-                case('SEGMENT_RADIUS_TO_HORIZONTAL_ANGLE')
+                case('SEGMENT_RADIUS_TO_HORIZON_ANGLE')
                   if (.not. associated(deviated_well_segment)) then
                     option%io_buffer = "Error in constructing &
                       &WELL_TRAJECTORY: please first specify &
