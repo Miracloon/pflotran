@@ -356,6 +356,8 @@ subroutine PMTHReadNewtonSelectCase(this,input,keyword,found, &
       call InputReadDouble(input,option,tempreal)
       call InputErrorMsg(input,option,keyword,error_string)
       this%rel_update_inf_tol(2) = tempreal
+    case('DEACTIVATE_LEGACY_SCALING')
+      th_scale_by_volume = PETSC_FALSE
 
     case default
       found = PETSC_FALSE
@@ -611,7 +613,7 @@ subroutine PMTHResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  call THResidual(snes,xx,r,this%realization,this%pm_well,ierr)
+  call THResidual(snes,xx,r,this%realization,this%pm_well,this%debug,ierr)
 
 end subroutine PMTHResidual
 
@@ -635,7 +637,7 @@ subroutine PMTHJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call THJacobian(snes,xx,A,B,this%realization,this%pm_well,ierr)
+  call THJacobian(snes,xx,A,B,this%realization,this%pm_well,this%debug,ierr)
 
 end subroutine PMTHJacobian
 

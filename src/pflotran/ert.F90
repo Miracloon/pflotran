@@ -231,7 +231,7 @@ end subroutine ERTSetup
 
 ! ************************************************************************** !
 
-subroutine ERTCalculateMatrix(realization,M,compute_delM)
+subroutine ERTCalculateMatrix(realization,M,compute_delM,debug)
   !
   ! Calculate System matrix for ERT
   !
@@ -255,6 +255,7 @@ subroutine ERTCalculateMatrix(realization,M,compute_delM)
   class(realization_subsurface_type) :: realization
   Mat :: M
   PetscBool :: compute_delM
+  type(debug_type) :: debug
 
   type(ert_auxvar_type), pointer :: ert_auxvars(:)
   type(option_type), pointer :: option
@@ -281,7 +282,6 @@ subroutine ERTCalculateMatrix(realization,M,compute_delM)
   PetscReal :: dcond_avg_up, dcond_avg_dn
   PetscReal :: dist_up, dist_dn, dist_0
   PetscReal :: up_frac
-  PetscViewer :: viewer
   PetscErrorCode :: ierr
   character(len=MAXSTRINGLENGTH) :: string
 
@@ -462,11 +462,9 @@ subroutine ERTCalculateMatrix(realization,M,compute_delM)
   ! zero out inactive cells
   call MatrixZeroingZeroMatEntries(patch%aux%ERT%matrix_zeroing,M)
 
-  if (realization%debug%matview_Matrix) then
-    string = 'ERTmatrix'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(M,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%matview_Matrix) then
+    string = 'ERTmatrix.out'
+    call DebugMatView(debug,M,string,option)
   endif
 
 contains

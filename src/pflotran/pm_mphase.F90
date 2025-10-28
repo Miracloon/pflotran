@@ -405,7 +405,7 @@ subroutine PMMphaseResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  call MphaseResidual(snes,xx,r,this%realization,ierr)
+  call MphaseResidual(snes,xx,r,this%realization,this%debug,ierr)
 
 end subroutine PMMphaseResidual
 
@@ -427,7 +427,7 @@ subroutine PMMphaseJacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call MphaseJacobian(snes,xx,A,B,this%realization,ierr)
+  call MphaseJacobian(snes,xx,A,B,this%realization,this%debug,ierr)
 
 end subroutine PMMphaseJacobian
 

@@ -1215,7 +1215,7 @@ end subroutine RichardsUpdateFixedAccumPatch
 
 ! ************************************************************************** !
 
-subroutine RichardsNumericalJacTest(xx,realization,pm_well)
+subroutine RichardsNumericalJacTest(xx,realization,pm_well,debug)
   !
   ! Computes the a test numerical jacobian
   !
@@ -1230,12 +1230,14 @@ subroutine RichardsNumericalJacTest(xx,realization,pm_well)
   use Grid_module
   use Field_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Vec :: xx
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
 
   Vec :: xx_pert
   Vec :: res
@@ -1270,7 +1272,7 @@ subroutine RichardsNumericalJacTest(xx,realization,pm_well)
   call MatSetType(A,MATAIJ,ierr);CHKERRQ(ierr)
   call MatSetFromOptions(A,ierr);CHKERRQ(ierr)
 
-  call RichardsResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,ierr)
+  call RichardsResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,debug,ierr)
   call VecGetArray(res,vec2_p,ierr);CHKERRQ(ierr)
   do icell = 1,grid%nlmax
     if (patch%imat(grid%nL2G(icell)) <= 0) cycle
@@ -1281,7 +1283,8 @@ subroutine RichardsNumericalJacTest(xx,realization,pm_well)
       perturbation = vec_p(idof)*perturbation_tolerance
       vec_p(idof) = vec_p(idof)+perturbation
       call VecRestoreArray(xx_pert,vec_p,ierr);CHKERRQ(ierr)
-      call RichardsResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization,pm_well,ierr)
+      call RichardsResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization, &
+                            pm_well,debug,ierr)
       call VecGetArray(res_pert,vec_p,ierr);CHKERRQ(ierr)
       do idof2 = 1, grid%nlmax*option%nflowdof
         derivative = (vec_p(idof2)-vec2_p(idof2))/perturbation
@@ -1312,7 +1315,7 @@ end subroutine RichardsNumericalJacTest
 
 ! ************************************************************************** !
 
-subroutine RichardsResidual(snes,xx,r,realization,pm_well,ierr)
+subroutine RichardsResidual(snes,xx,r,realization,pm_well,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -1330,6 +1333,7 @@ subroutine RichardsResidual(snes,xx,r,realization,pm_well,ierr)
   use Variables_module
   use Debug_module
   use PM_Well_class
+  use Debug_module
 
   implicit none
 
@@ -1338,13 +1342,13 @@ subroutine RichardsResidual(snes,xx,r,realization,pm_well,ierr)
   Vec :: r
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
-  PetscViewer :: viewer
+  type(debug_type) :: debug
+
   PetscInt :: skip_conn_type
   PetscErrorCode :: ierr
 
   type(field_type), pointer :: field
   type(option_type), pointer :: option
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PetscLogEventBegin(logging%event_r_residual,ierr);CHKERRQ(ierr)
 
@@ -1361,21 +1365,15 @@ subroutine RichardsResidual(snes,xx,r,realization,pm_well,ierr)
   call RichardsResidualAccumulation(r,realization,pm_well,ierr)
   call RichardsResidualSourceSink(r,realization,pm_well,ierr)
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'Rresidual','', &
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'Rresidual','', &
                             richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+                            richards_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'Rxx','', &
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'Rxx','', &
                             richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+                            richards_ni_count,option)
   endif
 
   call PetscLogEventEnd(logging%event_r_residual,ierr);CHKERRQ(ierr)
@@ -2295,7 +2293,7 @@ end subroutine RichApplyPrescribedConditions
 
 ! ************************************************************************** !
 
-subroutine RichardsJacobian(snes,xx,A,B,realization,pm_well,ierr)
+subroutine RichardsJacobian(snes,xx,A,B,realization,pm_well,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -2318,14 +2316,13 @@ subroutine RichardsJacobian(snes,xx,A,B,realization,pm_well,ierr)
   Mat :: A, B
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   MatType :: mat_type_A, mat_type_B
-  PetscViewer :: viewer
   type(option_type), pointer :: option
   PetscReal :: norm
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PetscLogEventBegin(logging%event_r_jacobian,ierr);CHKERRQ(ierr)
 
@@ -2343,10 +2340,10 @@ subroutine RichardsJacobian(snes,xx,A,B,realization,pm_well,ierr)
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
-  call RichardsJacobianInternalConn(J,realization,ierr)
-  call RichardsJacobianBoundaryConn(J,realization,ierr)
-  call RichardsJacobianAccumulation(J,realization,ierr)
-  call RichardsJacobianSourceSink(J,realization,pm_well,ierr)
+  call RichardsJacobianInternalConn(J,realization,debug,ierr)
+  call RichardsJacobianBoundaryConn(J,realization,debug,ierr)
+  call RichardsJacobianAccumulation(J,realization,debug,ierr)
+  call RichardsJacobianSourceSink(J,realization,pm_well,debug,ierr)
 
   if (A /= B .and. mat_type_A /= MATMFFD) then
     ! If the Jacobian and preconditioner matrices are different (and not
@@ -2355,16 +2352,12 @@ subroutine RichardsJacobian(snes,xx,A,B,realization,pm_well,ierr)
     call MatConvert(J,mat_type_B,MAT_REUSE_MATRIX,B,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'Rjacobian','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'Rjacobian','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                      richards_ni_count,option)
   endif
-  if (realization%debug%norm_Matrix) then
-    option => realization%option
+  if (debug%norm_Matrix) then
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
     call PrintMsg(option)
@@ -2399,7 +2392,7 @@ end subroutine RichardsJacobian
 
 ! ************************************************************************** !
 
-subroutine RichardsJacobianInternalConn(A,realization,ierr)
+subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   !
   ! Computes the interior flux terms of the Jacobian
   !
@@ -2418,11 +2411,13 @@ subroutine RichardsJacobianInternalConn(A,realization,ierr)
   use Material_Aux_module
   use Region_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Mat, intent(inout) :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -2449,10 +2444,6 @@ subroutine RichardsJacobianInternalConn(A,realization,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(inlinesurface_auxvar_type), pointer :: insurf_auxvars(:)
-
-  character(len=MAXSTRINGLENGTH) :: string
-
-  PetscViewer :: viewer
 
   patch => realization%patch
   grid => patch%grid
@@ -2620,22 +2611,19 @@ subroutine RichardsJacobianInternalConn(A,realization,ierr)
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Rjacobian_flux','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Rjacobian_flux','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                      richards_ni_count,option)
   endif
 
 end subroutine RichardsJacobianInternalConn
 
 ! ************************************************************************** !
 
-subroutine RichardsJacobianBoundaryConn(A,realization,ierr)
+subroutine RichardsJacobianBoundaryConn(A,realization,debug,ierr)
   !
   ! Computes the boundary flux terms of the Jacobian
   !
@@ -2654,11 +2642,13 @@ subroutine RichardsJacobianBoundaryConn(A,realization,ierr)
   use Material_Aux_module
   use Region_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Mat, intent(inout) :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -2683,10 +2673,6 @@ subroutine RichardsJacobianBoundaryConn(A,realization,ierr)
   type(richards_auxvar_type), pointer :: rich_auxvars(:), rich_auxvars_bc(:)
   type(global_auxvar_type), pointer :: global_auxvars(:), global_auxvars_bc(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
-
-  character(len=MAXSTRINGLENGTH) :: string
-
-  PetscViewer :: viewer
 
   patch => realization%patch
   grid => patch%grid
@@ -2803,22 +2789,19 @@ subroutine RichardsJacobianBoundaryConn(A,realization,ierr)
 
   endif
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Rjacobian_bcflux','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Rjacobian_bcflux','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                      richards_ni_count,option)
   endif
 
 end subroutine RichardsJacobianBoundaryConn
 
 ! ************************************************************************** !
 
-subroutine RichardsJacobianAccumulation(A,realization,ierr)
+subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   !
   ! Computes the accumulation terms of the Jacobian
   !
@@ -2835,11 +2818,13 @@ subroutine RichardsJacobianAccumulation(A,realization,ierr)
   use Debug_module
   use Region_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Mat, intent(inout) :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -2856,8 +2841,6 @@ subroutine RichardsJacobianAccumulation(A,realization,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(inlinesurface_auxvar_type), pointer :: inlinesurface_auxvars(:)
-  PetscViewer :: viewer
-  character(len=MAXSTRINGLENGTH) :: string
 
   patch => realization%patch
   grid => patch%grid
@@ -2918,22 +2901,19 @@ subroutine RichardsJacobianAccumulation(A,realization,ierr)
 
   endif
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Rjacobian_accum','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Rjacobian_accum','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                      richards_ni_count,option)
   endif
 
 end subroutine RichardsJacobianAccumulation
 
 ! ************************************************************************** !
 
-subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
+subroutine RichardsJacobianSourceSink(A,realization,pm_well,debug,ierr)
   !
   ! Computes the accumulation and source/sink terms of
   ! the Jacobian
@@ -2954,13 +2934,14 @@ subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
   use Utility_module, only : Smoothstep
   use Matrix_Zeroing_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Mat, intent(inout) :: A
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
-  class(pm_well_type), pointer :: cur_well
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -2980,7 +2961,7 @@ subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
-  PetscViewer :: viewer
+  class(pm_well_type), pointer :: cur_well
   PetscReal, pointer :: mmsrc(:)
   PetscReal :: well_status
   PetscReal :: well_factor
@@ -2989,7 +2970,6 @@ subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
   PetscReal :: pressure_min
   PetscReal :: ukvr, Dq, dphi, v_darcy
   Vec, parameter :: null_vec = tVec(0)
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: deactivate_row
   PetscReal, parameter :: epsilon = 1.d-30
 
@@ -3140,15 +3120,12 @@ subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
   call RichardsSSSandbox(null_vec,A,PETSC_TRUE,grid,material_auxvars, &
                          global_auxvars,rich_auxvars,option)
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Rjacobian_srcsink_nowell','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Rjacobian_srcsink_nowell','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                       richards_ni_count,option)
   endif
 
   ! Well Terms
@@ -3171,15 +3148,12 @@ subroutine RichardsJacobianSourceSink(A,realization,pm_well,ierr)
   endif
 
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Rjacobian_srcsink','', &
-                            richards_ts_count,richards_ts_cut_count, &
-                            richards_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Rjacobian_srcsink','', &
+                      richards_ts_count,richards_ts_cut_count, &
+                      richards_ni_count,option)
   endif
 
 #ifdef BUFFER_MATRIX

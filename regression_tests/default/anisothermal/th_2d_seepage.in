@@ -15,6 +15,11 @@ SUBSURFACE
 #=========================== numerical methods ================================
 NUMERICAL_METHODS FLOW
 
+  NEWTON_SOLVER
+    DEACTIVATE_LEGACY_SCALING
+    SCALE_LINEAR_SYSTEM
+  /
+
   LINEAR_SOLVER
     SOLVER DIRECT
   /

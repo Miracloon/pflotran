@@ -1518,14 +1518,13 @@ end subroutine SCO2SetSlminVecLoc
 
 ! ************************************************************************** !
 
-subroutine SCO2Residual(snes,xx,r,realization,pm_well,ierr)
+subroutine SCO2Residual(snes,xx,r,realization,pm_well,debug,ierr)
   !
   ! Computes the residual
   !
   ! Author: Michael Nole
   ! Date: 01/26/24
   !
-
   use Realization_Subsurface_class
   use Field_module
   use Patch_module
@@ -1548,8 +1547,7 @@ subroutine SCO2Residual(snes,xx,r,realization,pm_well,ierr)
   Vec :: r
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
-  class(pm_well_type), pointer :: cur_well
-  PetscViewer :: viewer
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   type(discretization_type), pointer :: discretization
@@ -1569,7 +1567,7 @@ subroutine SCO2Residual(snes,xx,r,realization,pm_well,ierr)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(connection_set_list_type), pointer :: connection_set_list
   type(connection_set_type), pointer :: cur_connection_set
-  character(len=MAXSTRINGLENGTH) :: string
+  class(pm_well_type), pointer :: cur_well
 
   PetscInt :: iconn
   PetscReal :: scale
@@ -1961,21 +1959,15 @@ subroutine SCO2Residual(snes,xx,r,realization,pm_well,ierr)
     call VecAXPY(r,-1.d0,field%flow_mass_transfer,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'Sresidual','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'Sresidual','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'Sxx','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'Sxx','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
   update_upwind_direction = PETSC_FALSE
@@ -1984,7 +1976,7 @@ end subroutine SCO2Residual
 
 ! ************************************************************************** !
 
-subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
+subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -2013,13 +2005,13 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
   Mat :: A, B
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   class(pm_well_type), pointer :: cur_well
   Mat :: J
   MatType :: mat_type
   PetscReal :: norm
-  PetscViewer :: viewer
 
   PetscReal :: qsrc, scale
   PetscInt :: imat, imat_up, imat_dn
@@ -2051,7 +2043,6 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
                                        global_auxvars_ss(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
 
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: well_ndof
   PetscInt :: deactivate_row
 
@@ -2092,7 +2083,6 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
-
   ! Perturb aux vars
   do ghosted_id = 1, grid%ngmax  ! For each local node do...
     if (patch%imat(ghosted_id) <= 0) cycle
@@ -2117,19 +2107,16 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
                               material_auxvars(ghosted_id), &
                               material_parameter%soil_heat_capacity(imat), &
                               option,well_ndof,Jup)
-    call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
+    call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                   ADD_VALUES,ierr);CHKERRQ(ierr)
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Sjacobian_accum','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'Sjacobian_accum','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
 
@@ -2169,32 +2156,29 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
                      patch%flow_upwind_direction(:,iconn), &
                      option,well_ndof,Jup,Jdn)
       if (local_id_up > 0) then
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_up-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_up-1,1,ghosted_id_up-1, &
                                       Jup,ADD_VALUES,ierr);CHKERRQ(ierr)
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_up-1,1,ghosted_id_dn-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_up-1,1,ghosted_id_dn-1, &
                                       Jdn,ADD_VALUES,ierr);CHKERRQ(ierr)
       endif
       if (local_id_dn > 0) then
         Jup = -Jup
         Jdn = -Jdn
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_dn-1,1,ghosted_id_dn-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_dn-1,1,ghosted_id_dn-1, &
                                       Jdn,ADD_VALUES,ierr);CHKERRQ(ierr)
-        call PUMSetValuesBlockedLocal(A,1,ghosted_id_dn-1,1,ghosted_id_up-1, &
+        call PUMSetValuesBlockedLocal(J,1,ghosted_id_dn-1,1,ghosted_id_up-1, &
                                       Jup,ADD_VALUES,ierr);CHKERRQ(ierr)
       endif
     enddo
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Sjacobian_flux','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'Sjacobian_flux','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
   ! Boundary Flux Terms -----------------------------------
@@ -2235,21 +2219,18 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
                       option,well_ndof,Jdn)
 
       Jdn = -Jdn
-      call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jdn, &
+      call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jdn, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
     enddo
     boundary_condition => boundary_condition%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Sjacobian_bcflux','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'Sjacobian_bcflux','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
   ! Source/sinks
@@ -2291,7 +2272,7 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
                         material_auxvars(ghosted_id), &
                         scale,well_ndof,Jup)
 
-      call PUMSetValuesBlockedLocal(A,1,ghosted_id-1,1,ghosted_id-1,Jup, &
+      call PUMSetValuesBlockedLocal(J,1,ghosted_id-1,1,ghosted_id-1,Jup, &
                                     ADD_VALUES,ierr);CHKERRQ(ierr)
 
     enddo
@@ -2311,26 +2292,23 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
           call cur_well%Perturb()
           ! Go through and update the well contributions to the Jacobian:
           ! dRi/d(P_well), dRwell/d(P_well), dRi/dxi, and dRwell,dxi
-          call cur_well%ModifyFlowJacobian(A,ierr)
+          call cur_well%ModifyFlowJacobian(J,ierr)
         endif
         cur_well => cur_well%next_well
       enddo
     endif
   endif
 
-  if (realization%debug%matview_Matrix_detailed) then
-    call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Sjacobian_srcsink','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix_detailed) then
+    call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,J,'Sjacobian_srcsink','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
-  call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-  call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+  call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
+  call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
 
   ! zero out isothermal and inactive cells
   call MatrixZeroingZeroMatEntries(patch%aux%SCO2%matrix_zeroing,A)
@@ -2353,11 +2331,11 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
             deactivate_row = deactivate_row - 1
             if (cur_well%well_grid%h_rank_id( &
                 cur_well%well_grid%bottom_seg_index) == option%myrank) then
-              call MatZeroRowsLocal(A,ONE_INTEGER,[deactivate_row], &
+              call MatZeroRowsLocal(J,ONE_INTEGER,[deactivate_row], &
                           qsrc,PETSC_NULL_VEC,PETSC_NULL_VEC, &
                           ierr);CHKERRQ(ierr)
             else
-              call MatZeroRowsLocal(A,ZERO_INTEGER,[deactivate_row], &
+              call MatZeroRowsLocal(J,ZERO_INTEGER,[deactivate_row], &
                           qsrc,PETSC_NULL_VEC,PETSC_NULL_VEC, &
                           ierr);CHKERRQ(ierr)
             endif
@@ -2368,17 +2346,13 @@ subroutine SCO2Jacobian(snes,xx,A,B,realization,pm_well,ierr)
     endif
 !  endif
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'Sjacobian','', &
-                            sco2_ts_count,sco2_ts_cut_count, &
-                            sco2_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'Sjacobian','', &
+                      sco2_ts_count,sco2_ts_cut_count, &
+                      sco2_ni_count,option)
   endif
 
-  if (realization%debug%norm_Matrix) then
-    option => realization%option
+  if (debug%norm_Matrix) then
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
     call PrintMsg(option)

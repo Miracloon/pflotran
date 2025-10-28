@@ -351,6 +351,7 @@ subroutine FactorySubsurfaceInitSimulation(simulation)
   use PM_Subsurface_Flow_class
   use Timestepper_SNES_class
   use Waypoint_module
+  use Debug_module
 
   implicit none
 
@@ -358,6 +359,7 @@ subroutine FactorySubsurfaceInitSimulation(simulation)
 
   class(realization_subsurface_type), pointer :: realization
   type(option_type), pointer :: option
+  type(debug_type), pointer :: debug
 
   realization => simulation%realization
   option => realization%option
@@ -402,8 +404,16 @@ subroutine FactorySubsurfaceInitSimulation(simulation)
   call FactorySubsurfSetupWaypointList(simulation)
   call FactSubLinkSetPMCWaypointPtrs(simulation)
 
-  if (realization%debug%print_couplers) then
-    call InitCommonVerifyAllCouplers(realization)
+  nullify(debug)
+  if (option%iflowmode /= NULL_MODE) then
+    debug => simulation%flow_process_model_coupler%pm_list%debug
+  elseif (option%itranmode /= NULL_MODE) then
+    debug => simulation%tran_process_model_coupler%pm_list%debug
+  endif
+  if (associated(debug)) then
+    if (debug%print_couplers) then
+      call InitCommonVerifyAllCouplers(realization)
+    endif
   endif
 
   call FactorySubsurfaceJumpStart(simulation)
@@ -609,6 +619,7 @@ subroutine FactorySubsurfSetupWaypointList(simulation)
   use Realization_Subsurface_class
   use Option_module
   use Waypoint_module
+  use Debug_module
 
   implicit none
 
@@ -616,6 +627,7 @@ subroutine FactorySubsurfSetupWaypointList(simulation)
 
   class(realization_subsurface_type), pointer :: realization
   type(waypoint_list_type), pointer :: sync_waypoint_list
+  type(debug_type), pointer :: debug
   type(option_type), pointer :: option
 
   realization => simulation%realization
@@ -646,9 +658,17 @@ subroutine FactorySubsurfSetupWaypointList(simulation)
                                       option)
 
   ! debugging output
-  if (realization%debug%print_waypoints) then
-    call WaypointListPrint(simulation%waypoint_list_subsurface,option, &
-                           realization%output_option)
+  nullify(debug)
+  if (option%iflowmode /= NULL_MODE) then
+    debug => simulation%flow_process_model_coupler%pm_list%debug
+  elseif (option%itranmode /= NULL_MODE) then
+    debug => simulation%tran_process_model_coupler%pm_list%debug
+  endif
+  if (associated(debug)) then
+    if (debug%print_waypoints) then
+      call WaypointListPrint(simulation%waypoint_list_subsurface,option, &
+                             realization%output_option)
+    endif
   endif
 
 end subroutine FactorySubsurfSetupWaypointList

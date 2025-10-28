@@ -404,6 +404,8 @@ subroutine PMRTReadNewtonSelectCase(this,input,keyword,found, &
     case('DAMPENING_FACTOR')
       call InputReadDouble(input,option,this%dampening_factor_from_input)
       call InputErrorMsg(input,option,keyword,error_string)
+    case('SCALE_LINEAR_SYSTEM')
+      this%scale_linear_system = PETSC_TRUE
     case default
       found = PETSC_FALSE
 
@@ -432,7 +434,7 @@ subroutine PMRTSetup(this)
   use Reactive_Transport_module
   use Reactive_Transport_Aux_module, only : reactive_transport_param_type
   use Material_module
-  use Variables_module, only : TORTUOSITY
+  use Variables_module, only : TORTUOSITY, VOLUME
 
   implicit none
 
@@ -440,6 +442,7 @@ subroutine PMRTSetup(this)
 
   type(reactive_transport_param_type), pointer :: rt_parameter
   PetscInt :: i
+  PetscInt :: idof, ndof
   PetscInt :: iphase
   PetscBool :: lflag
   PetscReal :: val
@@ -543,6 +546,23 @@ subroutine PMRTSetup(this)
   this%converged_real = 0.d0
 
   call CondControlAssignRTTranInitCond(this%realization)
+
+  if (this%scale_linear_system) then
+    call VecDuplicate(this%solution_vec,this%linear_system_scaling_vec, &
+                      ierr);CHKERRQ(ierr)
+    call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
+                                 this%realization%field%work_loc, &
+                                 VOLUME,ZERO_INTEGER)
+    call this%comm1%LocalToGlobal(this%realization%field%work_loc, &
+                                  this%realization%field%work)
+    call VecReciprocal(this%realization%field%work,ierr);CHKERRQ(ierr)
+    call VecGetBlockSize(this%linear_system_scaling_vec,ndof,ierr);CHKERRQ(ierr)
+    do idof = 1, ndof
+    call VecStrideScatter(this%realization%field%work,idof-1, &
+                          this%linear_system_scaling_vec,INSERT_VALUES, &
+                          ierr);CHKERRQ(ierr)
+    enddo
+  endif
 
 end subroutine PMRTSetup
 
@@ -995,7 +1015,7 @@ subroutine PMRTResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  call RTResidual(snes,xx,r,this%realization,ierr)
+  call RTResidual(snes,xx,r,this%realization,this%debug,ierr)
 
 end subroutine PMRTResidual
 
@@ -1019,7 +1039,7 @@ subroutine PMRTJacobian(this,snes,xx,A,B,ierr)
   if (this%option%transport%debug_derivatives) then
     call PMRTDebugDerivatives(this,snes,xx,A,B,ierr)
   else
-    call RTJacobian(snes,xx,A,B,this%realization,ierr)
+    call RTJacobian(snes,xx,A,B,this%realization,this%debug,ierr)
   endif
 
 end subroutine PMRTJacobian
@@ -1046,8 +1066,6 @@ subroutine PMRTDebugDerivatives(this,snes,xx,A,B,ierr)
   Mat :: A_analytical
   Mat :: A_numerical
   PetscBool :: original_flag
-  character(len=MAXSTRINGLENGTH) :: string
-  PetscViewer :: viewer
 
   original_flag = this%option%transport%numerical_derivatives
   call MatDuplicate(A,MAT_SHARE_NONZERO_PATTERN,A_numerical, &
@@ -1056,20 +1074,16 @@ subroutine PMRTDebugDerivatives(this,snes,xx,A,B,ierr)
                     ierr);CHKERRQ(ierr)
 
   this%option%transport%numerical_derivatives = PETSC_TRUE
-  call RTJacobian(snes,xx,A_numerical,A_numerical,this%realization,ierr)
-  string = 'RT_jacobian_numerical'
-  call DebugCreateViewer(this%realization%debug,string, &
-                          this%realization%option,viewer)
-  call MatView(A_numerical,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call RTJacobian(snes,xx,A_numerical,A_numerical,this%realization, &
+                  this%debug,ierr)
+  call DebugMatView(this%debug,A_numerical,'RT_jacobian_numerical', &
+                    this%realization%option)
 
   this%option%transport%numerical_derivatives = PETSC_FALSE
-  call RTJacobian(snes,xx,A_analytical,A_analytical,this%realization,ierr)
-  string = 'RT_jacobian_analytical'
-  call DebugCreateViewer(this%realization%debug,string, &
-                          this%realization%option,viewer)
-  call MatView(A_analytical,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call RTJacobian(snes,xx,A_analytical,A_analytical,this%realization, &
+                  this%debug,ierr)
+  call DebugMatView(this%debug,A_analytical,'RT_jacobian_analytical', &
+                    this%realization%option)
 
   call PetscUtilCompareMatrices(A_analytical,A_numerical, &
                                 this%realization%patch%grid%nL2G, &

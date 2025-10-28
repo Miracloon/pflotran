@@ -54,6 +54,7 @@ subroutine PMResidualPtr(snes,xx,r,this,ierr)
   PetscErrorCode :: ierr
 
   call this%pm%Residual(snes,xx,r,ierr)
+  call this%pm%ScaleResidual(r)
 
 end subroutine PMResidualPtr
 
@@ -73,6 +74,7 @@ subroutine PMJacobianPtr(snes,xx,A,B,this,ierr)
   PetscErrorCode :: ierr
 
   call this%pm%Jacobian(snes,xx,A,B,ierr)
+  call this%pm%ScaleJacobian(A,B)
 
 end subroutine PMJacobianPtr
 

@@ -1685,7 +1685,7 @@ end subroutine RTCalculateRHS_t1
 
 ! ************************************************************************** !
 
-subroutine RTCalculateTransportMatrix(realization,T)
+subroutine RTCalculateTransportMatrix(realization,debug,T)
   !
   ! Calculate transport matrix
   !
@@ -1703,10 +1703,12 @@ subroutine RTCalculateTransportMatrix(realization,T)
   use Debug_module
   use Matrix_Zeroing_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   Mat :: T
 
   type(global_auxvar_type), pointer :: global_auxvars(:)
@@ -1733,11 +1735,8 @@ subroutine RTCalculateTransportMatrix(realization,T)
   PetscReal :: qsrc(2)
   PetscInt :: flow_src_sink_type
   PetscReal :: coef_in(2), coef_out(2)
-  PetscViewer :: viewer
   PetscInt :: nphase
   PetscErrorCode :: ierr
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   option => realization%option
   field => realization%field
@@ -1907,12 +1906,8 @@ subroutine RTCalculateTransportMatrix(realization,T)
 
   call MatrixZeroingZeroMatEntries(patch%aux%RT%matrix_zeroing,T)
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'Tmatrix','', &
-                            rt_ts_count,rt_ts_cut_count,rt_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(T,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,T,'Tmatrix',option)
   endif
 
 end subroutine RTCalculateTransportMatrix
@@ -2085,7 +2080,7 @@ end subroutine RTComputeBCMassBalanceOS
 
 ! ************************************************************************** !
 
-subroutine RTNumericalJacobianTest(realization,xx)
+subroutine RTNumericalJacobianTest(realization,debug,xx)
   !
   ! Computes the a test numerical jacobian
   !
@@ -2099,10 +2094,12 @@ subroutine RTNumericalJacobianTest(realization,xx)
   use Grid_module
   use Field_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   Vec :: xx
 
   Vec :: xx_pert
@@ -2139,7 +2136,7 @@ subroutine RTNumericalJacobianTest(realization,xx)
   call MatSetType(A,MATAIJ,ierr);CHKERRQ(ierr)
   call MatSetFromOptions(A,ierr);CHKERRQ(ierr)
 
-  call RTResidual(PETSC_NULL_SNES,xx,res,realization,ierr)
+  call RTResidual(PETSC_NULL_SNES,xx,res,realization,debug,ierr)
   call VecGetArray(res,vec2_p,ierr);CHKERRQ(ierr)
   do idof = 1,grid%nlmax*option%ntrandof
     icell = (idof-1)/option%ntrandof+1
@@ -2149,7 +2146,7 @@ subroutine RTNumericalJacobianTest(realization,xx)
     perturbation = vec_p(idof)*perturbation_tolerance
     vec_p(idof) = vec_p(idof)+perturbation
     call VecRestoreArray(xx_pert,vec_p,ierr);CHKERRQ(ierr)
-    call RTResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization,ierr)
+    call RTResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization,debug,ierr)
     call VecGetArray(res_pert,vec_p,ierr);CHKERRQ(ierr)
     do idof2 = 1, grid%nlmax*option%ntrandof
       derivative = (vec_p(idof2)-vec2_p(idof2))/perturbation
@@ -2179,7 +2176,7 @@ end subroutine RTNumericalJacobianTest
 
 ! ************************************************************************** !
 
-subroutine RTResidual(snes,xx,r,realization,ierr)
+subroutine RTResidual(snes,xx,r,realization,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -2196,23 +2193,22 @@ subroutine RTResidual(snes,xx,r,realization,ierr)
   use Logging_module
   use Debug_module
   use Matrix_Zeroing_module
+  use Debug_module
 
   implicit none
 
   SNES :: snes
   Vec :: xx
   Vec :: r
-  class(realization_subsurface_type) :: realization
   PetscReal, pointer :: xx_p(:), log_xx_p(:)
+  class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   type(discretization_type), pointer :: discretization
   type(field_type), pointer :: field
   type(patch_type), pointer :: patch
   type(option_type), pointer :: option
-  PetscViewer :: viewer
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PetscLogEventBegin(logging%event_rt_residual,ierr);CHKERRQ(ierr)
 
@@ -2248,19 +2244,13 @@ subroutine RTResidual(snes,xx,r,realization,ierr)
 
   call MatrixZeroingZeroVecEntries(patch%aux%RT%matrix_zeroing,r)
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'RTresidual','', &
-                            rt_ts_count,rt_ts_cut_count,rt_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'RTresidual','', &
+                            rt_ts_count,rt_ts_cut_count,rt_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'RTxx','', &
-                            rt_ts_count,rt_ts_cut_count,rt_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(field%tran_xx,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,r,'RTxx','', &
+                            rt_ts_count,rt_ts_cut_count,rt_ni_count,option)
   endif
 
   ! print *,'RT CO2 conc', realization%patch%aux%rt%auxvars(1)%pri_molal(11)
@@ -3021,7 +3011,7 @@ end subroutine RTResidualEquilibrateCO2
 
 ! ************************************************************************** !
 
-subroutine RTJacobian(snes,xx,A,B,realization,ierr)
+subroutine RTJacobian(snes,xx,A,B,realization,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -3037,6 +3027,7 @@ subroutine RTJacobian(snes,xx,A,B,realization,ierr)
   use Logging_module
   use Debug_module
   use Matrix_Zeroing_module
+  use Debug_module
 
   implicit none
 
@@ -3044,17 +3035,16 @@ subroutine RTJacobian(snes,xx,A,B,realization,ierr)
   Vec :: xx
   Mat :: A, B
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   MatType :: mat_type
-  PetscViewer :: viewer
-  character(len=MAXSTRINGLENGTH) :: string
 
   call PetscLogEventBegin(logging%event_rt_jacobian,ierr);CHKERRQ(ierr)
 
 #if 0
-  call RTNumericalJacobianTest(realization,xx)
+  call RTNumericalJacobianTest(realization,debug,xx)
 #endif
 
   call MatGetType(A,mat_type,ierr);CHKERRQ(ierr)
@@ -3067,7 +3057,6 @@ subroutine RTJacobian(snes,xx,A,B,realization,ierr)
   endif
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
-
 
   call PetscLogEventBegin(logging%event_rt_jacobian1,ierr);CHKERRQ(ierr)
 
@@ -3089,24 +3078,19 @@ subroutine RTJacobian(snes,xx,A,B,realization,ierr)
 
   call PetscLogEventEnd(logging%event_rt_jacobian2,ierr);CHKERRQ(ierr)
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'RTjacobian','', &
-                            rt_ts_count,rt_ts_cut_count,rt_ni_count)
-    call DebugCreateViewer(realization%debug,string,realization%option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'RTjacobian','', &
+                      rt_ts_count,rt_ts_cut_count,rt_ni_count, &
+                      realization%option)
   endif
 
   if (realization%reaction%use_log_formulation) then
     call MatDiagonalScaleLocal(J,realization%field%tran_work_loc, &
                                ierr);CHKERRQ(ierr)
-
-    if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'RTjacobianLog','', &
-                            rt_ts_count,rt_ts_cut_count,rt_ni_count)
-      call DebugCreateViewer(realization%debug,string,realization%option,viewer)
-      call MatView(J,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    if (debug%matview_Matrix) then
+      call DebugMatView(debug,J,'RTjacobianLog','', &
+                        rt_ts_count,rt_ts_cut_count,rt_ni_count, &
+                        realization%option)
     endif
 
   endif

@@ -582,6 +582,7 @@ subroutine PMWellBaseInit(pm_well)
   allocate(pm_well%well)
   allocate(pm_well%well_comm)
   nullify(pm_well%realization)
+  nullify(pm_well%well_pert)
   pm_well%well_grid => WellGridCreate()
   call PMWellVarCreate(pm_well%well)
 

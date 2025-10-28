@@ -96,8 +96,6 @@ recursive subroutine PMCGeneralRunToTime(this,sync_time,stop_flag)
 
   implicit none
 
-#include "petsc/finclude/petscviewer.h"
-
   class(pmc_general_type), target :: this
   PetscReal :: sync_time
   PetscInt :: stop_flag

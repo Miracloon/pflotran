@@ -302,9 +302,9 @@ subroutine PMRichardsTSIJacobian(this,ts,time,U,Udot,shift,A,B,ierr)
 
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
-  call RichardsJacobianInternalConn(J,realization,ierr)
-  call RichardsJacobianBoundaryConn(J,realization,ierr)
-  call RichardsJacobianSourceSink(J,realization,null(),ierr)
+  call RichardsJacobianInternalConn(J,realization,this%debug,ierr)
+  call RichardsJacobianBoundaryConn(J,realization,this%debug,ierr)
+  call RichardsJacobianSourceSink(J,realization,null(),this%debug,ierr)
   call IJacobianAccumulation(J,shift,realization,ierr)
 
   if (A /= B) then

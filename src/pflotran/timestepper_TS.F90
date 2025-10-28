@@ -298,7 +298,6 @@ subroutine TimestepperTSCheckpointBinary(this,viewer,option)
   ! Author: Gautam Bisht, LBNL
   ! Date: 06/19/18
   !
-#include "petsc/finclude/petscviewer.h"
 #include "petsc/finclude/petscbag.h"
   use petscbag
 
@@ -332,7 +331,6 @@ subroutine TimestepperTSRestartBinary(this,viewer,option)
   ! Author: Gautam Bisht, LBNL
   ! Date: 06/19/18
   !
-#include "petsc/finclude/petscviewer.h"
 #include "petsc/finclude/petscbag.h"
   use petscbag
 
@@ -426,8 +424,6 @@ subroutine TimestepperTSGetHeader(this,header)
   use Option_module
 
   implicit none
-
-#include "petsc/finclude/petscviewer.h"
 
   class(timestepper_TS_type) :: this
   class(timestepper_TS_header_type) :: header

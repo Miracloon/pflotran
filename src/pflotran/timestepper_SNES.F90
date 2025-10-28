@@ -506,7 +506,6 @@ subroutine TimestepperSNESCheckpointBinary(this,viewer,option)
   ! Author: Glenn Hammond
   ! Date: 07/25/13
   !
-#include "petsc/finclude/petscviewer.h"
 #include "petsc/finclude/petscbag.h"
   use petscbag
 
@@ -610,7 +609,6 @@ subroutine TimestepperSNESRestartBinary(this,viewer,option)
   ! Author: Glenn Hammond
   ! Date: 07/25/13
   !
-#include "petsc/finclude/petscviewer.h"
 #include "petsc/finclude/petscbag.h"
   use petscbag
 

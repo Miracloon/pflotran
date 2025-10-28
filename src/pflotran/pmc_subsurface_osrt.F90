@@ -183,8 +183,6 @@ subroutine PMCSubsurfaceOSRTStepDT(this,stop_flag)
   type(reactive_transport_auxvar_type), pointer :: rt_auxvars(:)
   PetscInt, parameter :: iphase = 1
 
-  PetscViewer :: viewer
-
   PetscReal, pointer :: vec_ptr(:)
   PetscReal, pointer :: tran_xx_p(:)
   PetscInt :: idof
@@ -299,7 +297,7 @@ subroutine PMCSubsurfaceOSRTStepDT(this,stop_flag)
         &currently configured to handle species-dependent diffusion.'
       call PrintErrMsg(option)
     endif
-    call RTCalculateTransportMatrix(realization,solver%M)
+    call RTCalculateTransportMatrix(realization,process_model%debug,solver%M)
     call KSPSetOperators(solver%ksp,solver%M,solver%Mpre,ierr);CHKERRQ(ierr)
 
     ! loop over chemical component and transport
@@ -308,11 +306,9 @@ subroutine PMCSubsurfaceOSRTStepDT(this,stop_flag)
       tempint = idof-1
       call VecStrideGather(process_model%rhs,tempint,field%work,INSERT_VALUES, &
                            ierr);CHKERRQ(ierr)
-      if (realization%debug%vecview_residual) then
+      if (process_model%debug%vecview_residual) then
         string = 'Trhs'
-        call DebugCreateViewer(realization%debug,string,option,viewer)
-        call VecView(field%work,viewer,ierr);CHKERRQ(ierr)
-        call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+        call DebugVecView(process_model%debug,field%work,string,option)
       endif
 
       call PetscTime(log_ksp_start_time,ierr);CHKERRQ(ierr)

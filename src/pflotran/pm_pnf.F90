@@ -321,6 +321,7 @@ subroutine PMPNFSetupLinearSystem(this,A,solution,right_hand_side,ierr)
   use Coupler_module
   use Connection_module
   use Option_module
+  use Debug_module
   use Petsc_Utility_module, only : PUMSetValuesLocal
 
   implicit none
@@ -330,8 +331,6 @@ subroutine PMPNFSetupLinearSystem(this,A,solution,right_hand_side,ierr)
   Vec :: solution
   Mat :: A
   PetscErrorCode :: ierr
-
-  PetscViewer :: viewer
 
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
@@ -495,23 +494,14 @@ subroutine PMPNFSetupLinearSystem(this,A,solution,right_hand_side,ierr)
   call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
   call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
 
-  if (this%realization%debug%matview_Matrix) then
-    call PetscViewerASCIIOpen(option%mycomm,'PNFmatrix.mat',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%matview_Matrix) then
+    call DebugMatView(this%debug,A,'PNFmatrix.mat',option)
   endif
-  if (this%realization%debug%vecview_residual) then
-    call PetscViewerASCIIOpen(option%mycomm,'PNFrhs.vec',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call VecView(right_hand_side,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_residual) then
+    call DebugVecView(this%debug,right_hand_side,'PNFrhs.vec',option)
   endif
-  if (this%realization%debug%vecview_solution) then
-    call PetscViewerASCIIOpen(option%mycomm,'PNFsolution.vec',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call VecView(solution,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (this%debug%vecview_solution) then
+    call DebugVecView(this%debug,solution,'PNFsolution.vec',option)
   endif
 
 end subroutine PMPNFSetupLinearSystem

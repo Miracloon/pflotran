@@ -39,13 +39,6 @@ REGRESSION
   CELLS_PER_PROCESS 1
 END
 
-# == debugging ================================================================
-DEBUG
-#MATVIEW_JACOBIAN
-#VECVIEW_RESIDUAL
-#VECVIEW_SOLUTION
-/
-
 # == chemistry ================================================================
 CHEMISTRY
   PRIMARY_SPECIES

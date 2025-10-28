@@ -680,8 +680,8 @@ recursive subroutine PMSCO2InitializeRun(this)
     call MatAssemblyEnd(this%solver%M,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatSetOption(this%solver%M,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
                       ierr);CHKERRQ(ierr)
-    call MatAssemblyBegin(this%solver%Mpre,MAT_FINAL_ASSEMBLY,ierr); &
-                         CHKERRQ(ierr)
+    call MatAssemblyBegin(this%solver%Mpre,MAT_FINAL_ASSEMBLY, &
+                          ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(this%solver%Mpre,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatSetOption(this%solver%Mpre,MAT_NEW_NONZERO_LOCATIONS,PETSC_FALSE, &
                       ierr);CHKERRQ(ierr)
@@ -921,7 +921,8 @@ subroutine PMSCO2Residual(this,snes,xx,r,ierr)
   PetscErrorCode :: ierr
 
   call PMSubsurfaceFlowUpdatePropertiesNI(this)
-  call SCO2Residual(snes,xx,r,this%realization,this%pmwell_ptr,ierr)
+  call SCO2Residual(snes,xx,r,this%realization,this%pmwell_ptr, &
+                    this%debug,ierr)
 
 end subroutine PMSCO2Residual
 
@@ -943,7 +944,8 @@ subroutine PMSCO2Jacobian(this,snes,xx,A,B,ierr)
   Mat :: A, B
   PetscErrorCode :: ierr
 
-  call SCO2Jacobian(snes,xx,A,B,this%realization,this%pmwell_ptr,ierr)
+  call SCO2Jacobian(snes,xx,A,B,this%realization,this%pmwell_ptr, &
+                    this%debug,ierr)
 
 end subroutine PMSCO2Jacobian
 
@@ -2210,8 +2212,8 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
 
     mpi_int = MAX_DOF*sco2_max_states*MAX_INDEX
     call MPI_Allreduce(MPI_IN_PLACE,this%converged_real,mpi_int, &
-                       MPI_DOUBLE_PRECISION,MPI_MAX,option%mycomm,ierr); &
-                       CHKERRQ(ierr)
+                       MPI_DOUBLE_PRECISION,MPI_MAX,option%mycomm, &
+                       ierr);CHKERRQ(ierr)
 
     option%convergence = CONVERGENCE_CONVERGED
     do itol = 1, MAX_INDEX

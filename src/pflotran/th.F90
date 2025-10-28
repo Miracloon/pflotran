@@ -67,7 +67,7 @@ subroutine THTimeCut(realization,pm_well)
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
 
-  TH_ts_cut_count = TH_ts_cut_count + 1
+  th_ts_cut_count = th_ts_cut_count + 1
   call THInitializeTimestep(realization,pm_well)
 
 end subroutine THTimeCut
@@ -451,9 +451,9 @@ subroutine THSetup(realization,pm_well)
     call THWellSetup(pm_well,realization)
   endif
 
-  TH_ts_count = 0
-  TH_ts_cut_count = 0
-  TH_ni_count = 0
+  th_ts_count = 0
+  th_ts_cut_count = 0
+  th_ni_count = 0
 
 end subroutine THSetup
 
@@ -980,9 +980,9 @@ subroutine THUpdateSolution(realization)
   endif
 
 
-  TH_ts_count = TH_ts_count + 1
-  TH_ts_cut_count = 0
-  TH_ni_count = 0
+  th_ts_count = th_ts_count + 1
+  th_ts_cut_count = 0
+  th_ni_count = 0
 
 end subroutine THUpdateSolution
 
@@ -1093,7 +1093,7 @@ end subroutine THUpdateFixedAccumulation
 
 ! ************************************************************************** !
 
-subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
+subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well,debug)
   !
   ! Computes the a test numerical jacobian
   !
@@ -1107,6 +1107,7 @@ subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
   use Grid_module
   use Field_module
   use PM_Well_class
+  use Debug_module
 
   implicit none
 
@@ -1114,12 +1115,12 @@ subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
   Mat :: A_orig
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+ type(debug_type) :: debug
 
   Vec :: xx_pert
   Vec :: res
   Vec :: res_pert
   Mat :: A
-  PetscViewer :: viewer
   PetscErrorCode :: ierr
 
   PetscReal :: derivative, perturbation
@@ -1150,7 +1151,7 @@ subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
 !  call MatSetType(A,MATAIJ,ierr);CHKERRQ(ierr)
 !  call MatSetFromOptions(A,ierr);CHKERRQ(ierr)
 
-  call THResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,ierr)
+  call THResidual(PETSC_NULL_SNES,xx,res,realization,pm_well,debug,ierr)
   call VecGetArray(res,vec2_p,ierr);CHKERRQ(ierr)
   do icell = 1,grid%nlmax
     if (patch%imat(icell) <= 0) cycle
@@ -1161,7 +1162,7 @@ subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
       vec_p(idof) = vec_p(idof)+perturbation
       call VecRestoreArray(xx_pert,vec_p,ierr);CHKERRQ(ierr)
       call THResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization, &
-                      pm_well,ierr)
+                      pm_well,debug,ierr)
       call VecGetArray(res_pert,vec_p,ierr);CHKERRQ(ierr)
       do idof2 = 1, grid%nlmax*option%nflowdof
         derivative = (vec_p(idof2)-vec2_p(idof2))/perturbation
@@ -1177,10 +1178,7 @@ subroutine THNumericalJacobianTest(xx,A_orig,realization,pm_well)
 
   call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
   call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-  call PetscViewerASCIIOpen(option%mycomm,'numerical_jacobian.out',viewer, &
-                            ierr);CHKERRQ(ierr)
-  call MatView(A,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call DebugMatView(debug,A,'numerical_jacobian.out',option)
 
   call MatDestroy(A,ierr);CHKERRQ(ierr)
 
@@ -3549,7 +3547,7 @@ end subroutine THBCFlux
 
 ! ************************************************************************** !
 
-subroutine THResidual(snes,xx,r,realization,pm_well,ierr)
+subroutine THResidual(snes,xx,r,realization,pm_well,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -3576,14 +3574,13 @@ subroutine THResidual(snes,xx,r,realization,pm_well,ierr)
   Vec :: r
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: dummy_mat
   type(discretization_type), pointer :: discretization
   type(field_type), pointer :: field
   type(option_type), pointer :: option
-  character(len=MAXSTRINGLENGTH) :: string
-  PetscViewer :: viewer
 
   field => realization%field
   discretization => realization%discretization
@@ -3609,21 +3606,15 @@ subroutine THResidual(snes,xx,r,realization,pm_well,ierr)
     call THWellMatrixZeroing(pm_well,r,dummy_mat,PETSC_FALSE)
   endif
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'THresidual','', &
-                            TH_ts_count,TH_ts_cut_count, &
-                            TH_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'THresidual','', &
+                      th_ts_count,th_ts_cut_count, &
+                      th_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'THxx','', &
-                            TH_ts_count,TH_ts_cut_count, &
-                            TH_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'THxx','', &
+                      th_ts_count,th_ts_cut_count, &
+                      th_ni_count,option)
   endif
 
 end subroutine THResidual
@@ -4400,7 +4391,7 @@ end subroutine THResidualSourceSink
 
 ! ************************************************************************** !
 
-subroutine THJacobian(snes,xx,A,B,realization,pm_well,ierr)
+subroutine THJacobian(snes,xx,A,B,realization,pm_well,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -4424,16 +4415,16 @@ subroutine THJacobian(snes,xx,A,B,realization,pm_well,ierr)
   Mat :: A, B
   class(realization_subsurface_type) :: realization
   class(pm_well_type), pointer :: pm_well
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   Vec :: r_dummy
   MatType :: mat_type
-  PetscViewer :: viewer
   type(option_type),  pointer :: option
   PetscReal :: norm
 
-  character(len=MAXSTRINGLENGTH) :: string
+  option => realization%option
 
   call MatGetType(A,mat_type,ierr);CHKERRQ(ierr)
   if (mat_type == MATMFFD) then
@@ -4447,17 +4438,17 @@ subroutine THJacobian(snes,xx,A,B,realization,pm_well,ierr)
   call MatZeroEntries(J,ierr);CHKERRQ(ierr)
 
 #if 0
-   call THNumericalJacobianTest(xx,J,realization,pm_well)
+   call THNumericalJacobianTest(xx,J,realization,pm_well,debug)
 #endif
 
   if (th_numerical_derivatives) then
     call THPerturb(realization,pm_well)
   endif
 
-  call THJacobianInternalConn(J,realization,ierr)
-  call THJacobianBoundaryConn(J,realization,ierr)
-  call THJacobianAccumulation(J,realization,ierr)
-  call THJacobianSourceSink(J,realization,ierr)
+  call THJacobianInternalConn(J,realization,debug,ierr)
+  call THJacobianBoundaryConn(J,realization,debug,ierr)
+  call THJacobianAccumulation(J,realization,debug,ierr)
+  call THJacobianSourceSink(J,realization,debug,ierr)
   call THWell(r_dummy,J,pm_well,PETSC_TRUE)
 
   call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
@@ -4488,15 +4479,12 @@ subroutine THJacobian(snes,xx,A,B,realization,pm_well,ierr)
     call THWellMatrixZeroing(pm_well,r_dummy,J,PETSC_TRUE)
   endif
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'THjacobian','', &
-                            TH_ts_count,TH_ts_cut_count, &
-                            TH_ni_count)
-    call DebugCreateViewer(realization%debug,string,realization%option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'THjacobian','', &
+                      th_ts_count,th_ts_cut_count, &
+                      th_ni_count,option)
   endif
-  if (realization%debug%norm_Matrix) then
+  if (debug%norm_Matrix) then
     option => realization%option
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
@@ -4509,7 +4497,7 @@ subroutine THJacobian(snes,xx,A,B,realization,pm_well,ierr)
     call PrintMsg(option)
   endif
 
-  TH_ni_count = TH_ni_count + 1
+  th_ni_count = th_ni_count + 1
 
 end subroutine THJacobian
 
@@ -4578,7 +4566,7 @@ end subroutine THPerturb
 
 ! ************************************************************************** !
 
-subroutine THJacobianInternalConn(A,realization,ierr)
+subroutine THJacobianInternalConn(A,realization,debug,ierr)
   !
   ! Computes the jacobian contribution from internal flux
   !
@@ -4604,6 +4592,7 @@ subroutine THJacobianInternalConn(A,realization,ierr)
 
   Mat :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
   PetscInt :: icct_up, icct_dn
@@ -4643,10 +4632,6 @@ subroutine THJacobianInternalConn(A,realization,ierr)
   type(saturation_function_type), pointer :: sf_dn
   class(characteristic_curves_type), pointer :: cc_up, cc_dn
   class(cc_thermal_type), pointer :: tcc_up, tcc_dn
-
-  character(len=MAXSTRINGLENGTH) :: string
-
-  PetscViewer :: viewer
 
   patch => realization%patch
   grid => patch%grid
@@ -4797,13 +4782,10 @@ subroutine THJacobianInternalConn(A,realization,ierr)
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_flux'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_flux.out',option)
   endif
 
 
@@ -4811,7 +4793,7 @@ end subroutine THJacobianInternalConn
 
 ! ************************************************************************** !
 
-subroutine THJacobianBoundaryConn(A,realization,ierr)
+subroutine THJacobianBoundaryConn(A,realization,debug,ierr)
   !
   ! Computes the jacobian contribution from boundary flux
   !
@@ -4837,8 +4819,9 @@ subroutine THJacobianBoundaryConn(A,realization,ierr)
 
   Mat :: A
   class(realization_subsurface_type) :: realization
-
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
+
   PetscInt :: icct_dn
 
   PetscReal, pointer :: xx_loc_p(:)
@@ -4868,10 +4851,6 @@ subroutine THJacobianBoundaryConn(A,realization,ierr)
   type(saturation_function_type), pointer :: sf_dn
   class(characteristic_curves_type), pointer :: cc_dn
   class(cc_thermal_type), pointer :: tcc_dn
-
-  character(len=MAXSTRINGLENGTH) :: string
-
-  PetscViewer :: viewer
 
   patch => realization%patch
   grid => patch%grid
@@ -4957,13 +4936,10 @@ subroutine THJacobianBoundaryConn(A,realization,ierr)
     boundary_condition => boundary_condition%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_bcflux'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_bcflux.out',option)
   endif
 
   call VecRestoreArray(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)
@@ -4972,7 +4948,7 @@ end subroutine THJacobianBoundaryConn
 
 ! ************************************************************************** !
 
-subroutine THJacobianAccumulation(A,realization,ierr)
+subroutine THJacobianAccumulation(A,realization,debug,ierr)
   !
   ! Computes the jacobian contribution from accumulation term
   !
@@ -4999,6 +4975,7 @@ subroutine THJacobianAccumulation(A,realization,ierr)
 
   Mat :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -5022,13 +4999,9 @@ subroutine THJacobianAccumulation(A,realization,ierr)
   class(characteristic_curves_type), pointer :: characteristic_curves
   class(cc_thermal_type), pointer :: thermal_cc
 
-
-
   type(sec_heat_type), pointer :: sec_heat_vars(:)
-  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: icct
 
-  PetscViewer :: viewer
   PetscReal :: vol_frac_prim
 
   ! secondary continuum variables
@@ -5106,13 +5079,10 @@ subroutine THJacobianAccumulation(A,realization,ierr)
   enddo
 
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_accum'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_accum.out',option)
   endif
 
 
@@ -5122,7 +5092,7 @@ end subroutine THJacobianAccumulation
 
 ! ************************************************************************** !
 
-subroutine THJacobianSourceSink(A,realization,ierr)
+subroutine THJacobianSourceSink(A,realization,debug,ierr)
   !
   ! Computes the jacobian contribution from source sink
   !
@@ -5146,6 +5116,7 @@ subroutine THJacobianSourceSink(A,realization,ierr)
 
   Mat :: A
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
 
   PetscErrorCode :: ierr
 
@@ -5166,10 +5137,6 @@ subroutine THJacobianSourceSink(A,realization,ierr)
   type(th_auxvar_type), pointer :: th_auxvars(:), th_auxvars_ss(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
-
-  character(len=MAXSTRINGLENGTH) :: string
-
-  PetscViewer :: viewer
 
   PetscReal :: dummy_real
   PetscReal, pointer :: flow_array(:)
@@ -5227,13 +5194,10 @@ subroutine THJacobianSourceSink(A,realization,ierr)
     source_sink => source_sink%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    string = 'jacobian_srcsink'
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+    call DebugMatView(debug,A,'jacobian_srcsink.out',option)
   endif
 
   call VecRestoreArray(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)

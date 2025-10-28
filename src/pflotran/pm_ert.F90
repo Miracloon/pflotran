@@ -1143,7 +1143,6 @@ subroutine PMERTSolve(this,time,ierr)
   PetscReal, pointer :: vec_ptr(:)
   character(len=MAXSTRINGLENGTH) :: string
 
-  PetscViewer :: viewer
   !PetscLogDouble :: log_start_time
   PetscLogDouble :: log_ksp_start_time
   PetscLogDouble :: log_start_time
@@ -1167,7 +1166,8 @@ subroutine PMERTSolve(this,time,ierr)
 
   ! Build System matrix
   call ERTCalculateMatrix(realization,solver%M, &
-                          this%option%geophysics%compute_jacobian)
+                          this%option%geophysics%compute_jacobian, &
+                          this%debug)
   call KSPSetOperators(solver%ksp,solver%M,solver%M,ierr);CHKERRQ(ierr)
   !call MatView(solver%M,PETSC_VIEWER_STDOUT_WORLD,ierr);CHKERRA(ierr)
 
@@ -1229,11 +1229,9 @@ subroutine PMERTSolve(this,time,ierr)
     endif
     call VecRestoreArray(this%rhs,vec_ptr,ierr);CHKERRQ(ierr)
 
-    if (realization%debug%vecview_residual) then
+    if (this%debug%vecview_residual) then
       string = 'ERTrhs_' // trim(adjustl(StringWrite(elec_id)))
-      call DebugCreateViewer(realization%debug,string,this%option,viewer)
-      call VecView(this%rhs,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+      call DebugVecView(this%debug,this%rhs,string,this%option)
     endif
 
     ! Solve system
@@ -1242,11 +1240,9 @@ subroutine PMERTSolve(this,time,ierr)
     call PetscTime(log_end_time,ierr);CHKERRQ(ierr)
     this%ksp_time = this%ksp_time + (log_end_time - log_ksp_start_time)
 
-    if (realization%debug%vecview_solution) then
+    if (this%debug%vecview_solution) then
       string = 'ERTsolution_' // trim(adjustl(StringWrite(elec_id)))
-      call DebugCreateViewer(realization%debug,string,this%option,viewer)
-      call VecView(field%work,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+      call DebugVecView(this%debug,field%work,string,this%option)
     endif
 
     call DiscretizationGlobalToLocal(discretization,field%work, &

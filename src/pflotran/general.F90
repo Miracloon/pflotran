@@ -395,7 +395,7 @@ end subroutine GeneralTimeCut
 
 ! ************************************************************************** !
 
-subroutine GeneralNumericalJacobianTest(xx,realization,B)
+subroutine GeneralNumericalJacobianTest(xx,realization,debug,B)
   !
   ! Computes the a test numerical jacobian
   !
@@ -409,18 +409,19 @@ subroutine GeneralNumericalJacobianTest(xx,realization,B)
   use Grid_module
   use Field_module
   use Petsc_Utility_module
+  use Debug_module
 
   implicit none
 
   Vec :: xx
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   Mat :: B
 
   Vec :: xx_pert
   Vec :: res
   Vec :: res_pert
   Mat :: A
-  PetscViewer :: viewer
   PetscErrorCode :: ierr
 
   PetscReal, pointer :: vec_p(:), vec2_p(:)
@@ -457,13 +458,7 @@ subroutine GeneralNumericalJacobianTest(xx,realization,B)
                     ierr);CHKERRQ(ierr)
 
   call VecZeroEntries(res,ierr);CHKERRQ(ierr)
-  call GeneralResidual(PETSC_NULL_SNES,xx,res,realization,ierr)
-#if 0
-  word  = 'num_0.dat'
-  call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-  call VecView(res,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
+  call GeneralResidual(PETSC_NULL_SNES,xx,res,realization,debug,ierr)
   call VecGetArray(res,vec2_p,ierr);CHKERRQ(ierr)
   do icell = 1,grid%nlmax
     if (patch%imat(grid%nL2G(icell)) <= 0) cycle
@@ -474,14 +469,8 @@ subroutine GeneralNumericalJacobianTest(xx,realization,B)
       vec_p(idof) = vec_p(idof)+perturbation
       call VecRestoreArray(xx_pert,vec_p,ierr);CHKERRQ(ierr)
       call VecZeroEntries(res_pert,ierr);CHKERRQ(ierr)
-      call GeneralResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization,ierr)
-#if 0
-      write(word,*) idof
-      word  = 'num_' // trim(adjustl(word)) // '.dat'
-      call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-      call VecView(res_pert,viewer,ierr);CHKERRQ(ierr)
-      call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
+      call GeneralResidual(PETSC_NULL_SNES,xx_pert,res_pert,realization, &
+                           debug,ierr)
       call VecGetArray(res_pert,vec_p,ierr);CHKERRQ(ierr)
       do idof2 = 1, grid%nlmax*option%nflowdof
         derivative = (vec_p(idof2)-vec2_p(idof2))/perturbation
@@ -501,9 +490,7 @@ subroutine GeneralNumericalJacobianTest(xx,realization,B)
 #if 1
   write(word,*) icall
   word = 'numerical_jacobian-' // trim(adjustl(word)) // '.out'
-  call PetscViewerASCIIOpen(option%mycomm,word,viewer,ierr);CHKERRQ(ierr)
-  call MatView(A,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call PUMatView(A,word,option)
 #endif
 
 !geh: uncomment to overwrite numerical Jacobian
@@ -1294,7 +1281,7 @@ end subroutine GeneralUpdateFixedAccum
 
 ! ************************************************************************** !
 
-subroutine GeneralResidual(snes,xx,r,realization,ierr)
+subroutine GeneralResidual(snes,xx,r,realization,debug,ierr)
   !
   ! Computes the residual equation
   !
@@ -1329,7 +1316,7 @@ subroutine GeneralResidual(snes,xx,r,realization,ierr)
   Vec :: xx
   Vec :: r
   class(realization_subsurface_type) :: realization
-  PetscViewer :: viewer
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat, parameter :: null_mat = tMat(0)
@@ -1366,8 +1353,6 @@ subroutine GeneralResidual(snes,xx,r,realization,ierr)
   PetscReal, pointer :: accum_p(:), accum_p2(:)
 
   PetscReal :: qsrc(realization%option%nflowdof)
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   PetscInt :: icct_up, icct_dn
   PetscReal :: Res(realization%option%nflowdof)
@@ -1726,21 +1711,15 @@ subroutine GeneralResidual(snes,xx,r,realization,ierr)
     call VecRestoreArray(r,r_p,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%vecview_residual) then
-    call DebugWriteFilename(realization%debug,string,'Gresidual','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(r,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_residual) then
+    call DebugVecView(debug,r,'Gresidual','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
-  if (realization%debug%vecview_solution) then
-    call DebugWriteFilename(realization%debug,string,'Gxx','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call VecView(xx,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%vecview_solution) then
+    call DebugVecView(debug,xx,'Gresidual','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
 
   update_upwind_direction = PETSC_FALSE
@@ -1749,7 +1728,7 @@ end subroutine GeneralResidual
 
 ! ************************************************************************** !
 
-subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
+subroutine GeneralJacobian(snes,xx,A,B,realization,debug,ierr)
   !
   ! Computes the Jacobian
   !
@@ -1777,12 +1756,12 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
   Vec :: xx
   Mat :: A, B
   class(realization_subsurface_type) :: realization
+  type(debug_type) :: debug
   PetscErrorCode :: ierr
 
   Mat :: J
   MatType :: mat_type
   PetscReal :: norm
-  PetscViewer :: viewer
 
   PetscReal :: qsrc, scale
   PetscInt :: imat, imat_up, imat_dn
@@ -1813,8 +1792,6 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
                                        global_auxvars_ss(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(material_property_ptr_type), pointer :: material_property_array(:)
-
-  character(len=MAXSTRINGLENGTH) :: string
 
   patch => realization%patch
   grid => patch%grid
@@ -1897,17 +1874,13 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
                                   ADD_VALUES,ierr);CHKERRQ(ierr)
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_accum','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_accum','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
-
 
   ! Interior Flux Terms -----------------------------------
   connection_set_list => grid%internal_connection_set_list
@@ -1961,15 +1934,12 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
     cur_connection_set => cur_connection_set%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_flux','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_flux','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
 
   ! Boundary Flux Terms -----------------------------------
@@ -2017,15 +1987,12 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
     boundary_condition => boundary_condition%next
   enddo
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_bcflux','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_bcflux','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
 
   ! Source/sinks
@@ -2075,15 +2042,12 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
   call GeneralSSSandbox(null_vec,A,PETSC_TRUE,grid,material_auxvars, &
                         gen_auxvars,option)
 
-  if (realization%debug%matview_Matrix_detailed) then
+  if (debug%matview_Matrix_detailed) then
     call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
     call MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
-    call DebugWriteFilename(realization%debug,string,'Gjacobian_srcsink','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(A,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+    call DebugMatView(debug,A,'Gjacobian_srcsink','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
 
   call MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY,ierr);CHKERRQ(ierr)
@@ -2118,15 +2082,12 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
                           PETSC_NULL_VEC,ierr);CHKERRQ(ierr)
   endif
 
-  if (realization%debug%matview_Matrix) then
-    call DebugWriteFilename(realization%debug,string,'Gjacobian','', &
-                            general_ts_count,general_ts_cut_count, &
-                            general_ni_count)
-    call DebugCreateViewer(realization%debug,string,option,viewer)
-    call MatView(J,viewer,ierr);CHKERRQ(ierr)
-    call DebugViewerDestroy(realization%debug,viewer)
+  if (debug%matview_Matrix) then
+    call DebugMatView(debug,J,'Gjacobian','', &
+                      general_ts_count,general_ts_cut_count, &
+                      general_ni_count,option)
   endif
-  if (realization%debug%norm_Matrix) then
+  if (debug%norm_Matrix) then
     option => realization%option
     call MatNorm(J,NORM_1,norm,ierr);CHKERRQ(ierr)
     write(option%io_buffer,'("1 norm: ",es11.4)') norm
@@ -2138,8 +2099,6 @@ subroutine GeneralJacobian(snes,xx,A,B,realization,ierr)
     write(option%io_buffer,'("inf norm: ",es11.4)') norm
     call PrintMsg(option)
   endif
-
-!  call MatView(J,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
 #if 0
   imat = 1

@@ -59,12 +59,7 @@ REGRESSION
   /
 END
 
-#=========================== flow mode ========================================
-
-DEBUG
-#  PRINT_COUPLERS west south
-END
-
+#=========================== dataasets ========================================
 DATASET surface
   MAX_BUFFER_SIZE 5
   FILENAME 543_datum_dataset_in.h5

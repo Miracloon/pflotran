@@ -1772,7 +1772,7 @@ end subroutine ComputeFlowFluxVelocityStats
 
 ! ************************************************************************** !
 
-subroutine OutputPrintCouplers(realization_base,istep)
+subroutine OutputPrintCouplers(realization_base,debug,istep)
   !
   ! Prints values of auxiliary variables associated with
   ! couplers (boundary and initial conditions, source
@@ -1802,13 +1802,13 @@ subroutine OutputPrintCouplers(realization_base,istep)
   use Richards_Aux_module
 
   class(realization_base_type) :: realization_base
+  type(debug_type) :: debug
   PetscInt :: istep
 
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
   type(field_type), pointer :: field
   type(coupler_type), pointer :: coupler
-  type(debug_type), pointer :: flow_debug
   type(grid_type), pointer :: grid
   character(len=MAXWORDLENGTH) :: word
   character(len=MAXSTRINGLENGTH) :: string, coupler_string
@@ -1820,12 +1820,11 @@ subroutine OutputPrintCouplers(realization_base,istep)
   PetscErrorCode :: ierr
 
   option => realization_base%option
-  flow_debug => realization_base%debug
   field => realization_base%field
   patch => realization_base%patch
   grid => patch%grid
 
-  if (len_trim(flow_debug%coupler_string) == 0) then
+  if (len_trim(debug%coupler_string) == 0) then
     option%io_buffer = &
       'Coupler debugging requested, but no string of coupler names was included.'
     call PrintErrMsg(option)
@@ -1870,7 +1869,7 @@ subroutine OutputPrintCouplers(realization_base,istep)
       call PrintErrMsg(option)
   end select
 
-  coupler_string = flow_debug%coupler_string
+  coupler_string = debug%coupler_string
   ierr = INPUT_ERROR_NONE
   do
     call InputReadWord(coupler_string,word,PETSC_TRUE,ierr)
@@ -1914,7 +1913,7 @@ end subroutine OutputPrintCouplers
 
 ! ************************************************************************** !
 
-subroutine OutputPrintCouplersH5(realization_base,istep)
+subroutine OutputPrintCouplersH5(realization_base,debug,istep)
   !
   ! Prints values of auxiliary variables associated with
   ! couplers (boundary and initial conditions, source
@@ -1948,13 +1947,13 @@ subroutine OutputPrintCouplersH5(realization_base,istep)
   use Output_Common_module
 
   class(realization_base_type) :: realization_base
+  type(debug_type) :: debug
   PetscInt :: istep
 
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
   type(field_type), pointer :: field
   type(coupler_type), pointer :: coupler
-  type(debug_type), pointer :: flow_debug
   type(grid_type), pointer :: grid
   type(discretization_type), pointer :: discretization
   type(output_option_type), pointer :: output_option
@@ -1987,10 +1986,9 @@ subroutine OutputPrintCouplersH5(realization_base,istep)
   discretization => realization_base%discretization
   patch => realization_base%patch
   grid => patch%grid
-  flow_debug => realization_base%debug
   output_option => realization_base%output_option
 
-  if (len_trim(flow_debug%coupler_string) == 0) then
+  if (len_trim(debug%coupler_string) == 0) then
     option%io_buffer = 'Coupler debugging requested, but no string of &
                        &coupler names was included.'
     call PrintErrMsg(option)
@@ -2073,7 +2071,7 @@ subroutine OutputPrintCouplersH5(realization_base,istep)
   call DiscretizationCreateVector(discretization,ONEDOF,natural_vec,NATURAL, &
                                   option)
 
-  coupler_string = flow_debug%coupler_string
+  coupler_string = debug%coupler_string
   ierr = INPUT_ERROR_NONE
   do
     call InputReadWord(coupler_string,word,PETSC_TRUE,ierr)
@@ -2140,7 +2138,7 @@ end subroutine OutputPrintCouplersH5
 
 ! ************************************************************************** !
 
-subroutine OutputPrintRegions(realization_base)
+subroutine OutputPrintRegions(realization_base,debug)
   !
   ! Prints out the number of connections to each cell in a region.
   !
@@ -2157,12 +2155,13 @@ subroutine OutputPrintRegions(realization_base)
   implicit none
 
   class(realization_base_type) :: realization_base
+  type(debug_type) :: debug
 
-  if (realization_base%debug%print_regions_tec) then
+  if (debug%print_regions_tec) then
     call OutputTecplotPrintRegions(realization_base)
   endif
 
-  if (realization_base%debug%print_regions_hdf5) then
+  if (debug%print_regions_hdf5) then
     select case (realization_base%discretization%itype)
       case(STRUCTURED_GRID)
         call OutputHDF5PrintRegionsStructured(realization_base)

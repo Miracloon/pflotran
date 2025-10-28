@@ -1205,7 +1205,8 @@ subroutine PMNWTResidual(this,snes,xx,r,ierr)
   Vec :: r
   PetscErrorCode :: ierr
 
-  call NWTResidual(snes,xx,r,this%realization,this%pmwell_ptr,ierr)
+  call NWTResidual(snes,xx,r,this%realization,this%pmwell_ptr, &
+                   this%debug,ierr)
   if (associated(this%pmwell_ptr)) then
     select type (pm_well => this%pmwell_ptr)
       class is (pm_well_qi_type)
@@ -1239,7 +1240,7 @@ subroutine PMNWTJacobian(this,snes,xx,A,B,ierr)
 
   if (this%controls%well_cut_dt) return
 
-  call NWTJacobian(snes,xx,A,B,this%realization,ierr)
+  call NWTJacobian(snes,xx,A,B,this%realization,this%debug,ierr)
 
 end subroutine PMNWTJacobian
 
