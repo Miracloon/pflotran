@@ -956,14 +956,20 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
         well_flow_condition => cur_well%flow_condition
         if (associated(well_flow_condition%rate)) then
           cur_well%well%well_constraint_type = WELL_CONSTANT_RATE
+          if (trim(well_flow_condition%rate%units) /= " kg/s") then
+            option%io_buffer = 'The WELL_COUPLER FLOW_CONDITION for ' // trim(well_flow_condition%name) // ' &
+                              & must be of type MASS_RATE [kg/s].'
+            call PrintErrMsg(option)
+          endif
+          ! keep the units as kg/s, as this is what is used within pm_well
           if (any(well_flow_condition%rate%dataset%rarray(:) < 0.d0)) then
             cur_well%well%total_rate = well_flow_condition%rate%dataset% &
-                                       rarray(1)
+                                       rarray(1)  ! [kg/s]
             if (cur_well%well%total_rate > 0.d0) then
               option%io_buffer = "The well model does not support a concurrent &
                                 & injection and production well."
             endif
-            cur_well%well%th_ql = 0.d0
+            cur_well%well%th_ql = 0.d0  ! [kg/s]
           else
             cur_well%well%th_ql = well_flow_condition%rate%dataset% &
                                   rarray(1)
@@ -973,7 +979,7 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
           cur_well%well%well_constraint_type = WELL_CONSTANT_PRESSURE_HYDROSTATIC
           cur_well%well%th_p = well_flow_condition%pressure%dataset% &
                                        rarray(1)
-          cur_well%well%th_ql = 0.d0
+          cur_well%well%th_ql = 0.d0  ! [kg/s]
         endif
         if (Initialized(cur_well%well%bh_p)) then
           do idof = 1,option%nflowdof
@@ -1875,7 +1881,7 @@ subroutine RichardsResidualSourceSink(r,realization,pm_well,ierr)
   PetscReal, pointer :: qflx_pf_p(:)
 #endif
   PetscReal :: qsrc, qsrc_mol
-  PetscReal, pointer :: r_p(:)
+  PetscReal, pointer :: r_p(:)  ! [kmol/s]
   PetscReal, pointer :: mmsrc(:)
   PetscReal :: well_status
   PetscReal :: well_factor

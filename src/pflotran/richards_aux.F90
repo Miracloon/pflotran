@@ -36,7 +36,7 @@ module Richards_Aux_module
     PetscReal :: pl   ! liquid pressure
     PetscReal :: sl   ! liquid saturation
     PetscReal :: dpl  ! reservoir-well liquid pressure differential
-    PetscReal :: Ql   ! liquid exchange flux
+    PetscReal :: Ql   ! liquid exchange flux [kg/s]
     PetscReal :: bh_p ! bottom hole pressure
     PetscReal :: pressure_bump ! pressure change for initialization  ! TODO: JOE: Can I remove this as I am not creating a numerical jacobian?
   end type richards_well_aux_type

@@ -265,11 +265,11 @@ module PM_Well_class
     PetscReal, pointer :: xmass(:,:)
     ! fluid enthalpy
     PetscReal, pointer :: H(:)
-    ! fluid source/sink in/out of well [kmol/s]
+    ! fluid source/sink in/out of well [kg/s]
     PetscReal, pointer :: Q(:)
     ! flag for output
     PetscBool :: output_Q
-    ! cumulative fluid source/sink in/out of well [kmol/s]
+    ! cumulative fluid source/sink in/out of well [kg/s]
     PetscReal, pointer :: Q_cumulative(:)
   end type well_fluid_type
 
@@ -7139,7 +7139,7 @@ subroutine PMWellUpdateReservoirSrcSinkFlow(pm_well)
             pm_well%realization%patch%aux%richards% &
               auxvars(ghosted_id)%well%dpl = well_delta_liq
             pm_well%realization%patch%aux%richards% &
-              auxvars(ghosted_id)%well%Ql = pm_well%well%liq%Q(k)
+              auxvars(ghosted_id)%well%Ql = pm_well%well%liq%Q(k)  ! [kg/s]
             pm_well%realization%patch%aux%richards% &
               auxvars(ghosted_id)%well%bh_p = pm_well%well%bh_p
         end select
@@ -7369,6 +7369,7 @@ subroutine PMWellModifyFlowResHydrostatic(this,residual)
 
   use SCO2_Aux_module, only : sco2_thermal, SCO2_TEMPERATURE_DOF
   use Hydrate_Aux_module, only : HYDRATE_ENERGY_DOF, hydrate_fmw_comp
+  use Richards_Aux_module, only : richards_density_kmol_to_kg
 
   class(pm_well_hydrostatic_type) :: this
   PetscReal, pointer :: residual(:)
@@ -7481,7 +7482,7 @@ subroutine PMWellModifyFlowResHydrostatic(this,residual)
       enddo
     case(RICHARDS_MODE)
       if (this%well%well_constraint_type == WELL_CONSTANT_RATE) then
-        sum_q = 0.d0
+        sum_q = 0.d0  ! [kg/s]
         do k = 1,this%well_grid%nsegments
           if (.not. this%well_grid%segment_connected(k)) cycle
           if (this%well_grid%h_rank_id(k) /= this%option%myrank) &
@@ -7493,18 +7494,20 @@ subroutine PMWellModifyFlowResHydrostatic(this,residual)
           if (k == this%well_grid%bottom_seg_index) then
             ! An extra residual is required for the bottom well cell.
             ! Residual = Q - sum(q)
-            sum_q = sum(this%well%liq%q)
+            sum_q = sum(this%well%liq%q)  ! [kg/s]
             if (this%well%th_ql > 0.d0) then
-              Q = -1.d0 * (this%well%th_ql)
+              Q = -1.d0 * (this%well%th_ql)  ! [kg/s]
             else if (this%well%total_rate < 0.d0) then
-              Q = -1.d0 * this%well%total_rate
+              Q = -1.d0 * this%well%total_rate  ! [kg/s]
             else
-              Q = 0
+              Q = 0  ! [kg/s]
             endif
-            residual(local_end) = Q - sum_q
+            residual(local_end) = (Q - sum_q) / &
+                                   richards_density_kmol_to_kg ! [kg/s] / [kg/kmol] = [kmol/s]
           endif
           residual(local_start) = residual(local_start) + &
-                                      this%well%liq%q(k)
+                                    this%well%liq%q(k) / &
+                                    richards_density_kmol_to_kg ! [kg/s] / [kg/kmol] = [kmol/s]
         enddo
       elseif (this%well%well_constraint_type == WELL_CONSTANT_PRESSURE_HYDROSTATIC) then
         do k = 1,this%well_grid%nsegments
@@ -7516,7 +7519,8 @@ subroutine PMWellModifyFlowResHydrostatic(this,residual)
           local_end = local_id * this%option%nflowdof
           local_start = local_end - this%option%nflowdof + 1
           residual(local_start) = residual(local_start) + &
-                                      this%well%liq%q(k)
+                                    this%well%liq%q(k) / &
+                                    richards_density_kmol_to_kg ! [kg/s] / [kg/kmol] = [kmol/s]
         enddo
       endif
   end select
@@ -7552,6 +7556,9 @@ function GetConst(well, k) result(deriv)
   ! Author: Joe Eyles, WSP
   ! Date: 07/2025
   !
+
+  use Richards_Aux_module, only : richards_density_kmol_to_kg
+
   implicit none
 
   type(well_type), pointer :: well
@@ -7569,7 +7576,7 @@ function GetConst(well, k) result(deriv)
     mobility = 1.d0 / well%liq%visc(k)
     den_ave = well%liq%den(k)
   endif
-  deriv = den_ave*mobility*well%WI(k)
+  deriv = den_ave*mobility*well%WI(k)/richards_density_kmol_to_kg  ! [kg/s/Pa]
 end function GetConst
 
 ! ************************************************************************** !
@@ -7998,7 +8005,7 @@ subroutine PMWellModifyFlowJacHydrostatic(this,Jac,ierr)
         deriv_const_sum = 0
         do k = 1,this%well_grid%nsegments
           if (.not. this%well_grid%segment_connected(k)) cycle
-          deriv = GetConst(this%well, k)
+          deriv = GetConst(this%well, k)  ! [kg/s/Pa]
           deriv_const_sum = deriv_const_sum + deriv
 
           ! Set dRw1/dPrk
@@ -10489,11 +10496,11 @@ subroutine PMWellCalcCumulativeQFlux(pm_well)
 
   dt = pm_well%option%flow_dt
 
-  ! (+) Q is into the well [kmol-liq/sec]
-  ! (-) Q is out of the well [kmol-liq/sec]
+  ! (+) Q is into the well [kg-liq/sec]
+  ! (-) Q is out of the well [kg-liq/sec]
 
   do k = 1,nsegments
-    ! Q_cumulative [kmol-liq]
+    ! Q_cumulative [kg-liq]
     pm_well%well%liq%Q_cumulative(k) = pm_well%well%liq%Q_cumulative(k) + &
                                        (pm_well%well%liq%Q(k)*dt)
   enddo
