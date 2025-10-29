@@ -1,9 +1,9 @@
 -- PRESSURE: Liquid Pressure --
-      Max:   1.2345791217454E+08
-      Min:   4.0274754010295E+07
-     Mean:   8.1866333092419E+07
-        1:   1.2345791217454E+08
-        2:   4.0274754010295E+07
+      Max:   7.8605569660816E+06
+      Min:   3.2042144727643E+06
+     Mean:   5.5323857194229E+06
+        1:   7.8605569660816E+06
+        2:   3.2042144727643E+06
 -- SATURATION: Liquid Saturation --
       Max:   1.0000000000000E+00
       Min:   1.0000000000000E+00
@@ -17,10 +17,10 @@
         1:        99
         2:        99
 -- PRESSURE: Well Liq. Pressure --
-      Max:   1.2570785319982E+08
+      Max:   1.0110497991356E+07
       Min:  -9.9900000000000E+02
-     Mean:   6.2853427099908E+07
-        1:   1.2570785319982E+08
+     Mean:   5.0547494956778E+06
+        1:   1.0110497991356E+07
         2:  -9.9900000000000E+02
 -- PRESSURE: Well Gas Pressure --
       Max:  -9.9900000000000E+02
@@ -41,16 +41,16 @@
         1:  -9.9900000000000E+02
         2:  -9.9900000000000E+02
 -- PRESSURE: Well BHP --
-      Max:   1.2571766319982E+08
+      Max:   1.0120307991356E+07
       Min:   2.0000000000000E+06
-     Mean:   6.3858831599908E+07
-        1:   1.2571766319982E+08
+     Mean:   6.0601539956778E+06
+        1:   1.0120307991356E+07
         2:   2.0000000000000E+06
 -- SOLUTION: Flow --
-   Time (seconds):   6.8188789999795E-03
+   Time (seconds):   5.5062400001589E-03
    Time Steps:           10
-   Newton Iterations:           25
-   Linear Solver Iterations:           75
+   Newton Iterations:           20
+   Linear Solver Iterations:           60
    Time Step Cuts:            0
-   Solution 2-Norm:   1.8075630757877E+08
-   Residual 2-Norm:   3.3039534698327E-12
+   Solution 2-Norm:   1.3359490261398E+07
+   Residual 2-Norm:   2.7207911341556E-15
