@@ -82,8 +82,13 @@ subroutine TNPFlux(reaction, &
   sat_up = global_auxvar_up%sat(iphase)
   sat_dn = global_auxvar_dn%sat(iphase)
 
-  tort_up =  material_auxvar_up%tortuosity
-  tort_dn =  material_auxvar_dn%tortuosity
+  if (rt_parameter%anisotropic_tortuosity) then
+    tort_up = TortuosityTensorToScalar(material_auxvar_up,dist)
+    tort_dn = TortuosityTensorToScalar(material_auxvar_dn,dist)
+  else
+    tort_up = material_auxvar_up%tortuosity
+    tort_dn = material_auxvar_dn%tortuosity
+  endif
 
   ! 1000 converts m^3 -> L
   factor_up = max(sat_up * material_auxvar_up%porosity * &
@@ -229,7 +234,11 @@ subroutine TNPFluxBC( &
       case(DIRICHLET_BC, DIRICHLET_ZERO_GRADIENT_BC)
           ndof = rt_parameter%naqcomp
           sat_dn = global_auxvar_dn%sat(iphase)
-          tort_dn =  material_auxvar_dn%tortuosity
+          if (rt_parameter%anisotropic_tortuosity) then
+            tort_dn = TortuosityTensorToScalar(material_auxvar_dn,dist_dn)
+          else
+            tort_dn = material_auxvar_dn%tortuosity
+          endif
           factor_dn = max(sat_dn * material_auxvar_dn%porosity * &
                   tort_dn * global_auxvar_dn%den_kg(iphase)*1.d-3* &
                   area*1000.d0, 1d-40) ! 1000 converts m^3 -> L
@@ -382,8 +391,13 @@ subroutine TNPFluxDerivative(reaction, &
   sat_up = global_auxvar_up%sat(iphase)
   sat_dn = global_auxvar_dn%sat(iphase)
 
-  tort_up =  material_auxvar_up%tortuosity
-  tort_dn =  material_auxvar_dn%tortuosity
+  if (rt_parameter%anisotropic_tortuosity) then
+    tort_up = TortuosityTensorToScalar(material_auxvar_up,dist)
+    tort_dn = TortuosityTensorToScalar(material_auxvar_dn,dist)
+  else
+    tort_up = material_auxvar_up%tortuosity
+    tort_dn = material_auxvar_dn%tortuosity
+  endif
 
   factor_up = max(sat_up * material_auxvar_up%porosity * &
           tort_up * global_auxvar_up%den_kg(iphase)*1.d-3 * &
@@ -539,7 +553,11 @@ subroutine TNPFluxDerivativeBC(&
           dist_dn = dist(0)-dist_up ! should avoid truncation error
 
           sat_dn = global_auxvar_dn%sat(iphase)
-          tort_dn =  material_auxvar_dn%tortuosity
+          if (rt_parameter%anisotropic_tortuosity) then
+            tort_dn = TortuosityTensorToScalar(material_auxvar_dn,dist)
+          else
+            tort_dn = material_auxvar_dn%tortuosity
+          endif
 
           factor_dn = max(sat_dn * material_auxvar_dn%porosity * &
             tort_dn * global_auxvar_dn%den_kg(iphase)*1.d-3 * &
@@ -658,4 +676,6 @@ subroutine ComputeElectricPotentialTotalComponent(reaction, &
 end subroutine ComputeElectricPotentialTotalComponent
 
 end module Transport_NP_module
+
+
 
