@@ -73,8 +73,8 @@ for ifilename in range(len(filenames)):
       if yes == 1:
         break
     
-filename = 'processor_output.txt'
-fout = open(filename,'w')
+output_filename = 'processor_output.txt'
+fout = open(output_filename,'w')
 
 # write out filename header
 for ifile in range(len(files)):
@@ -115,5 +115,5 @@ for ifile in range(len(files)):
   files[ifile].close()
 fout.close()
 
-print('done')
+print(f'Results have been written to file {output_filename}. Done.')
   
