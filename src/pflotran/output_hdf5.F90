@@ -536,7 +536,7 @@ subroutine OutputHDF5UGridXDMF(realization_base,var_list_type)
   endif
 
   if (OptionIsIORank(option)) then
-    option%io_buffer = ' --> write xmf output file: ' // trim(filename_path)
+    option%io_buffer = ' --> write xmf output file: ' // trim(xmf_filename)
     call PrintMsg(option)
     open(unit=OUTPUT_UNIT,file=xmf_filename,action="write")
     call OutputXMFHeader(OUTPUT_UNIT, &
