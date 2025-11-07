@@ -189,7 +189,7 @@ function MaterialPropertyCreate(option)
   material_property%isotropic_permeability = PETSC_TRUE
   material_property%full_permeability_tensor = PETSC_FALSE
   material_property%vertical_anisotropy_ratio = UNINITIALIZED_DOUBLE
-  material_property%permeability_scaling_factor = 0.d0
+  material_property%permeability_scaling_factor = UNINITIALIZED_DOUBLE
   material_property%permeability_pwr = 1.d0
   material_property%permeability_crit_por = 0.d0
   material_property%permeability_min_scale_fac = 0.d0
@@ -2546,7 +2546,7 @@ subroutine MaterialPropInputRecord(material_property_list)
       write(word1,*) cur_matprop%permeability(2,3)
       write(id,'(a)') adjustl(trim(word1)) // ' m^2'
     endif
-    if (cur_matprop%permeability_scaling_factor > 0.d0) then
+    if (Initialized(cur_matprop%permeability_scaling_factor)) then
       write(id,'(a29)',advance='no') 'permeability scaling factor: '
       write(word1,*) cur_matprop%permeability_scaling_factor
       write(id,'(a)') adjustl(trim(word1))
