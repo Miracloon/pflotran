@@ -540,6 +540,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
   use Field_module
   use Grid_module
   use Reaction_Gas_module
+  use Secondary_Continuum_Aux_module
 
 
   class(realization_subsurface_type) :: realization
@@ -554,6 +555,8 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(reactive_transport_auxvar_type), pointer :: rt_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(sec_transport_type), pointer :: rt_sec_transport_vars(:)
+  type(reactive_transport_auxvar_type), pointer :: rtsec
   class(reaction_rt_type), pointer :: reaction
 
   PetscReal :: sum_mol_tot(max_size)
@@ -570,6 +573,9 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
   PetscInt :: i, icomp, imnrl, ncomp, irate, irxn, naqcomp, k
   PetscReal :: liquid_saturation, porosity, volume
   PetscReal :: tempreal
+  PetscReal :: sec_porosity
+  PetscInt  :: nsec, j
+  PetscReal :: eps, Vpri, Vsec, sumvol, wj
 
   option => realization%option
   patch => realization%patch
@@ -581,6 +587,11 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
   rt_auxvars => patch%aux%RT%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  if (associated(patch%aux%SC_RT)) then
+     rt_sec_transport_vars => patch%aux%SC_RT%sec_transport_vars
+  else
+     nullify(rt_sec_transport_vars)
+  endif
 
   sum_mol = 0.d0
   sum_mol_tot = 0.d0
@@ -680,6 +691,89 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
            sum_mol_by_gas(1:reaction%gas%nactive_gas) * &
                                   ! 1.d-3 to convert g -> kg
            reaction%gas%actmolarwt * 1.d-3
+      endif
+    endif
+    ! Secondary continuum contribution
+    if (option%use_sc) then
+      if (associated(rt_sec_transport_vars)) then
+        nsec = rt_sec_transport_vars(ghosted_id)%ncells
+        if (nsec > 0) then
+          eps  = material_auxvars(ghosted_id)%secondary_prop%epsilon
+          Vpri = material_auxvars(ghosted_id)%volume
+          Vsec = (1.d0 - eps) * Vpri
+
+          sec_porosity = patch%material_property_array(patch%imat(ghosted_id))%ptr%multicontinuum%porosity
+
+          sumvol = sum(rt_sec_transport_vars(ghosted_id)%vol(1:nsec))
+          if (sumvol > 0.d0) then
+            do j = 1, nsec
+              wj = rt_sec_transport_vars(ghosted_id)%vol(j) / sumvol
+              rtsec => rt_sec_transport_vars(ghosted_id)%sec_rt_auxvar(j)
+
+              ! aqueous
+              sum_mol_aq(1:naqcomp) = sum_mol_aq(1:naqcomp) + &
+                   rtsec%total(:,LIQUID_PHASE) * &
+                   liquid_saturation * sec_porosity * (Vsec*wj) * 1.d3
+
+              ! equilibrium sorption
+              if (reaction%neqsorb > 0) then
+                sum_mol_sb(1:naqcomp) = sum_mol_sb(1:naqcomp) + &
+                     rtsec%total_sorb_eq(:) * (Vsec*wj)
+              endif
+
+              ! kinetic sorption
+              do irxn = 1, reaction%surface_complexation%nkinmrsrfcplxrxn
+                do irate = 1, reaction%surface_complexation%kinmr_nrate(irxn)
+                  sum_mol_sb(1:naqcomp) = sum_mol_sb(1:naqcomp) + &
+                       rtsec%kinmr_total_sorb(:,irate,irxn) * (Vsec*wj)
+                enddo
+              enddo
+
+              ! minerals
+              do imnrl = 1, reaction%mineral%nkinmnrl
+                tempreal = rtsec%mnrl_volfrac(imnrl) * (Vsec*wj) / &
+                           reaction%mineral%kinmnrl_molar_vol(imnrl)
+                ncomp = reaction%mineral%kinmnrlspecid(0,imnrl)
+                do i = 1, ncomp
+                  icomp = reaction%mineral%kinmnrlspecid(i,imnrl)
+                  sum_mol_mnrl(icomp) = sum_mol_mnrl(icomp) + &
+                       reaction%mineral%kinmnrlstoich(i,imnrl) * tempreal
+                enddo
+                sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) + tempreal
+                if (reaction%print_total_mass_kg) then
+                  sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) * &
+                       reaction%mineral%kinmnrl_molar_wt(imnrl) * 1.d-3
+                endif
+              enddo
+
+              ! immobile
+              do i = 1, reaction%immobile%nimmobile
+                sum_mol_by_im(i) = sum_mol_by_im(i) + rtsec%immobile(i) * (Vsec*wj)
+                if (reaction%print_total_mass_kg) then
+                    option%io_buffer = 'Conversion of moles to mass must be implemented &
+                    &for immobile species in reactive_transport.F90:RTComputeMassBalance'
+                  call PrintErrMsg(option)
+                  sum_mol_by_im(i) = sum_mol_by_im(i) * &
+                       reaction%immobile%list%molar_weight * 1.d-3
+                endif
+              enddo
+
+              ! gas
+              if (reaction%gas%nactive_gas > 0) then
+                sum_mol_gas(1:naqcomp) = sum_mol_gas(1:naqcomp) + &
+                     rtsec%total(:,GAS_PHASE) * &
+                     (1.d0 - liquid_saturation) * sec_porosity * (Vsec*wj) * 1.d3
+                do i = 1, reaction%gas%nactive_gas
+                  sum_mol_by_gas(i) = sum_mol_by_gas(i) + &
+                    ReactionGasPartialPresToConc(rtsec%gas_pp(i), &
+                        global_auxvars(ghosted_id)%temp) * &
+                    (1.d0 - liquid_saturation) * sec_porosity * (Vsec*wj)
+                enddo
+              endif
+
+            enddo
+          endif
+        endif
       endif
     endif
   enddo
