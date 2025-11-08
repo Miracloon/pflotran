@@ -1,0 +1,34 @@
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+    /
+  /
+END
+
+SUBSURFACE
+
+EXTERNAL_FILE cell_index_aniso_perm.txt
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  PERMEABILITY
+    ANISOTROPIC
+    DATASET charlie
+  /
+  CHARACTERISTIC_CURVES default
+END
+
+MATERIAL_PROPERTY soil2
+  ID 2
+  POROSITY 0.35d0
+  PERMEABILITY
+    DATASET alfa
+  /
+  CHARACTERISTIC_CURVES default
+END
+
+END_SUBSURFACE

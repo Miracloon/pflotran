@@ -646,6 +646,8 @@ subroutine InitSubsurfAssignMatProperties(realization)
     call DatasetGriddedHDF5Prune(gridded_dataset)
   enddo
 
+  call SubsurfaceReadScalePerms(realization)
+
   ! update ghosted values
   if (option%nflowdof > 0) then
     call DiscretizationGlobalToLocal(discretization,field%perm0_xx, &
@@ -993,7 +995,7 @@ subroutine SubsurfReadPermsFromFile(realization,material_property)
   class(dataset_common_hdf5_type), pointer :: dataset_common_hdf5_ptr
   PetscInt :: local_id
   PetscInt :: idirection, temp_int
-  PetscReal :: ratio, scale
+  PetscReal :: ratio
   Vec :: global_vec
   PetscErrorCode :: ierr
 
@@ -1037,21 +1039,15 @@ subroutine SubsurfReadPermsFromFile(realization,material_property)
                                     PETSC_FALSE,global_vec)
     call VecGetArray(global_vec,vec_p,ierr);CHKERRQ(ierr)
     ratio = 1.d0
-    scale = 1.d0
-    !TODO(geh): fix so that ratio and scale work for perms outside
-    ! of dataset
     if (Initialized(material_property%vertical_anisotropy_ratio)) then
       ratio = material_property%vertical_anisotropy_ratio
-    endif
-    if (material_property%permeability_scaling_factor > 0.d0) then
-      scale = material_property%permeability_scaling_factor
     endif
     do local_id = 1, grid%nlmax
       if (patch%imat(grid%nL2G(local_id)) == &
           material_property%internal_id) then
-        perm_xx_p(local_id) = vec_p(local_id)*scale
-        perm_yy_p(local_id) = vec_p(local_id)*scale
-        perm_zz_p(local_id) = vec_p(local_id)*ratio*scale
+        perm_xx_p(local_id) = vec_p(local_id)
+        perm_yy_p(local_id) = vec_p(local_id)
+        perm_zz_p(local_id) = vec_p(local_id)*ratio
         if (option%flow%full_perm_tensor) then
           perm_xy_p(local_id) = 0.d0
           perm_xz_p(local_id) = 0.d0
@@ -1124,6 +1120,94 @@ subroutine SubsurfReadPermsFromFile(realization,material_property)
   endif
 
 end subroutine SubsurfReadPermsFromFile
+
+! ************************************************************************** !
+
+subroutine SubsurfaceReadScalePerms(realization)
+  !
+  ! Scales permeabilities based on scaling prescribed in input deck
+  !
+  ! Author: Glenn Hammond
+  ! Date: 11/07/25
+  !
+
+  use Realization_Subsurface_class
+  use Field_module
+  use Grid_module
+  use Option_module
+  use Patch_module
+  use Material_module
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+
+  type(material_property_type), pointer :: material_property
+  type(field_type), pointer :: field
+  type(patch_type), pointer :: patch
+  type(grid_type), pointer :: grid
+  type(option_type), pointer :: option
+  PetscInt :: local_id
+  PetscInt :: ghosted_id
+  PetscInt :: material_id
+  PetscReal :: perm_scale
+  PetscErrorCode :: ierr
+
+  PetscReal, pointer :: perm_xx_p(:)
+  PetscReal, pointer :: perm_yy_p(:)
+  PetscReal, pointer :: perm_zz_p(:)
+  PetscReal, pointer :: perm_xy_p(:)
+  PetscReal, pointer :: perm_yz_p(:)
+  PetscReal, pointer :: perm_xz_p(:)
+
+  field => realization%field
+  patch => realization%patch
+  grid => patch%grid
+  option => realization%option
+
+  if (option%iflowmode == NULL_MODE) return
+
+  call VecGetArray(field%perm0_xx,perm_xx_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%perm0_yy,perm_yy_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%perm0_zz,perm_zz_p,ierr);CHKERRQ(ierr)
+  if (option%flow%full_perm_tensor) then
+    call VecGetArray(field%perm0_xy,perm_xy_p,ierr);CHKERRQ(ierr)
+    call VecGetArray(field%perm0_xz,perm_xz_p,ierr);CHKERRQ(ierr)
+    call VecGetArray(field%perm0_yz,perm_yz_p,ierr);CHKERRQ(ierr)
+  endif
+
+  do material_id = 1, size(patch%material_property_array)
+    material_property => &
+            patch%material_property_array(material_id)%ptr
+    if (.not.associated(material_property)) cycle
+    if (Initialized(material_property%permeability_scaling_factor)) then
+      perm_scale = material_property%permeability_scaling_factor
+      do local_id = 1, grid%nlmax
+        ghosted_id = grid%nL2G(local_id)
+        if (material_id == patch%imat(ghosted_id)) then
+          perm_xx_p(local_id) = perm_xx_p(local_id)*perm_scale
+          perm_yy_p(local_id) = perm_yy_p(local_id)*perm_scale
+          perm_zz_p(local_id) = perm_zz_p(local_id)*perm_scale
+          if (option%flow%full_perm_tensor) then
+            perm_xy_p(local_id) = perm_xy_p(local_id)*perm_scale
+            perm_xz_p(local_id) = perm_xz_p(local_id)*perm_scale
+            perm_yz_p(local_id) = perm_yz_p(local_id)*perm_scale
+          endif
+        endif
+      enddo
+    endif
+  enddo
+
+  call VecRestoreArray(field%perm0_xx,perm_xx_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%perm0_yy,perm_yy_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%perm0_zz,perm_zz_p,ierr);CHKERRQ(ierr)
+  if (option%flow%full_perm_tensor) then
+    call VecRestoreArray(field%perm0_xy,perm_xy_p,ierr);CHKERRQ(ierr)
+    call VecRestoreArray(field%perm0_xz,perm_xz_p,ierr);CHKERRQ(ierr)
+    call VecRestoreArray(field%perm0_yz,perm_yz_p,ierr);CHKERRQ(ierr)
+  endif
+
+end subroutine SubsurfaceReadScalePerms
 
 ! ************************************************************************** !
 

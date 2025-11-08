@@ -361,6 +361,7 @@ dataset_map_hdf5.o : \
 debug.o : \
   input_aux.o \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o \
   string.o
 discretization.o : \
@@ -524,6 +525,7 @@ factory_subsurface.o : \
   checkpoint.o \
   co2_span_wagner.o \
   dataset.o \
+  debug.o \
   discretization.o \
   dm_custom.o \
   eos.o \
@@ -659,7 +661,6 @@ factory_subsurface_read.o : \
   dataset_ascii.o \
   dataset_base.o \
   dataset_common_hdf5.o \
-  debug.o \
   discretization.o \
   eos.o \
   eos_water.o \
@@ -2015,6 +2016,7 @@ pm_auxiliary.o : \
   string.o \
   utility.o
 pm_base.o : \
+  debug.o \
   input_aux.o \
   option.o \
   output_aux.o \
@@ -2263,6 +2265,7 @@ pm_pnf.o : \
   communicator_base.o \
   connection.o \
   coupler.o \
+  debug.o \
   discretization.o \
   eos_water.o \
   field.o \
@@ -3699,6 +3702,7 @@ simulation_subsurface.o : \
   characteristic_curves_thermal.o \
   checkpoint.o \
   condition.o \
+  debug.o \
   discretization.o \
   driver.o \
   eos.o \
