@@ -279,6 +279,7 @@ module PFLOTRAN_Constants_module
   PetscInt, parameter, public :: GEOMECH_ERT_COUPLING = 6
   PetscInt, parameter, public :: GEOMECH_DRAINED_SPLIT = 1
   PetscInt, parameter, public :: GEOMECH_FIXED_STRAIN_SPLIT = 2
+  PetscInt, parameter, public :: GEOMECH_FIXED_STRESS_SPLIT = 3
 
   ! Macros that are used as 'vscatter_index' values
   PetscInt, parameter, public :: SUBSURF_TO_GEOMECHANICS = 3

@@ -254,6 +254,8 @@ subroutine InitSubsurfGeomechReadInput(geomech,geomech_solver, &
                                             geomech_realization%dt_coupling, &
                                             internal_units,'GEOMECHANICS_TIME,&
                                             &COUPLING_TIMESTEP_SIZE',option)
+            case('SYNC_FLOW_TIMESTEP_SIZE') ! for sync drained split
+              option%geomechanics%sync_flow_dt = PETSC_TRUE
             case default
               call InputKeywordUnrecognized(input,word, &
                                             'GEOMECHANICS_TIME',option)
@@ -387,6 +389,7 @@ subroutine InitSubsurfGeomechJumpStart(geomech)
   class(realization_geomech_type), pointer :: geomech_realization
   class(pmc_geomechanics_type), pointer :: geomech_pmc
   class(timestepper_ksp_type), pointer :: geomech_timestepper
+  type(option_type), pointer :: option
 
   PetscBool :: snapshot_plot_flag,observation_plot_flag,massbal_plot_flag
   PetscBool :: geomech_read
@@ -396,6 +399,7 @@ subroutine InitSubsurfGeomechJumpStart(geomech)
   geomech_realization => geomech%realization
   geomech_pmc => geomech%process_model_coupler
   geomech_timestepper => TimestepperKSPCast(geomech_pmc%timestepper)
+  option => geomech_pmc%option
 
   call PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
                            "-vecload_block_size",failure,ierr);CHKERRQ(ierr)
@@ -408,7 +412,7 @@ subroutine InitSubsurfGeomechJumpStart(geomech)
   geomech_read = PETSC_FALSE
   failure = PETSC_FALSE
 
-  call OutputGeomechInit(geomech_timestepper%steps)
+  call OutputGeomechInit(geomech_timestepper%steps, option)
 
   ! pushed in INIT_STAGE()
   call PetscLogStagePop(ierr);CHKERRQ(ierr)
@@ -874,6 +878,7 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   class(timestepper_ksp_type), pointer :: timestepper
   type(geomechanics_regression_type), pointer :: geomech_regression
   PetscErrorCode :: ierr
+  PetscInt :: ghosted_id
 
   if (.not. associated(pm_geomech)) return
 
@@ -962,6 +967,13 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   call simulation%flow_process_model_coupler%SetAuxData()
   call simulation%geomech%process_model_coupler%GetAuxData()
   call simulation%geomech%process_model_coupler%SetAuxData()
+
+  ! used for fixed-stress coupling flow (TH and RICHARDS) routines
+  do ghosted_id = 1, subsurf_realization%patch%grid%ngmax
+    pm_geomech%subsurf_realization%patch%aux%Material%auxvars(ghosted_id)% &
+      geomech => pm_geomech%geomech_realization%geomech_patch%geomech_aux
+  enddo
+
   ! this is solely for casting to pmc geomech
   select type(pmc => simulation%geomech%process_model_coupler)
     class is(pmc_geomechanics_type)

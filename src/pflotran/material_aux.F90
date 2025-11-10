@@ -3,6 +3,7 @@ module Material_Aux_module
 #include "petsc/finclude/petscsys.h"
   use petscsys
   use PFLOTRAN_Constants_module
+  use Geomechanics_Auxiliary_module
 
   implicit none
 
@@ -71,6 +72,7 @@ module Material_Aux_module
     type(secondary_auxvar_type), pointer :: secondary_prop
     PetscReal, pointer :: geomechanics_subsurface_prop(:)
     PetscInt :: creep_closure_id
+    type(geomech_auxiliary_type), pointer :: geomech
 
 !    procedure(SaturationFunction), nopass, pointer :: SaturationFunction
 !  contains
@@ -309,6 +311,7 @@ subroutine MaterialAuxVarInit(auxvar,option)
   endif
 
   nullify(auxvar%geomechanics_subsurface_prop)
+  nullify(auxvar%geomech)
 
 end subroutine MaterialAuxVarInit
 
@@ -1180,6 +1183,7 @@ subroutine MaterialAuxVarStrip(auxvar)
   if (associated(auxvar%geomechanics_subsurface_prop)) then
     call DeallocateArray(auxvar%geomechanics_subsurface_prop)
   endif
+  nullify(auxvar%geomech)
 
 end subroutine MaterialAuxVarStrip
 

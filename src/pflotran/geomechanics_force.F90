@@ -1677,6 +1677,7 @@ subroutine GeomechForceApplyTractionBCtoRHS(local_coordinates, &
     force = force + w(igpt)*kron_N_traction(:,1)*surf_J
     call ShapeFunctionDestroy(shapefunction)
 
+    deallocate(kron_N_traction)
     deallocate(N)
 
   enddo
@@ -2255,7 +2256,7 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
     rhs_vec = rhs_vec + w(igpt)*density*matmul(kron_N_eye,bf)*detJ_map
     rhs_vec = rhs_vec + w(igpt)*beta*dot_product(N(:,1),local_press)* &
       vecB_transpose(:,1)*detJ_map
-    rhs_vec = rhs_vec + w(igpt)*alpha*(3*lambda+2*mu)* &
+    rhs_vec = rhs_vec + w(igpt)*alpha*(3.d0*lambda+2.d0*mu)* &
       dot_product(N(:,1),local_temp)*vecB_transpose(:,1)*detJ_map
     call ShapeFunctionDestroy(shapefunction)
     deallocate(N)

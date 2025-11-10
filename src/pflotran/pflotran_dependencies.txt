@@ -1542,6 +1542,7 @@ material.o : \
   variables.o \
   wipp.o
 material_aux.o : \
+  geomechanics_auxiliary.o \
   option.o \
   pflotran_constants.o \
   string.o \
@@ -2148,9 +2149,11 @@ pm_geomechanics_force.o : \
   geomechanics_force.o \
   geomechanics_realization.o \
   global.o \
+  global_aux.o \
   grid.o \
   input_aux.o \
   option.o \
+  parameter.o \
   pflotran_constants.o \
   pm_base.o \
   realization_subsurface.o \
@@ -2777,6 +2780,7 @@ pmc_geomechanics.o : \
   geomechanics_force.o \
   geomechanics_realization.o \
   geomechanics_subsurface_properties.o \
+  global_aux.o \
   grid.o \
   option.o \
   output_geomechanics.o \
@@ -3570,9 +3574,11 @@ richards_common.o : \
   characteristic_curves.o \
   connection.o \
   eos_water.o \
+  geomechanics_auxiliary.o \
   global_aux.o \
   material_aux.o \
   option.o \
+  parameter.o \
   pflotran_constants.o \
   richards_aux.o \
   utility.o
@@ -3925,6 +3931,7 @@ th.o : \
   eos_water.o \
   field.o \
   fluid.o \
+  geomechanics_auxiliary.o \
   global_aux.o \
   grid.o \
   logging.o \
@@ -3933,6 +3940,7 @@ th.o : \
   matrix_zeroing.o \
   option.o \
   output_aux.o \
+  parameter.o \
   patch.o \
   petsc_utility.o \
   pflotran_constants.o \

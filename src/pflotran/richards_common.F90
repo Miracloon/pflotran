@@ -43,10 +43,12 @@ subroutine RichardsAccumDerivative(rich_auxvar,global_auxvar, &
 
   use Option_module
   use Characteristic_Curves_module
+  use Parameter_module
   use Material_Aux_module, only : material_auxvar_type, &
                                  MaterialAuxVarInit, &
                                  MaterialAuxVarCopy, &
                                  MaterialAuxVarStrip
+  use Geomechanics_Auxiliary_module
 
   implicit none
 
@@ -66,7 +68,38 @@ subroutine RichardsAccumDerivative(rich_auxvar,global_auxvar, &
   type(material_auxvar_type) :: material_auxvar_pert
   PetscReal :: x(1), x_pert(1), pert, res(1), res_pert(1), J_pert(1,1)
 
+  PetscReal :: biot_coeff
+  PetscReal :: youngs_mod, poissons_ratio
+  PetscReal :: porosity_0, dr_bulk_modulus
+  PetscInt :: porosity_id
+
+  type(geomech_parameter_type), pointer :: GeomechParam
+
   vol_over_dt = material_auxvar%volume/option%flow_dt
+
+  ! jaa update 12/18/2025
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+
+          GeomechParam => material_auxvar%geomech%GeomechParam
+          ! get geomech and flow material properties
+          porosity_0 = material_auxvar%porosity_0
+          youngs_mod = GeomechParam%youngs_modulus(material_auxvar%id)
+          poissons_ratio = GeomechParam%poissons_ratio(material_auxvar%id)
+          biot_coeff = GeomechParam%biot_coeff(material_auxvar%id)
+          ! Bulk modulus unit = Pa
+          dr_bulk_modulus = youngs_mod / &
+                           (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+          ! Burghardt 2017 paper
+          material_auxvar%dporosity_dp = (biot_coeff**2)/dr_bulk_modulus + &
+                 ((biot_coeff-porosity_0)*(1.d0-biot_coeff))/dr_bulk_modulus
+          porosity_id = ParameterGetIDFromName('flow_porosity', option)
+          material_auxvar%porosity = global_auxvar%parameters(porosity_id)
+
+    end select ! split_scheme
+  end select ! flow_coupling
 
   ! accumulation term units = dkmol/dp
   J(1,1) = (material_auxvar%dporosity_dp*global_auxvar%sat(1)* &
@@ -122,6 +155,8 @@ subroutine RichardsAccumulation(rich_auxvar,global_auxvar, &
 
   use Option_module
   use Material_Aux_module, only : material_auxvar_type
+  use Parameter_module
+  use Geomechanics_Auxiliary_module
 
   implicit none
 
@@ -133,11 +168,71 @@ subroutine RichardsAccumulation(rich_auxvar,global_auxvar, &
 
   PetscReal :: vol_over_dt
 
+  PetscReal :: biot_coeff
+  PetscReal :: youngs_mod, poissons_ratio
+  PetscReal :: porosity_0, dr_bulk_modulus
+  PetscReal :: C1, C2, press_0, vstrain_0, vstrain
+  PetscReal :: del_vstrain, por, press_mech
+  PetscInt :: id_porosity, id_press_0, id_vstrain_0
+  PetscInt :: id_vstrain, id_press_mech, id_porosity_mech
+
+  type(geomech_parameter_type), pointer :: GeomechParam
+
   vol_over_dt = material_auxvar%volume/option%flow_dt
+  por = material_auxvar%porosity
+
+  ! jaa update 12/18/2025
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+
+          GeomechParam => material_auxvar%geomech%GeomechParam
+
+          ! get geomech and flow material properties
+          youngs_mod = GeomechParam%youngs_modulus(material_auxvar%id)
+          poissons_ratio = GeomechParam%poissons_ratio(material_auxvar%id)
+          biot_coeff = GeomechParam%biot_coeff(material_auxvar%id)
+          porosity_0 = material_auxvar%porosity_0
+          ! 3D bulk modulus
+          dr_bulk_modulus = youngs_mod / &
+                            (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+          ! C1 constant
+          C1 = (biot_coeff-porosity_0)*(1.d0 - biot_coeff)/dr_bulk_modulus
+          ! C2 constant
+          C2 = biot_coeff**2/dr_bulk_modulus
+          ! get stored parameters from pmc_geomech
+          id_press_0=ParameterGetIDFromName('press_0',option)
+          id_vstrain_0=ParameterGetIDFromName('vol_strain_0',option)
+          id_vstrain=ParameterGetIDFromName('vol_strain',option)
+          id_press_mech=ParameterGetIDFromName('stored_pressure',option)
+          id_porosity_mech=ParameterGetIDFromName('stored_porosity',option)
+          id_porosity = ParameterGetIDFromName('flow_porosity', option)
+          press_0 = global_auxvar%parameters(id_press_0)
+          press_mech = global_auxvar%parameters(id_press_mech)
+          vstrain_0 = global_auxvar%parameters(id_vstrain_0)
+          vstrain = global_auxvar%parameters(id_vstrain)
+          ! porosity@ n
+          if (option%iflag == RICHARDS_UPDATE_FOR_FIXED_ACCUM) then
+            por = global_auxvar%parameters(id_porosity_mech)
+          else ! porosity@ n+1
+            ! delta vstrain
+            del_vstrain = vstrain - vstrain_0
+            ! Burghardt 2017 paper
+            ! new porosity (mass conservative)
+            por = porosity_0 + (biot_coeff * del_vstrain) + &
+                  ( C1 * ( press_mech - press_0 )) + &
+                  ( (C2 + C1) * ( global_auxvar%pres(1) - press_mech ))
+            ! store new (mass conserved) flow porosity
+            global_auxvar%parameters(id_porosity) = por
+          endif
+
+    end select ! split_scheme
+  end select ! flow_coupling
 
   ! accumulation term units = kmol/s
   Res(1) = global_auxvar%sat(1) * global_auxvar%den(1) * &
-           material_auxvar%porosity * vol_over_dt
+           por * vol_over_dt
 
 end subroutine RichardsAccumulation
 

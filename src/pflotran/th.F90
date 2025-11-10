@@ -1093,6 +1093,7 @@ subroutine THUpdateFixedAccumulation(realization)
     endif
 
     global_auxvars(ghosted_id)%istate = iphase
+    option%iflag = TH_UPDATE_FOR_FIXED_ACCUM
     call THAccumulation(th_auxvars(ghosted_id),global_auxvars(ghosted_id), &
                         material_auxvars(ghosted_id), &
                         th_parameter%dencpr(patch%cct_id(ghosted_id)), &
@@ -1231,6 +1232,8 @@ subroutine THAccumDerivative(th_auxvar,global_auxvar, &
   use Saturation_Function_module
   use Material_Aux_module, only : material_auxvar_type
   use EOS_Water_module
+  use Parameter_module
+  use Geomechanics_Auxiliary_module
 
   implicit none
 
@@ -1272,6 +1275,14 @@ subroutine THAccumDerivative(th_auxvar,global_auxvar, &
   PetscReal :: ddeni_dp, ddeni_dT
   PetscReal :: dui_dT
   PetscInt :: idof, ieq
+
+  PetscInt :: id_porosity
+  PetscReal :: biot_coeff
+  PetscReal :: youngs_mod, poissons_ratio
+  PetscReal :: porosity_0, dr_bulk_modulus
+  PetscReal :: alpha, dpor_dT
+
+  type(geomech_parameter_type), pointer :: GeomechParam
 
   J = 0.d0
   if (th_numerical_derivatives) then
@@ -1323,6 +1334,50 @@ subroutine THAccumDerivative(th_auxvar,global_auxvar, &
   J(TH_ENERGY_EQUATION_INDEX,TH_TEMPERATURE_DOF) = &
             sat*(dden_dT*u + den*du_dT)*porXvol + (1.d0 - por)*vol*rock_dencpr
 
+  ! jaa update 12/18/2025
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+
+          GeomechParam => material_auxvar%geomech%GeomechParam
+          ! update porosity, dcompressed_porosity_dp, and set dpor_dT
+          ! without geomech coupling, porosity is not a function of temperature
+          porosity_0 = material_auxvar%porosity_0
+          youngs_mod = GeomechParam%youngs_modulus(material_auxvar%id)
+          poissons_ratio = GeomechParam%poissons_ratio(material_auxvar%id)
+          biot_coeff = GeomechParam%biot_coeff(material_auxvar%id)
+          alpha = GeomechParam%thermal_exp_coeff(material_auxvar%id)
+          ! Bulk modulus unit = Pa
+          dr_bulk_modulus = youngs_mod / &
+                           (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+          ! Burghardt 2017 paper
+          dcompressed_porosity_dp = (biot_coeff**2)/dr_bulk_modulus + &
+            ((biot_coeff-porosity_0)*(1.d0-biot_coeff))/dr_bulk_modulus
+          id_porosity = ParameterGetIDFromName('flow_porosity',option)
+          por = global_auxvar%parameters(id_porosity)
+          dpor_dT = alpha
+
+          porXvol = por*vol
+
+          ! d(por*sat*den)/dP * vol
+          J(TH_LIQUID_EQUATION_INDEX,TH_PRESSURE_DOF) = &
+            (sat*dden_dp + dsat_dp*den)*porXvol + &
+            dcompressed_porosity_dp*sat*den*vol
+
+          J(TH_LIQUID_EQUATION_INDEX,TH_TEMPERATURE_DOF) = sat*dden_dT*porXvol + &
+                                                  sat*den*dpor_dT*vol
+          J(TH_ENERGY_EQUATION_INDEX,TH_PRESSURE_DOF) = (dsat_dp*den*u + &
+                                                   sat*dden_dp*u + &
+                                                   sat*den*du_dp)*porXvol + &
+                                                   (den*sat*u - rock_dencpr*temp)* &
+                                                   vol*dcompressed_porosity_dp
+          J(TH_ENERGY_EQUATION_INDEX,TH_TEMPERATURE_DOF) = &
+                    sat*(dden_dT*u + den*du_dT)*porXvol + (1.d0 - por)*vol*rock_dencpr + &
+                    sat*den*u*dpor_dT*vol - dpor_dT*vol*rock_dencpr*temp
+
+    end select ! split_scheme
+  end select ! flow_coupling
 
   if (option%flow%th_freezing) then
      ! SK, 11/17/11
@@ -1477,6 +1532,8 @@ subroutine THAccumulation(th_auxvar,global_auxvar, &
   use Option_module
   use Material_Aux_module, only : material_auxvar_type
   use EOS_Water_module
+  use Parameter_module
+  use Geomechanics_Auxiliary_module
 
   implicit none
 
@@ -1495,10 +1552,72 @@ subroutine THAccumulation(th_auxvar,global_auxvar, &
   PetscReal :: sat_g, den_g, kmol_g, u_g
   PetscReal :: sat_i, den_i, u_i
 
+  PetscInt :: porosity_id
+  PetscReal :: biot_coeff, youngs_mod, poissons_ratio, dr_bulk_modulus
+
+  PetscInt :: id_press_0, id_temp_0
+  PetscInt :: id_vstrain_0, id_vstrain, id_press_mech
+  PetscInt :: id_porosity_mech
+  PetscReal :: porosity_0, C1, C2, press_0, temp_0
+  PetscReal :: vstrain_0, vstrain, del_vstrain, alpha
+  PetscReal :: press_mech
+
+  type(geomech_parameter_type), pointer :: GeomechParam
+
   Res = 0.d0
 
   vol = material_auxvar%volume
   por = material_auxvar%porosity
+
+  ! jaa update 12/18/2025
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+
+          GeomechParam => material_auxvar%geomech%GeomechParam
+          ! get geomech and flow material properties
+          youngs_mod = GeomechParam%youngs_modulus(material_auxvar%id)
+          poissons_ratio = GeomechParam%poissons_ratio(material_auxvar%id)
+          biot_coeff = GeomechParam%biot_coeff(material_auxvar%id)
+          alpha = GeomechParam%thermal_exp_coeff(material_auxvar%id)
+          porosity_0 = material_auxvar%porosity_0
+          ! 3D bulk modulus
+          dr_bulk_modulus = youngs_mod / &
+                            (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+          ! C1 constant
+          C1 = (biot_coeff-porosity_0)*(1.d0 - biot_coeff)/dr_bulk_modulus
+          ! C2 constant
+          C2 = biot_coeff**2/dr_bulk_modulus
+          ! get stored values
+          id_press_0=ParameterGetIDFromName('press_0',option)
+          id_temp_0=ParameterGetIDFromName('temp_0',option)
+          id_vstrain_0=ParameterGetIDFromName('vol_strain_0',option)
+          id_vstrain=ParameterGetIDFromName('vol_strain',option)
+          id_press_mech=ParameterGetIDFromName('stored_pressure',option)
+          id_porosity_mech=ParameterGetIDFromName('stored_porosity',option)
+          porosity_id = ParameterGetIDFromName('flow_porosity', option)
+          press_0 = global_auxvar%parameters(id_press_0)
+          press_mech = global_auxvar%parameters(id_press_mech)
+          temp_0 = global_auxvar%parameters(id_temp_0)
+          vstrain_0 = global_auxvar%parameters(id_vstrain_0)
+          vstrain = global_auxvar%parameters(id_vstrain)
+          if (option%iflag == TH_UPDATE_FOR_FIXED_ACCUM) then
+            por = global_auxvar%parameters(id_porosity_mech)
+          else
+            ! delta vstrain
+            del_vstrain = vstrain - vstrain_0
+            ! Burghardt 2017 paper
+            por = porosity_0 + (biot_coeff * del_vstrain) + &
+                  ( C1 * ( press_mech - press_0 )) + &
+                  ( (C2 + C1) * ( th_auxvar%pres - press_mech )) + &
+                  ( alpha * (th_auxvar%temp - temp_0 ))
+            ! store new (mass conserved) flow porosity for threshold check
+            global_auxvar%parameters(porosity_id) = por
+          endif
+
+    end select ! split_scheme
+  end select ! flow_coupling
 
   ! TechNotes, TH Mode: First term of Equation 8
   porXvol = por*vol
@@ -4215,6 +4334,8 @@ subroutine THResidualAccumulation(r,realization,ierr)
       vol_frac_prim = material_auxvars(ghosted_id)%secondary_prop%epsilon
     endif
 
+    ! non-fixed here
+    option%iflag = TH_UPDATE_FOR_ACCUM
     call THAccumulation(th_auxvars(ghosted_id),global_auxvars(ghosted_id), &
                         material_auxvars(ghosted_id), &
                         th_parameter%dencpr(patch%cct_id(ghosted_id)), &

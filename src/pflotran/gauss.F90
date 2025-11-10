@@ -563,7 +563,7 @@ subroutine GaussTetrahedra(num_gauss_pts,r,w)
       r(3,:) = (/p2,p2,p1/)
       r(4,:) = (/p2,p2,p2/)
       !
-      w = 1.0/(6.d0*4.d0)*(/1.d0,1.d0,1.d0,1.d0/)
+      w = 1.d0/(6.d0*4.d0)*(/1.d0,1.d0,1.d0,1.d0/)
 
     !------------------------------------
     ! No of Gauss Points = 5

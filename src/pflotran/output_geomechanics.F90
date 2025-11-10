@@ -24,7 +24,7 @@ contains
 
 ! ************************************************************************** !
 
-subroutine OutputGeomechInit(num_steps)
+subroutine OutputGeomechInit(num_steps, option)
   !
   ! Initializes module variables for geomechanics variables
   !
@@ -37,12 +37,18 @@ subroutine OutputGeomechInit(num_steps)
   implicit none
 
   PetscInt :: num_steps
+  type(option_type), pointer :: option
 
-  if (num_steps == 0) then
+  if (num_steps == 0 .and. option%geomechanics%split_scheme == &
+                           GEOMECH_DRAINED_SPLIT) then
+    geomech_hdf5_first = PETSC_TRUE
+  elseif (num_steps == -1 .and. option%geomechanics%split_scheme /= &
+                                GEOMECH_DRAINED_SPLIT) then
     geomech_hdf5_first = PETSC_TRUE
   else
     geomech_hdf5_first = PETSC_FALSE
   endif
+
 
 end subroutine OutputGeomechInit
 

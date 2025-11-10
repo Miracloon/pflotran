@@ -370,6 +370,30 @@ subroutine FactorySubsurfaceInitSimulation(simulation)
       call RealizationRegisterParameter(realization,'geomechanics_stress')
       call RealizationRegisterParameter(realization,'geomechanics_strain')
   end select
+
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+          call RealizationRegisterParameter(realization, &
+                                            'vol_strain_0')
+          call RealizationRegisterParameter(realization, &
+                                            'vol_strain')
+          call RealizationRegisterParameter(realization, &
+                                            'press_old')
+          call RealizationRegisterParameter(realization, &
+                                            'press_0')
+          call RealizationRegisterParameter(realization, &
+                                            'temp_0')
+          call RealizationRegisterParameter(realization, &
+                                            'flow_porosity')
+          call RealizationRegisterParameter(realization, &
+                                            'stored_porosity')
+          call RealizationRegisterParameter(realization, &
+                                            'stored_pressure')
+    end select
+  end select
+
   call FactorySubsurfSetupRealization(simulation)
 
   call InitCommonAddOutputWaypoints(option,simulation%output_option, &

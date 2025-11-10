@@ -138,6 +138,24 @@ subroutine PMGeomechReadSimOptionsBlock(this,input)
             call InputKeywordUnrecognized(input,word, &
                                 trim(error_string)//','//trim(keyword),option)
         end select
+
+      case('SPLIT_SCHEME')
+        call InputReadCard(input,option,word,PETSC_FALSE)
+        call StringToUpper(word)
+        select case (word)
+          case ('DRAINED')
+            option%geomechanics%split_scheme = GEOMECH_DRAINED_SPLIT
+          !case ('UNDRAINED')
+          !  option%geomechanics%split_scheme = GEOMECH_UNDRAINED_SPLIT
+          case ('FIXED_STRAIN')
+            option%geomechanics%split_scheme = GEOMECH_FIXED_STRAIN_SPLIT
+          case ('FIXED_STRESS')
+            option%geomechanics%split_scheme = GEOMECH_FIXED_STRESS_SPLIT
+          case default
+            call InputKeywordUnrecognized(input,word, &
+                                trim(error_string)//','//trim(keyword),option)
+        end select
+
       case default
         call InputKeywordUnrecognized(input,keyword,error_string,option)
     end select
@@ -317,6 +335,10 @@ subroutine PMGeomechForcePreSolve(this)
   use Geomechanics_Force_module, only : GeomechUpdateSolution, &
                                         GeomechStoreInitialDisp, &
                                         GeomechForceUpdateAuxVars
+  use Grid_module
+  use Global_Aux_module
+  use Parameter_module
+  use Option_module
 
   implicit none
 

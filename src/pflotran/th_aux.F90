@@ -35,6 +35,7 @@ module TH_Aux_module
   PetscReal, public :: th_well_init_well_temperature = UNINITIALIZED_DOUBLE
 
   PetscInt, parameter, public :: TH_UPDATE_FOR_FIXED_ACCUM = 0
+  PetscInt, parameter, public :: TH_UPDATE_FOR_ACCUM = 1
 
   type, public :: th_auxvar_type
     PetscReal :: pres
