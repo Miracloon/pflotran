@@ -319,8 +319,8 @@ subroutine OutputAggregateToFile(realization_base)
   PetscInt :: icolumn
   PetscErrorCode :: ierr
 
-  call PetscLogEventBegin(logging%event_output_observation_agg, &
-                          ierr);CHKERRQ(ierr)
+  !call PetscLogEventBegin(logging%event_output_observation_agg, &
+  !                        ierr);CHKERRQ(ierr)
 
   patch => realization_base%patch
   option => realization_base%option
@@ -419,8 +419,8 @@ subroutine OutputAggregateToFile(realization_base)
   enddo
 
   observation_aggregate_first = PETSC_FALSE
-  call PetscLogEventEnd(logging%event_output_observation_agg, &
-                        ierr);CHKERRQ(ierr)
+  !call PetscLogEventEnd(logging%event_output_observation_agg, &
+  !                      ierr);CHKERRQ(ierr)
 
 end subroutine OutputAggregateToFile
 

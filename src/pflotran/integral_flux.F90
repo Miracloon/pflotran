@@ -32,6 +32,7 @@ module Integral_Flux_module
     PetscInt, pointer :: boundary_connections(:)
     PetscInt, pointer :: source_sink_connections(:)
     PetscReal, pointer :: integral_value(:)
+    PetscReal, pointer :: instantaneous_value(:)
     type(integral_flux_type), pointer :: next
   end type integral_flux_type
 
@@ -86,6 +87,7 @@ function IntegralFluxCreate()
   nullify(integral_flux%boundary_connections)
   nullify(integral_flux%source_sink_connections)
   nullify(integral_flux%integral_value)
+  nullify(integral_flux%instantaneous_value)
   nullify(integral_flux%next)
 
   IntegralFluxCreate => integral_flux
@@ -287,6 +289,9 @@ subroutine IntegralFluxSizeStorage(integral_flux,option)
   allocate(integral_flux%integral_value(option%nflowdof+option%ntrandof))
   integral_flux%integral_value = 0.d0
 
+  allocate(integral_flux%instantaneous_value(option%nflowdof+option%ntrandof))
+  integral_flux%instantaneous_value = 0.d0
+
 end subroutine IntegralFluxSizeStorage
 
 ! ************************************************************************** !
@@ -341,6 +346,9 @@ subroutine IntegralFluxUpdate(integral_flux_list,internal_fluxes, &
     call IntegralFluxGetInstantaneous(integral_flux, internal_fluxes, &
                                       boundary_fluxes,source_sink_fluxes, &
                                       num_values,sum_array,option)
+    ! warning: this instantaneous value isn't multiplied by flow_dof_scale
+    integral_flux%instantaneous_value(offset+1:offset+num_values) = &
+      sum_array(1:num_values)
     integral_flux%integral_value(offset+1:offset+num_values) = &
       integral_flux%integral_value(offset+1:offset+num_values) + &
       sum_array(1:num_values)*dt
@@ -690,6 +698,7 @@ subroutine IntegralFluxDestroy(integral_flux)
   call DeallocateArray(integral_flux%boundary_connections)
   call DeallocateArray(integral_flux%source_sink_connections)
   call DeallocateArray(integral_flux%integral_value)
+  call DeallocateArray(integral_flux%instantaneous_value)
   deallocate(integral_flux)
   nullify(integral_flux)
 
