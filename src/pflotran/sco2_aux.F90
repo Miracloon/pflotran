@@ -474,7 +474,7 @@ subroutine SCO2AuxVarPerturb(sco2_auxvar, global_auxvar, material_auxvar, &
   ! Phase ID's
   PetscInt :: lid, gid, pid, pwid, pbid, spid, tgid
   ! Component ID's
-  PetscInt :: wid, co2_id, co2_pressure_id, sid, pgid
+  PetscInt :: co2_id, co2_pressure_id, sid, pgid
   ! Other ID's
   PetscInt :: cpid, vpid, rvpid
 
@@ -487,7 +487,6 @@ subroutine SCO2AuxVarPerturb(sco2_auxvar, global_auxvar, material_auxvar, &
   pgid = option%trapped_gas_phase
   spid = option%saturation_pressure_id
 
-  wid = option%water_id
   co2_id = option%co2_id
   sid = option%salt_id
 
@@ -748,7 +747,7 @@ subroutine SCO2AuxVarUpdateState(x, sco2_auxvar, global_auxvar, &
   ! Phase ID's
   PetscInt :: lid, gid, pid, pwid, pbid, spid, tgid
   ! Component ID's
-  PetscInt :: wid, co2_id, co2_pressure_id, sid
+  PetscInt :: co2_id, co2_pressure_id, sid
   ! Other ID's
   PetscInt :: cpid, vpid, rvpid
   PetscReal :: state_change_threshold
@@ -770,7 +769,6 @@ subroutine SCO2AuxVarUpdateState(x, sco2_auxvar, global_auxvar, &
   tgid = option%trapped_gas_phase
   spid = option%saturation_pressure_id
 
-  wid = option%water_id
   co2_id = option%co2_id
   sid = option%salt_id
 
@@ -1840,6 +1838,13 @@ subroutine SCO2AuxVarCompute(x,sco2_auxvar,global_auxvar,material_auxvar, &
     sco2_auxvar%H(pid) = sco2_auxvar%H(pid) * 1.d-6
     sco2_auxvar%U(pid) = sco2_auxvar%H(pid)
   endif
+
+#if 0
+  if (abs(natural_id) == 5 .or. abs(natural_id) == 14) then
+    call SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
+                            natural_id,'',PETSC_FALSE,STDOUT_UNIT,option)
+  endif
+#endif
 
 end subroutine SCO2AuxVarCompute
 
@@ -3390,7 +3395,7 @@ end subroutine SCO2SaltSolubility
 ! ************************************************************************** !
 
 subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
-                                 natural_id,string,append,option)
+                              natural_id,string,append,fid,option)
   !
   ! Prints out the contents of an auxvar to a file
   !
@@ -3410,11 +3415,12 @@ subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
   PetscInt :: natural_id
   character(len=*) :: string
   PetscBool :: append
+  PetscInt :: fid
   type(option_type) :: option
 
   character(len=MAXSTRINGLENGTH) :: string2
   PetscInt :: apid, cpid, vpid, spid, tgid
-  PetscInt :: gid, lid, acid, wid, sid
+  PetscInt :: gid, lid, wid, sid
   PetscReal :: liquid_mass, gas_mass
   PetscReal :: liquid_density, gas_density, salt_density
   PetscReal :: liquid_energy, gas_energy, salt_energy
@@ -3429,7 +3435,6 @@ subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
   spid = option%saturation_pressure_id
   tgid = option%trapped_gas_phase
 
-  acid = option%air_id ! air component id
   wid = option%water_id
   sid = option%salt_id
 
@@ -3444,30 +3449,32 @@ subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
   trapped_gas_saturation = 0.d0
   precipitate_saturation = 0.d0
 
-  write(string2,*) natural_id
-  string2 = trim(adjustl(string)) // '_' // trim(adjustl(string2)) // '.txt'
-  if (append) then
-    open(unit=86,file=string2,position='append')
-  else
-    open(unit=86,file=string2)
+  if (fid /= STDOUT_UNIT) then
+    write(string2,*) natural_id
+    string2 = trim(adjustl(string)) // '_' // trim(adjustl(string2)) // '.txt'
+    if (append) then
+      open(unit=fid,file=string2,position='append')
+    else
+      open(unit=fid,file=string2)
+    endif
   endif
 
-  write(86,*) '--------------------------------------------------------'
-  write(86,*) trim(string)
-  write(86,*) '             cell id: ', natural_id
+  write(fid,*) '--------------------------------------------------------'
+  write(fid,*) trim(string)
+  write(fid,*) '             cell id: ', natural_id
   select case(global_auxvar%istate)
     case(SCO2_LIQUID_STATE)
-      write(86,*) ' Thermodynamic state: Liquid phase'
+      write(fid,*) ' Thermodynamic state: Liquid phase'
       liquid_density = sco2_auxvar%den(lid)
       liquid_energy = sco2_auxvar%U(lid)
       liquid_saturation = sco2_auxvar%sat(lid)
     case(SCO2_GAS_STATE)
-      write(86,*) ' Thermodynamic state: Gas phase'
+      write(fid,*) ' Thermodynamic state: Gas phase'
       gas_density = sco2_auxvar%den(gid)
       gas_energy = sco2_auxvar%U(gid)
       gas_saturation = sco2_auxvar%sat(gid)
     case(SCO2_LIQUID_GAS_STATE)
-      write(86,*) ' Thermodynamic state: Liquid-Gas phase'
+      write(fid,*) ' Thermodynamic state: Liquid-Gas phase'
       liquid_density = sco2_auxvar%den(lid)
       gas_density = sco2_auxvar%den(gid)
       liquid_energy = sco2_auxvar%U(lid)
@@ -3475,7 +3482,7 @@ subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
       liquid_saturation = sco2_auxvar%sat(lid)
       gas_saturation = sco2_auxvar%sat(gid)
     case(SCO2_TRAPPED_GAS_STATE)
-      write(86,*) ' Thermodynamic state: Trapped Gas phase'
+      write(fid,*) ' Thermodynamic state: Trapped Gas phase'
 
   end select
   liquid_mass = (liquid_density*sco2_auxvar%xmol(lid,lid)* &
@@ -3488,73 +3495,73 @@ subroutine SCO2OutputAuxVars1(sco2_auxvar,global_auxvar,material_auxvar, &
               gas_density*sco2_auxvar%xmol(gid,gid)* &
               gas_saturation)* &
               sco2_auxvar%effective_porosity*material_auxvar%volume
-  write(86,*) 'tot liq comp mass [kmol]: ', liquid_mass
-  write(86,*) 'tot gas comp mass [kmol]: ', gas_mass
-  write(86,*) '             energy [MJ]: ', liquid_mass*liquid_energy + &
+  write(fid,*) 'tot liq comp mass [kmol]: ', liquid_mass
+  write(fid,*) 'tot gas comp mass [kmol]: ', gas_mass
+  write(fid,*) '             energy [MJ]: ', liquid_mass*liquid_energy + &
                                             gas_mass*gas_energy
-  write(86,*) '         liquid pressure: ', sco2_auxvar%pres(lid)
-  write(86,*) '            gas pressure: ', sco2_auxvar%pres(gid)
-  write(86,*) '            air pressure: ', sco2_auxvar%pres(apid)
-  write(86,*) '      capillary pressure: ', sco2_auxvar%pres(cpid)
-  write(86,*) '          vapor pressure: ', sco2_auxvar%pres(vpid)
-  write(86,*) '     saturation pressure: ', sco2_auxvar%pres(spid)
-  write(86,*) '         temperature [C]: ', sco2_auxvar%temp
-  write(86,*) '       liquid saturation: ', sco2_auxvar%sat(lid)
-  write(86,*) '          gas saturation: ', sco2_auxvar%sat(gid)
-  write(86,*) '   liquid density [kmol]: ', sco2_auxvar%den(lid)
-  write(86,*) '     liquid density [kg]: ', sco2_auxvar%den_kg(lid)
-  write(86,*) '      gas density [kmol]: ', sco2_auxvar%den(gid)
-  write(86,*) '        gas density [kg]: ', sco2_auxvar%den_kg(gid)
-  write(86,*) '     X (water in liquid): ', sco2_auxvar%xmol(lid,lid)
-  write(86,*) '       X (air in liquid): ', sco2_auxvar%xmol(gid,lid)
-  write(86,*) '        X (water in gas): ', sco2_auxvar%xmol(lid,gid)
-  write(86,*) '          X (air in gas): ', sco2_auxvar%xmol(gid,gid)
-  write(86,*) '      liquid H [MJ/kmol]: ', sco2_auxvar%H(lid)
-  write(86,*) '         gas H [MJ/kmol]: ', sco2_auxvar%H(gid)
-  write(86,*) '      liquid U [MJ/kmol]: ', sco2_auxvar%U(lid)
-  write(86,*) '         gas U [MJ/kmol]: ', sco2_auxvar%U(gid)
-  write(86,*) '         liquid mobility: ', sco2_auxvar%mobility(lid)
-  write(86,*) '            gas mobility: ', sco2_auxvar%mobility(gid)
-  write(86,*) '      effective porosity: ', sco2_auxvar%effective_porosity
-  write(86,*) '...'
-  write(86,*) liquid_mass
-  write(86,*) gas_mass
-  write(86,*) liquid_mass*sco2_auxvar%U(lid) + &
+  write(fid,*) '         liquid pressure: ', sco2_auxvar%pres(lid)
+  write(fid,*) '            gas pressure: ', sco2_auxvar%pres(gid)
+  write(fid,*) '            co2 pressure: ', sco2_auxvar%pres(apid)
+  write(fid,*) '      capillary pressure: ', sco2_auxvar%pres(cpid)
+  write(fid,*) '          vapor pressure: ', sco2_auxvar%pres(vpid)
+  write(fid,*) '     saturation pressure: ', sco2_auxvar%pres(spid)
+  write(fid,*) '         temperature [C]: ', sco2_auxvar%temp
+  write(fid,*) '       liquid saturation: ', sco2_auxvar%sat(lid)
+  write(fid,*) '          gas saturation: ', sco2_auxvar%sat(gid)
+  write(fid,*) '   liquid density [kmol]: ', sco2_auxvar%den(lid)
+  write(fid,*) '     liquid density [kg]: ', sco2_auxvar%den_kg(lid)
+  write(fid,*) '      gas density [kmol]: ', sco2_auxvar%den(gid)
+  write(fid,*) '        gas density [kg]: ', sco2_auxvar%den_kg(gid)
+  write(fid,*) '     X (water in liquid): ', sco2_auxvar%xmol(lid,lid)
+  write(fid,*) '       X (co2 in liquid): ', sco2_auxvar%xmol(gid,lid)
+  write(fid,*) '        X (water in gas): ', sco2_auxvar%xmol(lid,gid)
+  write(fid,*) '          X (co2 in gas): ', sco2_auxvar%xmol(gid,gid)
+  write(fid,*) '      liquid H [MJ/kmol]: ', sco2_auxvar%H(lid)
+  write(fid,*) '         gas H [MJ/kmol]: ', sco2_auxvar%H(gid)
+  write(fid,*) '      liquid U [MJ/kmol]: ', sco2_auxvar%U(lid)
+  write(fid,*) '         gas U [MJ/kmol]: ', sco2_auxvar%U(gid)
+  write(fid,*) '         liquid mobility: ', sco2_auxvar%mobility(lid)
+  write(fid,*) '            gas mobility: ', sco2_auxvar%mobility(gid)
+  write(fid,*) '      effective porosity: ', sco2_auxvar%effective_porosity
+  write(fid,*) '...'
+  write(fid,*) liquid_mass
+  write(fid,*) gas_mass
+  write(fid,*) liquid_mass*sco2_auxvar%U(lid) + &
               gas_mass*sco2_auxvar%U(gid)
-  write(86,*) sco2_auxvar%pres(lid)
-  write(86,*) sco2_auxvar%pres(gid)
-  write(86,*) sco2_auxvar%pres(apid)
-  write(86,*) sco2_auxvar%pres(cpid)
-  write(86,*) sco2_auxvar%pres(vpid)
-  write(86,*) sco2_auxvar%pres(spid)
-  write(86,*) sco2_auxvar%temp
-  write(86,*) sco2_auxvar%sat(lid)
-  write(86,*) sco2_auxvar%sat(gid)
-  write(86,*) sco2_auxvar%den(lid)
-  write(86,*) sco2_auxvar%den_kg(lid)
-  write(86,*) sco2_auxvar%den(gid)
-  write(86,*) sco2_auxvar%den_kg(gid)
-  write(86,*) sco2_auxvar%xmol(lid,lid)
-  write(86,*) sco2_auxvar%xmol(gid,lid)
-  write(86,*) sco2_auxvar%xmol(lid,gid)
-  write(86,*) sco2_auxvar%xmol(gid,gid)
-  write(86,*) sco2_auxvar%H(lid)
-  write(86,*) sco2_auxvar%H(gid)
-  write(86,*) sco2_auxvar%U(lid)
-  write(86,*) sco2_auxvar%U(gid)
-  write(86,*) ''
-  write(86,*) sco2_auxvar%mobility(lid)
-  write(86,*) sco2_auxvar%mobility(gid)
-  write(86,*) sco2_auxvar%effective_porosity
-  write(86,*) '--------------------------------------------------------'
+  write(fid,*) sco2_auxvar%pres(lid)
+  write(fid,*) sco2_auxvar%pres(gid)
+  write(fid,*) sco2_auxvar%pres(apid)
+  write(fid,*) sco2_auxvar%pres(cpid)
+  write(fid,*) sco2_auxvar%pres(vpid)
+  write(fid,*) sco2_auxvar%pres(spid)
+  write(fid,*) sco2_auxvar%temp
+  write(fid,*) sco2_auxvar%sat(lid)
+  write(fid,*) sco2_auxvar%sat(gid)
+  write(fid,*) sco2_auxvar%den(lid)
+  write(fid,*) sco2_auxvar%den_kg(lid)
+  write(fid,*) sco2_auxvar%den(gid)
+  write(fid,*) sco2_auxvar%den_kg(gid)
+  write(fid,*) sco2_auxvar%xmol(lid,lid)
+  write(fid,*) sco2_auxvar%xmol(gid,lid)
+  write(fid,*) sco2_auxvar%xmol(lid,gid)
+  write(fid,*) sco2_auxvar%xmol(gid,gid)
+  write(fid,*) sco2_auxvar%H(lid)
+  write(fid,*) sco2_auxvar%H(gid)
+  write(fid,*) sco2_auxvar%U(lid)
+  write(fid,*) sco2_auxvar%U(gid)
+  write(fid,*) ''
+  write(fid,*) sco2_auxvar%mobility(lid)
+  write(fid,*) sco2_auxvar%mobility(gid)
+  write(fid,*) sco2_auxvar%effective_porosity
+  write(fid,*) '--------------------------------------------------------'
 
-  close(86)
+  if (fid /= STDOUT_UNIT) close(fid)
 
 end subroutine SCO2OutputAuxVars1
 
 ! ************************************************************************** !
 
-subroutine SCO2OutputAuxVars2(sco2_auxvars,global_auxvars,option)
+subroutine SCO2OutputAuxVars2(sco2_auxvars,global_auxvars,fid,option)
   !
   ! Prints out the contents of an auxvar to a file
   !
@@ -3569,11 +3576,12 @@ subroutine SCO2OutputAuxVars2(sco2_auxvars,global_auxvars,option)
 
   type(sco2_auxvar_type) :: sco2_auxvars(0:,:)
   type(global_auxvar_type) :: global_auxvars(:)
+  PetscInt :: fid
   type(option_type) :: option
 
   character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: apid, cpid, vpid
-  PetscInt :: gid, lid, acid, wid
+  PetscInt :: gid, lid
   PetscInt :: i, n, idof
 
   lid = option%liquid_phase
@@ -3582,71 +3590,70 @@ subroutine SCO2OutputAuxVars2(sco2_auxvars,global_auxvars,option)
   cpid = option%capillary_pressure_id
   vpid = option%vapor_pressure_id
 
-  acid = option%air_id ! air component id
-  wid = option%water_id
-
-  string = 'sco2_auxvar.txt'
-  open(unit=86,file=string)
+  if (fid /= STDOUT_UNIT) then
+    string = 'sco2_auxvar.txt'
+    open(unit=fid,file=string)
+  endif
 
   n = size(global_auxvars)
 
 100 format(a,100('','',i9))
 
-  write(86,'(a,100('','',i9))') '             cell id: ', &
+  write(fid,'(a,100('','',i9))') '             cell id: ', &
     ((i,i=1,n),idof=0,3)
-  write(86,'(a,100('','',i2))') '                idof: ', &
+  write(fid,'(a,100('','',i2))') '                idof: ', &
     ((idof,i=1,n),idof=0,3)
-  write(86,'(a,100('','',i2))') '               state: ', &
+  write(fid,'(a,100('','',i2))') '               state: ', &
     (global_auxvars(i)%istate,i=1,n)
-  write(86,100) '      liquid pressure: ', &
+  write(fid,100) '      liquid pressure: ', &
     ((sco2_auxvars(idof,i)%pres(lid),i=1,n),idof=0,3)
-  write(86,100) '         gas pressure: ', &
+  write(fid,100) '         gas pressure: ', &
     ((sco2_auxvars(idof,i)%pres(gid),i=1,n),idof=0,3)
-  write(86,100) '         air pressure: ', &
+  write(fid,100) '         co2 pressure: ', &
     ((sco2_auxvars(idof,i)%pres(apid),i=1,n),idof=0,3)
-  write(86,100) '   capillary pressure: ', &
+  write(fid,100) '   capillary pressure: ', &
     ((sco2_auxvars(idof,i)%pres(cpid),i=1,n),idof=0,3)
-  write(86,100) '       vapor pressure: ', &
+  write(fid,100) '       vapor pressure: ', &
     ((sco2_auxvars(idof,i)%pres(vpid),i=1,n),idof=0,3)
-  write(86,100) '      temperature [C]: ', &
+  write(fid,100) '      temperature [C]: ', &
     ((sco2_auxvars(idof,i)%temp,i=1,n),idof=0,3)
-  write(86,100) '    liquid saturation: ', &
+  write(fid,100) '    liquid saturation: ', &
     ((sco2_auxvars(idof,i)%sat(lid),i=1,n),idof=0,3)
-  write(86,100) '       gas saturation: ', &
+  write(fid,100) '       gas saturation: ', &
     ((sco2_auxvars(idof,i)%sat(gid),i=1,n),idof=0,3)
-  write(86,100) 'liquid density [kmol]: ', &
+  write(fid,100) 'liquid density [kmol]: ', &
     ((sco2_auxvars(idof,i)%den(lid),i=1,n),idof=0,3)
-  write(86,100) '  liquid density [kg]: ', &
+  write(fid,100) '  liquid density [kg]: ', &
     ((sco2_auxvars(idof,i)%den_kg(lid),i=1,n),idof=0,3)
-  write(86,100) '   gas density [kmol]: ', &
+  write(fid,100) '   gas density [kmol]: ', &
     ((sco2_auxvars(idof,i)%den(gid),i=1,n),idof=0,3)
-  write(86,100) '     gas density [kg]: ', &
+  write(fid,100) '     gas density [kg]: ', &
     ((sco2_auxvars(idof,i)%den_kg(gid),i=1,n),idof=0,3)
-  write(86,100) '  X (water in liquid): ', &
+  write(fid,100) '  X (water in liquid): ', &
     ((sco2_auxvars(idof,i)%xmol(lid,lid),i=1,n),idof=0,3)
-  write(86,100) '    X (air in liquid): ', &
+  write(fid,100) '    X (co2 in liquid): ', &
     ((sco2_auxvars(idof,i)%xmol(gid,lid),i=1,n),idof=0,3)
-  write(86,100) '     X (water in gas): ', &
+  write(fid,100) '     X (water in gas): ', &
     ((sco2_auxvars(idof,i)%xmol(lid,gid),i=1,n),idof=0,3)
-  write(86,100) '       X (air in gas): ', &
+  write(fid,100) '       X (co2 in gas): ', &
     ((sco2_auxvars(idof,i)%xmol(gid,gid),i=1,n),idof=0,3)
-  write(86,100) '   liquid H [MJ/kmol]: ', &
+  write(fid,100) '   liquid H [MJ/kmol]: ', &
     ((sco2_auxvars(idof,i)%H(lid),i=1,n),idof=0,3)
-  write(86,100) '      gas H [MJ/kmol]: ', &
+  write(fid,100) '      gas H [MJ/kmol]: ', &
     ((sco2_auxvars(idof,i)%H(gid),i=1,n),idof=0,3)
-  write(86,100) '   liquid U [MJ/kmol]: ', &
+  write(fid,100) '   liquid U [MJ/kmol]: ', &
     ((sco2_auxvars(idof,i)%U(lid),i=1,n),idof=0,3)
-  write(86,100) '      gas U [MJ/kmol]: ', &
+  write(fid,100) '      gas U [MJ/kmol]: ', &
     ((sco2_auxvars(idof,i)%U(gid),i=1,n),idof=0,3)
-  write(86,*)
-  write(86,100) '      liquid mobility: ', &
+  write(fid,*)
+  write(fid,100) '      liquid mobility: ', &
     ((sco2_auxvars(idof,i)%mobility(lid),i=1,n),idof=0,3)
-  write(86,100) '         gas mobility: ', &
+  write(fid,100) '         gas mobility: ', &
     ((sco2_auxvars(idof,i)%mobility(gid),i=1,n),idof=0,3)
-  write(86,100) '   effective porosity: ', &
+  write(fid,100) '   effective porosity: ', &
     ((sco2_auxvars(idof,i)%effective_porosity,i=1,n),idof=0,3)
 
-  close(86)
+  if (fid /= STDOUT_UNIT) close(fid)
 
 end subroutine SCO2OutputAuxVars2
 
