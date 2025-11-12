@@ -2165,11 +2165,13 @@ subroutine SFBCCapillaryPressure(this,liquid_saturation, &
     Sla = liquid_saturation + Sgt
     Se = (Sla -this%Sr) / (1.d0 -this%Sr)
     R = 1.d0 / this%Sgt_max - 1.d0
-    if (Sl_min < 0.d0) then
-      Sl_min = (Sgte * R * Sla + Sgte * (R**2) * Sla + Sla - Sgte - &
-                2.d0 * Sgte * R - Sgte * (R**2)) / &
-                (1.d0 + Sgte * (R**2) * Sla - Sgte * R - Sgte * (R**2))
-      Sl_min = min(max(Sl_min,0.d0),1.d0)
+    if (present(Sl_min)) then
+      if (Sl_min < 0.d0) then
+        Sl_min = (Sgte * R * Sla + Sgte * (R**2) * Sla + Sla - Sgte - &
+                  2.d0 * Sgte * R - Sgte * (R**2)) / &
+                  (1.d0 + Sgte * (R**2) * Sla - Sgte * R - Sgte * (R**2))
+        Sl_min = min(max(Sl_min,0.d0),1.d0)
+      endif
     endif
   else
     dSe_dsatl = 1.d0 / (1.d0-this%Sr)
