@@ -2483,6 +2483,10 @@ subroutine OutputHDF5WriteCoordUGridXDMFExp(realization_base,option, &
   !
   local_size = grid%unstructured_grid%explicit_grid%num_elems
 
+  if (local_size == 0) then
+    return ! Nothing to write
+  endif
+
   call VecCreate(PETSC_COMM_SELF,natural_vec,ierr);CHKERRQ(ierr)
   call VecSetSizes(natural_vec,local_size*EIGHT_INTEGER,PETSC_DECIDE, &
                    ierr);CHKERRQ(ierr)
