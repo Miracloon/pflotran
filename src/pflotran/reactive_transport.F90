@@ -587,10 +587,15 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
   rt_auxvars => patch%aux%RT%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  nullify(rt_sec_transport_vars)
   if (associated(patch%aux%SC_RT)) then
      rt_sec_transport_vars => patch%aux%SC_RT%sec_transport_vars
-  else
-     nullify(rt_sec_transport_vars)
+  endif
+
+  if (reaction%immobile%nimmobile > 0 .and. reaction%print_total_mass_kg) then
+    option%io_buffer = 'Conversion of moles to mass must be implemented &
+      &for immobile species in reactive_transport.F90:RTComputeMassBalance'
+    call PrintErrMsg(option)
   endif
 
   sum_mol = 0.d0
@@ -664,9 +669,6 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
       sum_mol_by_im(i) = sum_mol_by_im(i) + &
           rt_auxvars(ghosted_id)%immobile(i) * volume
       if (reaction%print_total_mass_kg) then
-        option%io_buffer = 'Conversion of moles to mass must be implemented &
-          &for immobile species in reactive_transport.F90:RTComputeMassBalance'
-        call PrintErrMsg(option)
         sum_mol_by_im(i) = sum_mol_by_im(i) * &
           reaction%immobile%list%molar_weight
       endif
@@ -750,9 +752,6 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
               do i = 1, reaction%immobile%nimmobile
                 sum_mol_by_im(i) = sum_mol_by_im(i) + rtsec%immobile(i) * (Vsec*wj)
                 if (reaction%print_total_mass_kg) then
-                    option%io_buffer = 'Conversion of moles to mass must be implemented &
-                    &for immobile species in reactive_transport.F90:RTComputeMassBalance'
-                  call PrintErrMsg(option)
                   sum_mol_by_im(i) = sum_mol_by_im(i) * &
                        reaction%immobile%list%molar_weight * 1.d-3
                 endif
