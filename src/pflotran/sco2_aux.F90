@@ -1876,7 +1876,8 @@ subroutine SCO2VaporPressureBrine(T,P_sat,Pc,rho_kg,x_salt,P_vap,extended)
 
   if (Pc > epsilon) then
     if (extended) then
-      P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * Pc / &
+!      P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * Pc / &
+      P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * (Pc ** 1.25d0) / &
               (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
     else
       P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * (Pc ** 1.25d0) / &
