@@ -2163,7 +2163,7 @@ subroutine ReactionMnrlUpdateKineticState(rt_auxvar,global_auxvar, &
                             material_auxvar,reaction,option)
 
   do imnrl = 1, reaction%mineral%nkinmnrl
-    ! rate = mol/m^3/sec
+    ! rate = mol/m^3 bulk/sec
     ! dvolfrac = m^3 mnrl/m^3 bulk = rate (mol mnrl/m^3 bulk/sec) *
     !                                mol_vol (m^3 mnrl/mol mnrl)
     delta_volfrac = rt_auxvar%mnrl_rate(imnrl)* &

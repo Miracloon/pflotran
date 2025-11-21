@@ -113,6 +113,7 @@ subroutine SCO2Accumulation(sco2_auxvar,global_auxvar,material_auxvar, &
         enddo
     end select
   endif
+
 end subroutine SCO2Accumulation
 
 ! ************************************************************************** !

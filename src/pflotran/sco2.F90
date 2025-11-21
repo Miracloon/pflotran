@@ -289,7 +289,8 @@ subroutine SCO2InitializeTimestep(realization)
 
   PetscInt :: ghosted_id, wid, co2_id, lid, gid
   PetscReal :: volume, dt, porosity
-  PetscReal :: water_mass, co2_mass, rxn_mass_chng
+  PetscReal :: water_mass, co2_mass
+  PetscReal :: water_moles_per_m3bulk, co2_moles_per_m3bulk, rxn_moles_chng
 
   option => realization%option
   patch => realization%patch
@@ -308,47 +309,51 @@ subroutine SCO2InitializeTimestep(realization)
     volume = material_auxvars(ghosted_id)%volume
     porosity = sco2_auxvars(ZERO_INTEGER,ghosted_id)%effective_porosity
     if (option%ntrandof > 0) then
-      ! reaction_rate is read in as total mass in SCO2 mode, convert
-      ! to a rate.
+      ! for SCO2, reaction_rate is total moles/m^3 bulk
+      ! need to convert to a rate [moles/m^3 bulk/sec].
       if (sco2_zero_rxn_source_w_no_gas) then
         if (sco2_auxvars(ZERO_INTEGER,ghosted_id)%sat(gid) <= 0.d0) then
           global_auxvars(ghosted_id)%reaction_rate(:) = 0.d0
         endif
       else
+        ! units: [kg water/m^3 pore]
         water_mass = sco2_auxvars(ZERO_INTEGER,ghosted_id)%sat(lid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%den_kg(lid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%xmass(wid,lid) + &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%sat(gid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%den_kg(gid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%xmass(wid,gid)
-        water_mass = water_mass * porosity * volume
-
+        ! mol/m^3 bulk = kg/m^3 pore * m^3 pore/m^3 bulk / (g/mol * kg/g)
+        water_moles_per_m3bulk = water_mass * porosity / (fmw_comp(1) * 1.d-3)
+        ! units: [kg co2/m^3 pore]
         co2_mass = sco2_auxvars(ZERO_INTEGER,ghosted_id)%sat(lid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%den_kg(lid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%xmass(co2_id,lid) + &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%sat(gid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%den_kg(gid) * &
                     sco2_auxvars(ZERO_INTEGER,ghosted_id)%xmass(co2_id,gid)
-        co2_mass = co2_mass * porosity * volume
+        co2_moles_per_m3bulk = co2_mass * porosity / (fmw_comp(2) * 1.d-3)
 
         ! Reaction rate = mineralization rate. positive means sink
-        rxn_mass_chng = global_auxvars(ghosted_id)%reaction_rate(ONE_INTEGER)
-        if (rxn_mass_chng > 0.d0) then
+        ! reaction_rate units coming in: mole/m^3 bulk
+        ! reaction_rate units going out: mole/m^3 bulk/sec
+        rxn_moles_chng = global_auxvars(ghosted_id)%reaction_rate(ONE_INTEGER)
+        if (rxn_moles_chng > 0.d0) then
           ! Don't extract more H2O mass than exists
           global_auxvars(ghosted_id)%reaction_rate(ONE_INTEGER) = &
-                              min(rxn_mass_chng, water_mass) / dt
+                              min(rxn_moles_chng, water_moles_per_m3bulk) / dt
         else
           global_auxvars(ghosted_id)%reaction_rate(ONE_INTEGER) = &
-                              rxn_mass_chng / dt
+                              rxn_moles_chng / dt
         endif
-        rxn_mass_chng = global_auxvars(ghosted_id)%reaction_rate(TWO_INTEGER)
-        if (rxn_mass_chng > 0.d0) then
+        rxn_moles_chng = global_auxvars(ghosted_id)%reaction_rate(TWO_INTEGER)
+        if (rxn_moles_chng > 0.d0) then
           ! Don't extract more CO2 mass than exists
           global_auxvars(ghosted_id)%reaction_rate(TWO_INTEGER) = &
-                              min(rxn_mass_chng, co2_mass) / dt
+                              min(rxn_moles_chng, co2_moles_per_m3bulk) / dt
         else
           global_auxvars(ghosted_id)%reaction_rate(TWO_INTEGER) = &
-                              rxn_mass_chng / dt
+                              rxn_moles_chng / dt
         endif
       endif
     endif
