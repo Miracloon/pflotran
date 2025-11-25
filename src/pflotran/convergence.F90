@@ -296,6 +296,8 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
           rsn_string = 'itol_upd'
         case(12)
           rsn_string = 'itol_post_check'
+        case(999)
+          rsn_string = 'custom'
         case default
           write(rsn_string,'(i3)') reason
       end select
@@ -399,6 +401,8 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
           string = 'itol_post_check'
         case(13)
           string = 'itol_res_sec'
+        case(999)
+          string = 'custom'
         case default
           write(string,'(i3)') reason
       end select
