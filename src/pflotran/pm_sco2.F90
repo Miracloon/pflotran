@@ -865,9 +865,9 @@ subroutine PMSCO2UpdateTimestep(this,update_dt, &
         value = this%max_salt_mass_change
         governor_value = this%salt_mass_change_governor
       else
-        string = 'Newton Iterations'
-        value = num_newton_iterations
-        governor_value = iacceleration + 0.d0
+        string = 'excessive Newton iterations'
+        value = dble(num_newton_iterations)
+        governor_value = dble(iacceleration)
       endif
       string = ' Dt limited by ' // trim(string) // ': Val=' // &
         trim(StringWriteF('(es10.3)',value)) // ', Gov=' // &
