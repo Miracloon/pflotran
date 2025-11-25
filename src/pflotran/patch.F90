@@ -81,6 +81,7 @@ module Patch_module
     type(strata_list_type), pointer :: strata_list
     type(observation_list_type), pointer :: observation_list
     type(integral_flux_list_type), pointer :: integral_flux_list
+    type(integral_flux_list_type), pointer :: conservation_integral_flux_list
 
     ! Pointers to objects in mother realization object
     type(field_type), pointer :: field
@@ -194,6 +195,8 @@ function PatchCreate()
   call ObservationInitList(patch%observation_list)
   allocate(patch%integral_flux_list)
   call IntegralFluxInitList(patch%integral_flux_list)
+  allocate(patch%conservation_integral_flux_list)
+  call IntegralFluxInitList(patch%conservation_integral_flux_list)
   allocate(patch%strata_list)
   call StrataInitList(patch%strata_list)
 
@@ -667,6 +670,10 @@ subroutine PatchProcessCouplers(patch,flow_conditions,transport_conditions, &
                            &PRESCRIBED_CONDITION: ' // trim(coupler%name) // '.'
         call PrintErrMsg(option)
       endif
+    endif
+    if (option%compute_mass_balance_new) then
+      option%flow%store_fluxes = PETSC_TRUE
+      option%transport%store_fluxes = PETSC_TRUE
     endif
     coupler => coupler%next
   enddo
@@ -12304,6 +12311,7 @@ subroutine PatchDestroy(patch)
 
   call ObservationDestroyList(patch%observation_list)
   call IntegralFluxDestroyList(patch%integral_flux_list)
+  call IntegralFluxDestroyList(patch%conservation_integral_flux_list)
   call StrataDestroyList(patch%strata_list)
 
   call AuxDestroy(patch%aux)

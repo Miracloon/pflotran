@@ -108,7 +108,7 @@ module Utility_module
             MatInv3, &
             InterfaceApproxWithDeriv, &
             InterfaceApproxWithoutDeriv, &
-            PrintProgressBarInt, &
+            UpdateProgressBar, &
             InverseNorm, &
             Erf_, &
             DigitsOfAccuracy, &
@@ -2366,7 +2366,7 @@ end subroutine InterfaceApproxWithoutDeriv
 
 ! ************************************************************************** !
 
-subroutine PrintProgressBarInt(max_value,increment,current)
+subroutine UpdateProgressBar(max_value,increment,current,print_to_screen)
   !
   ! Prints a piece of a progress bar to the screen based on the maximum
   ! value, the increment of progress (must be given in percent), and the
@@ -2381,10 +2381,13 @@ subroutine PrintProgressBarInt(max_value,increment,current)
   PetscReal :: max_value
   PetscInt :: increment
   PetscInt :: current
+  PetscBool :: print_to_screen
 
   PetscInt :: max_value_int
   PetscInt :: g, j, chunk
   character(len=MAXWORDLENGTH) :: percent_num
+
+  if (.not.print_to_screen) return
 
   max_value_int = floor(max_value)
   if (max_value_int < increment) then
@@ -2407,7 +2410,7 @@ subroutine PrintProgressBarInt(max_value,increment,current)
     enddo
   endif
 
-end subroutine PrintProgressBarInt
+end subroutine UpdateProgressBar
 
 ! ************************************************************************** !
 

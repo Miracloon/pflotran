@@ -9,6 +9,7 @@ module Output_module
   use Output_Tecplot_module
   use Output_VTK_module
   use Output_Observation_module
+  use Output_Conservation_module
 
   use PFLOTRAN_Constants_module
   use Utility_module, only : Equal
@@ -58,6 +59,7 @@ subroutine OutputInit(option,num_steps)
 
   call OutputCommonInit()
   call OutputObservationInit(num_steps)
+  call OutputConservationInit(num_steps)
   call OutputHDF5Init(num_steps)
   call OutputEKGInit(option,num_steps)
 
@@ -108,6 +110,7 @@ subroutine OutputFileRead(input,realization,output_option, &
   character(len=MAXSTRINGLENGTH) :: string
   PetscReal :: temp_real,temp_real2
   PetscReal :: units_conversion
+  PetscReal :: time_increment
   PetscInt :: k
   PetscBool :: added
   PetscBool :: vel_cent, vel_face
@@ -135,6 +138,10 @@ subroutine OutputFileRead(input,realization,output_option, &
       output_option%print_observation = PETSC_TRUE
     case('MASS_BALANCE_FILE')
       option%compute_mass_balance_new = PETSC_TRUE
+    case('CONSERVATION_FILE')
+      output_option%print_conservation = PETSC_TRUE
+      option%flow%store_fluxes = PETSC_TRUE
+      option%transport%store_fluxes = PETSC_TRUE
   end select
 
   call InputPushBlock(input,option)
@@ -193,6 +200,10 @@ subroutine OutputFileRead(input,realization,output_option, &
             option%io_buffer = 'NO_PRINT_SOURCE_SINK cannot be specified for &
                                &OUTPUT,SNAPSHOT_FILE block.'
             call PrintErrMsg(option)
+          case('CONSERVATION_FILE')
+            option%io_buffer = 'NO_PRINT_SOURCE_SINK cannot be specified for &
+                               &OUTPUT,CONSERVATION_FILE block.'
+            call PrintErrMsg(option)
           case('MASS_BALANCE_FILE')
             output_option%print_ss_massbal = PETSC_FALSE
         end select
@@ -206,6 +217,10 @@ subroutine OutputFileRead(input,realization,output_option, &
           case('SNAPSHOT_FILE')
             option%io_buffer = 'TOTAL_MASS_REGIONS cannot be specified for &
                                &OUTPUT,SNAPSHOT_FILE block.'
+            call PrintErrMsg(option)
+          case('CONSERVATION_FILE')
+            option%io_buffer = 'TOTAL_MASS_REGIONS not set up for &
+                               &OUTPUT,CONSERVATION_FILE block.'
             call PrintErrMsg(option)
           case('MASS_BALANCE_FILE')
             string = 'OUTPUT,' // trim(block_name) // ',TOTAL_MASS_REGIONS'
@@ -261,6 +276,8 @@ subroutine OutputFileRead(input,realization,output_option, &
               waypoint%print_obs_output = PETSC_TRUE
             case('MASS_BALANCE_FILE')
               waypoint%print_msbl_output = PETSC_TRUE
+            case('CONSERVATION_FILE')
+              waypoint%print_cons_output = PETSC_TRUE
           end select
           call WaypointInsertInList(waypoint,waypoint_list,option)
         enddo
@@ -275,80 +292,66 @@ subroutine OutputFileRead(input,realization,output_option, &
         select case(trim(word))
         !.............
           case('TIME')
+            !TODO(geh): refactor to consolidate all the code creating waypoints
             string = trim(string)//',TIME'
-            call InputReadDouble(input,option,temp_real)
+            call InputReadDouble(input,option,time_increment)
             call InputErrorMsg(input,option,'time increment',string)
             internal_units = 'sec'
-            call InputReadAndConvertUnits(input,temp_real, &
+            call InputReadAndConvertUnits(input,time_increment, &
                                           internal_units,string,option)
-            select case(trim(block_name))
-              case('SNAPSHOT_FILE')
-                output_option%periodic_snap_output_time_incr = temp_real
-              case('OBSERVATION_FILE')
-                output_option%periodic_obs_output_time_incr = temp_real
-              case('MASS_BALANCE_FILE')
-                output_option%periodic_msbl_output_time_incr = temp_real
-            end select
             call InputReadCard(input,option,word)
-            if (.not.InputError(input)) then
-              if (StringCompareIgnoreCase(word,'between')) then
-                call InputReadDouble(input,option,temp_real)
-                call InputErrorMsg(input,option,'start time',string)
-                internal_units = 'sec'
-                call InputReadAndConvertUnits(input,temp_real, &
-                                              internal_units, &
-                                              trim(string)//',START TIME', &
-                                              option)
-                call InputReadCard(input,option,word)
-                if (.not.StringCompareIgnoreCase(word,'and')) then
-                  input%ierr = INPUT_ERROR_DEFAULT
-                endif
-                call InputErrorMsg(input,option,'AND',string)
-                call InputReadDouble(input,option,temp_real2)
-                call InputErrorMsg(input,option,'end time',string)
-                internal_units = 'sec'
-                call InputReadAndConvertUnits(input,temp_real2, &
-                                              internal_units, &
-                                              trim(string)//',END TIME',option)
+            if (InputError(input)) then
+              ! if the word BETWEEN does not exist, the increment will be stored
+              ! and waypoints will be calculated later over the entire simulation
+              select case(trim(block_name))
+                case('SNAPSHOT_FILE')
+                  output_option%periodic_snap_output_time_incr = time_increment
+                case('OBSERVATION_FILE')
+                  output_option%periodic_obs_output_time_incr = time_increment
+                case('MASS_BALANCE_FILE')
+                  output_option%periodic_msbl_output_time_incr = time_increment
+                case('CONSERVATION_FILE')
+                  output_option%periodic_cons_output_time_incr = time_increment
+              end select
+            elseif (StringCompareIgnoreCase(word,'between')) then
+              call InputReadDouble(input,option,temp_real)
+              call InputErrorMsg(input,option,'start time',string)
+              internal_units = 'sec'
+              call InputReadAndConvertUnits(input,temp_real, &
+                                            internal_units, &
+                                            trim(string)//',START TIME', &
+                                            option)
+              call InputReadCard(input,option,word)
+              if (.not.StringCompareIgnoreCase(word,'and')) then
+                input%ierr = INPUT_ERROR_DEFAULT
+              endif
+              call InputErrorMsg(input,option,'AND',string)
+              call InputReadDouble(input,option,temp_real2)
+              call InputErrorMsg(input,option,'end time',string)
+              internal_units = 'sec'
+              call InputReadAndConvertUnits(input,temp_real2, &
+                                            internal_units, &
+                                            trim(string)//',END TIME',option)
+              do
+                waypoint => WaypointCreate()
+                waypoint%time = temp_real
                 select case(trim(block_name))
                   case('SNAPSHOT_FILE')
-                    do
-                      waypoint => WaypointCreate()
-                      waypoint%time = temp_real
-                      waypoint%print_snap_output = PETSC_TRUE
-                      call WaypointInsertInList(waypoint,waypoint_list,option)
-                      temp_real = temp_real + &
-                           output_option%periodic_snap_output_time_incr
-                      if (temp_real > temp_real2) exit
-                    enddo
-                    output_option%periodic_snap_output_time_incr = 0.d0
+                    waypoint%print_snap_output = PETSC_TRUE
                   case('OBSERVATION_FILE')
-                    do
-                      waypoint => WaypointCreate()
-                      waypoint%time = temp_real
-                      waypoint%print_obs_output = PETSC_TRUE
-                      call WaypointInsertInList(waypoint,waypoint_list,option)
-                      temp_real = temp_real + &
-                           output_option%periodic_obs_output_time_incr
-                      if (temp_real > temp_real2) exit
-                    enddo
-                    output_option%periodic_obs_output_time_incr = 0.d0
+                    waypoint%print_obs_output = PETSC_TRUE
                   case('MASS_BALANCE_FILE')
-                    do
-                      waypoint => WaypointCreate()
-                      waypoint%time = temp_real
-                      waypoint%print_msbl_output = PETSC_TRUE
-                      call WaypointInsertInList(waypoint,waypoint_list,option)
-                      temp_real = temp_real + &
-                           output_option%periodic_msbl_output_time_incr
-                      if (temp_real > temp_real2) exit
-                    enddo
-                    output_option%periodic_msbl_output_time_incr = 0.d0
+                    waypoint%print_msbl_output = PETSC_TRUE
+                  case('CONSERVATION_FILE')
+                    waypoint%print_cons_output = PETSC_TRUE
                 end select
-              else
-                input%ierr = INPUT_ERROR_DEFAULT
-                call InputErrorMsg(input,option,'BETWEEN',string)
-              endif
+                call WaypointInsertInList(waypoint,waypoint_list,option)
+                temp_real = temp_real + time_increment
+                if (temp_real > temp_real2) exit
+              enddo
+            else
+              input%ierr = INPUT_ERROR_DEFAULT
+              call InputErrorMsg(input,option,'BETWEEN',string)
             endif
         !.................
           case('TIMESTEP')
@@ -363,6 +366,9 @@ subroutine OutputFileRead(input,realization,output_option, &
               case('MASS_BALANCE_FILE')
                 call InputReadInt(input,option, &
                      output_option%periodic_msbl_output_ts_imod)
+              case('CONSERVATION_FILE')
+                call InputReadInt(input,option, &
+                     output_option%periodic_cons_output_ts_imod)
             end select
             call InputErrorMsg(input,option,'timestep increment',string)
         !.............
@@ -1018,7 +1024,8 @@ end subroutine OutputVariableRead
 ! ************************************************************************** !
 
 subroutine Output(realization_base,snapshot_plot_flag, &
-                  observation_plot_flag,massbal_plot_flag)
+                  observation_plot_flag,massbal_plot_flag, &
+                  conservation_plot_flag)
   !
   ! Main driver for all output subroutines
   !
@@ -1036,6 +1043,7 @@ subroutine Output(realization_base,snapshot_plot_flag, &
   PetscBool :: snapshot_plot_flag
   PetscBool :: observation_plot_flag
   PetscBool :: massbal_plot_flag
+  PetscBool :: conservation_plot_flag
 
   character(len=MAXSTRINGLENGTH) :: string
   PetscErrorCode :: ierr
@@ -1160,6 +1168,13 @@ subroutine Output(realization_base,snapshot_plot_flag, &
     call OutputMassBalance(realization_base)
   endif
 
+!.................................
+  if (conservation_plot_flag) then
+    if (realization_base%output_option%print_conservation) then
+      call OutputConservation(realization_base)
+    endif
+  endif
+
   ! Output temporally average variables
   call OutputAvegVars(realization_base)
 
@@ -1171,6 +1186,7 @@ subroutine Output(realization_base,snapshot_plot_flag, &
   snapshot_plot_flag = PETSC_FALSE
   observation_plot_flag = PETSC_FALSE
   massbal_plot_flag = PETSC_FALSE
+  conservation_plot_flag = PETSC_FALSE
   realization_base%output_option%plot_name = ''
 
   call PetscLogStagePop(ierr);CHKERRQ(ierr)
@@ -1197,8 +1213,10 @@ subroutine OutputInputRecord(output_option,waypoint_list)
   type(waypoint_type), pointer :: cur_waypoint
   type(output_variable_type), pointer :: cur_variable
   character(len=MAXWORDLENGTH) :: word
-  character(len=MAXSTRINGLENGTH) :: snap_string,obs_string,msbl_string
-  PetscBool :: snap_output_found,obs_output_found,msbl_output_found
+  character(len=MAXSTRINGLENGTH) :: snap_string, obs_string, msbl_string, &
+                                    cons_string
+  PetscBool :: snap_output_found, obs_output_found, msbl_output_found, &
+               cons_output_found
   PetscInt :: id = INPUT_RECORD_UNIT
   character(len=10) :: Format
 
@@ -1226,9 +1244,11 @@ subroutine OutputInputRecord(output_option,waypoint_list)
   snap_string = ''
   obs_string = ''
   msbl_string = ''
+  cons_string = ''
   snap_output_found = PETSC_FALSE
   obs_output_found = PETSC_FALSE
   msbl_output_found = PETSC_FALSE
+  cons_output_found = PETSC_FALSE
   cur_waypoint => waypoint_list%first
   do
     if (.not.associated(cur_waypoint)) exit
@@ -1246,6 +1266,11 @@ subroutine OutputInputRecord(output_option,waypoint_list)
       msbl_output_found = PETSC_TRUE
       write(word,Format) cur_waypoint%time / output_option%tconv
       msbl_string = trim(msbl_string) // adjustl(trim(word)) // ','
+    endif
+    if (cur_waypoint%print_cons_output) then
+      cons_output_found = PETSC_TRUE
+      write(word,Format) cur_waypoint%time / output_option%tconv
+      cons_string = trim(cons_string) // adjustl(trim(word)) // ','
     endif
     cur_waypoint => cur_waypoint%next
   enddo
@@ -1478,6 +1503,53 @@ subroutine OutputInputRecord(output_option,waypoint_list)
   else
     write(id,'(a)') 'OFF'
   endif
+
+  write(id,'(a29)',advance='no') '---------------------------: '
+  write(id,'(a)') 'conservation file output'
+  write(id,'(a29)',advance='no') 'format: '
+  write(id,'(a)') 'ascii'
+  write(id,'(a29)',advance='no') 'periodic timestep: '
+  if (output_option%periodic_cons_output_ts_imod == 100000000) then
+    write(id,'(a)') 'OFF'
+  else
+    write(id,'(a)') 'ON'
+    write(id,'(a29)',advance='no') 'timestep increment: '
+    write(word,'(i7)') output_option%periodic_cons_output_ts_imod
+    write(id,'(a)') adjustl(trim(word))
+  endif
+  write(id,'(a29)',advance='no') 'periodic time: '
+  if (output_option%periodic_cons_output_time_incr <= 0) then
+    write(id,'(a)') 'OFF'
+  else
+    write(id,'(a)') 'ON'
+    write(id,'(a29)',advance='no') 'time increment: '
+    write(word,Format) output_option%periodic_cons_output_time_incr / &
+                  output_option%tconv
+    write(id,'(a)') adjustl(trim(word)) // &
+                    adjustl(trim(output_option%tunit))
+  endif
+  write(id,'(a29)',advance='no') 'specific times: '
+  if (cons_output_found) then
+    write(id,'(a)') 'ON'
+    write(id,'(a29)',advance='no') 'times (' // &
+                                    trim(output_option%tunit) // '): '
+    write(id,'(a)') trim(cons_string)
+  else
+    write(id,'(a)') 'OFF'
+  endif
+  write(id,'(a29)',advance='no') 'print initial time: '
+  if (output_option%print_initial_massbal) then
+    write(id,'(a)') 'ON'
+  else
+    write(id,'(a)') 'OFF'
+  endif
+  write(id,'(a29)',advance='no') 'print final time: '
+  if (output_option%print_final_massbal) then
+    write(id,'(a)') 'ON'
+  else
+    write(id,'(a)') 'OFF'
+  endif
+
 
 
 end subroutine OutputInputRecord

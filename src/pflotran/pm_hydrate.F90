@@ -51,7 +51,6 @@ module PM_Hydrate_class
     procedure, public :: UpdateSolution => PMHydrateUpdateSolution
     procedure, public :: UpdateAuxVars => PMHydrateUpdateAuxVars
     procedure, public :: MaxChange => PMHydrateMaxChange
-    procedure, public :: ComputeMassBalance => PMHydrateComputeMassBalance
     procedure, public :: InputRecord => PMHydrateInputRecord
     procedure, public :: CheckpointBinary => PMHydrateCheckpointBinary
     procedure, public :: RestartBinary => PMHydrateRestartBinary
@@ -3258,25 +3257,6 @@ subroutine PMHydrateMaxChange(this)
   this%max_saturation_change = maxval(max_change_global(6:9))
 
 end subroutine PMHydrateMaxChange
-
-! ************************************************************************** !
-
-subroutine PMHydrateComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Michael Nole
-  ! Date: 07/23/19
-  !
-
-  use Hydrate_module, only : HydrateComputeMassBalance
-
-  implicit none
-
-  class(pm_hydrate_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call HydrateComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMHydrateComputeMassBalance
 
 ! ************************************************************************** !
 

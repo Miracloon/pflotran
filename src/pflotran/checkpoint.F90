@@ -1529,9 +1529,9 @@ subroutine CheckpointPeriodicTimeWaypoints(waypoint_list,option)
         waypoint%time = temp_real
         waypoint%print_checkpoint = PETSC_TRUE
         call WaypointInsertInList(waypoint,waypoint_list,option)
-        if ((num_waypoints > warning_num_waypoints) .and. &
-            OptionPrintToScreen(option)) then
-          call PrintProgressBarInt(num_waypoints,TEN_INTEGER,k)
+        if (num_waypoints > warning_num_waypoints) then
+          call UpdateProgressBar(num_waypoints,TEN_INTEGER,k, &
+                                 OptionPrintToScreen(option))
         endif
       enddo
     endif

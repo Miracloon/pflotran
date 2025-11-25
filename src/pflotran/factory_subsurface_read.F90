@@ -1803,6 +1803,9 @@ subroutine FactorySubsurfReadInput(simulation,input)
             case('MASS_BALANCE_FILE')
               call OutputFileRead(input,realization,output_option, &
                                   waypoint_list,trim(word))
+            case('CONSERVATION_FILE')
+              call OutputFileRead(input,realization,output_option, &
+                                  waypoint_list,trim(word))
             case('TIME_UNITS')
               call InputReadWord(input,option,word,PETSC_TRUE)
               call InputErrorMsg(input,option,'Output Time Units','OUTPUT')

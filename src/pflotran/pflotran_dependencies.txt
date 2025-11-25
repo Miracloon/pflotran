@@ -545,6 +545,7 @@ factory_subsurface.o : \
   option.o \
   output.o \
   output_aux.o \
+  output_conservation.o \
   parameter.o \
   patch.o \
   pflotran_constants.o \
@@ -1252,6 +1253,7 @@ init_common.o : \
   pflotran_constants.o \
   realization_subsurface.o \
   region.o \
+  string.o \
   utility.o \
   waypoint.o
 init_subsurface.o : \
@@ -1710,6 +1712,7 @@ output.o : \
   option.o \
   output_aux.o \
   output_common.o \
+  output_conservation.o \
   output_ekg.o \
   output_hdf5.o \
   output_observation.o \
@@ -1742,6 +1745,7 @@ output_common.o : \
   discretization.o \
   dm_custom.o \
   field.o \
+  general_aux.o \
   global_aux.o \
   grid.o \
   grid_structured.o \
@@ -1749,14 +1753,46 @@ output_common.o : \
   grid_unstructured_cell.o \
   logging.o \
   material_aux.o \
+  nw_transport_aux.o \
   option.o \
   output_aux.o \
   patch.o \
   pflotran_constants.o \
+  reaction_aux.o \
   realization_base.o \
   richards_aux.o \
+  sco2_aux.o \
   th_aux.o \
-  variables.o
+  variables.o \
+  wipp_flow_aux.o
+output_conservation.o : \
+  coupler.o \
+  general.o \
+  global_aux.o \
+  grid.o \
+  hydrate.o \
+  integral_flux.o \
+  material_aux.o \
+  mphase.o \
+  nw_transport.o \
+  nw_transport_aux.o \
+  option.o \
+  output_aux.o \
+  output_common.o \
+  patch.o \
+  pflotran_constants.o \
+  reaction_aux.o \
+  reactive_transport.o \
+  reactive_transport_aux.o \
+  realization_base.o \
+  realization_subsurface.o \
+  richards.o \
+  sco2.o \
+  string.o \
+  th.o \
+  utility.o \
+  wipp_flow.o \
+  zflow.o
 output_ekg.o : \
   option.o \
   output_aux.o \
@@ -3412,6 +3448,7 @@ realization_subsurface.o : \
   communicator_structured.o \
   communicator_unstructured.o \
   condition.o \
+  connection.o \
   coupler.o \
   data_mediator_base.o \
   data_mediator_dataset.o \
@@ -3429,6 +3466,7 @@ realization_subsurface.o : \
   grid_unstructured_aux.o \
   grid_unstructured_cell.o \
   input_aux.o \
+  integral_flux.o \
   material.o \
   material_aux.o \
   material_transform.o \

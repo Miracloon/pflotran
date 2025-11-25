@@ -44,7 +44,10 @@ module Output_Common_module
             OutputGetExplicitIDsFlowrates, &
             OutputGetExplicitAuxVars, &
             OutputGetExplicitCellInfo, &
-            OutputCollectVelocityOrFlux
+            OutputCollectVelocityOrFlux, &
+            OutputCommonMapFlowFormulaWeight, &
+            OutputCommonGlobalMassHeader, &
+            OutputCommonFluxHeader
 
 contains
 
@@ -1990,5 +1993,453 @@ subroutine OutputCollectVelocityOrFlux(realization_base, iphase, direction, &
   call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
 
 end subroutine OutputCollectVelocityOrFlux
+
+! ************************************************************************** !
+
+subroutine OutputCommonMapFlowFormulaWeight(option,flow_dof_scale)
+  !
+  ! Maps the formula weights for flow mode to an array
+  !
+  ! Author: Glenn Hammond
+  ! Date: 12/04/25
+  !
+  use General_Aux_module, only : general_fmw => fmw_comp
+  use Option_module, only : option_type
+  use Richards_Aux_module, only : richards_density_kmol_to_kg
+  use SCO2_Aux_module, only : sco2_fmw => fmw_comp
+  use WIPP_Flow_Aux_module, only : wipp_flow_fmw => fmw_comp
+
+  implicit none
+
+  type(option_type) :: option
+  PetscReal :: flow_dof_scale(:)
+
+  flow_dof_scale = 1.d0
+  select case(option%iflowmode)
+    case(RICHARDS_MODE,RICHARDS_TS_MODE)
+      flow_dof_scale(1) = richards_density_kmol_to_kg
+    case(TH_MODE,TH_TS_MODE)
+      flow_dof_scale(1) = FMWH2O
+    case(G_MODE,H_MODE)
+      flow_dof_scale(1) = FMWH2O
+      flow_dof_scale(2) = general_fmw(2)
+    case(WF_MODE)
+      flow_dof_scale(1) = FMWH2O
+      flow_dof_scale(2) = wipp_flow_fmw(2)
+    case(MPH_MODE)
+      flow_dof_scale(1) = FMWH2O
+      flow_dof_scale(2) = FMWCO2
+    case(SCO2_MODE)
+      !MAN: double check if this is mass or molar
+      flow_dof_scale(1) = sco2_fmw(1)
+      flow_dof_scale(2) = sco2_fmw(2)
+      flow_dof_scale(3) = sco2_fmw(3)
+  end select
+
+end subroutine OutputCommonMapFlowFormulaWeight
+
+! ************************************************************************** !
+
+subroutine OutputCommonGlobalMassHeader(realization_base,fid,icol, &
+                                        include_energy)
+  !
+  ! Maps the formula weights for flow mode to an array
+  !
+  ! Author: Glenn Hammond
+  ! Date: 12/04/25
+  !
+  use Option_module
+  use NW_Transport_Aux_module
+  use Reaction_Aux_module
+
+  implicit none
+
+  class(realization_base_type), target :: realization_base
+  PetscInt :: fid
+  PetscInt :: icol
+  PetscBool :: include_energy
+
+  type(option_type), pointer :: option
+  type(output_option_type), pointer :: output_option
+  class(reaction_rt_type), pointer :: reaction
+  class(reaction_nw_type), pointer :: reaction_nw
+  character(len=MAXSTRINGLENGTH) :: string
+  PetscInt :: i
+
+  option => realization_base%option
+  reaction => ReactionAuxCast(realization_base%reaction_base)
+  reaction_nw => NWTReactionCast(realization_base%reaction_base)
+  output_option => realization_base%output_option
+
+  ! catch request of energy header when not supported
+  select case(option%iflowmode)
+    case(NULL_MODE,RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE)
+    case(TH_MODE,TH_TS_MODE)
+    case default
+      option%io_buffer = 'Energy headers must be added for flow mode "' // &
+        trim(option%flowmode) // &
+        '" in output_common.F90:OutputCommonGlobalMassHeader().'
+      call PrintErrMsg(option)
+  end select
+
+  ! write header
+  write(fid,'(a)',advance="no") ' "Time [' // trim(output_option%tunit) // &
+    ']"'
+
+  if (option%iflowmode > 0) then
+    call OutputWriteToHeader(fid,'dt_flow',output_option%tunit,'',icol)
+  endif
+
+  if (option%ntrandof > 0) then
+    call OutputWriteToHeader(fid,'dt_tran',output_option%tunit,'',icol)
+  endif
+
+  select case(option%iflowmode)
+    case(RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass','kg','',icol)
+    case(ZFLOW_MODE)
+      call OutputWriteToHeader(fid,'Global Water Volume','m^3','',icol)
+    case(TH_MODE,TH_TS_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Liquid Phase', &
+                               'kg','',icol)
+      if (include_energy) then
+        call OutputWriteToHeader(fid,'Global Energy','MJ','',icol)
+      endif
+    case(H_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Liquid Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Air Mass in Liquid Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Water Mass in Gas Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Air Mass in Gas Phase', &
+                               'kg','',icol)
+    case(G_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Liquid Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Air Mass in Liquid Phase', &
+                               'kg','',icol)
+      if (option%nphase > 2) then
+        call OutputWriteToHeader(fid,'Global Salt Mass in Liquid Phase', &
+                                 'kg','',icol)
+        call OutputWriteToHeader(fid,'Global Water Mass in Gas Phase', &
+                                 'kg','',icol)
+        call OutputWriteToHeader(fid,'Global Air Mass in Gas Phase', &
+                                 'kg','',icol)
+        call OutputWriteToHeader(fid,'Global Salt Mass in Precipitate', &
+                                 'kg','',icol)
+      else
+        call OutputWriteToHeader(fid,'Global Water Mass in Gas Phase', &
+                                 'kg','',icol)
+        call OutputWriteToHeader(fid,'Global Air Mass in Gas Phase', &
+                                 'kg','',icol)
+      endif
+    case(WF_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Liquid Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Gas Component Mass in Gas &
+                               &Phase', 'kg','',icol)
+    case(MPH_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Water Phase', &
+                               'kmol','',icol)
+      call OutputWriteToHeader(fid,'Global CO2 Mass in Water Phase', &
+                               'kmol','',icol)
+      call OutputWriteToHeader(fid,'Trapped CO2 Mass in Water Phase', &
+                               'kmol','',icol)
+      call OutputWriteToHeader(fid,'Global Water Mass in Gas Phase', &
+                               'kmol','',icol)
+      call OutputWriteToHeader(fid,'Global CO2 Mass in Gas Phase', &
+                               'kmol','',icol)
+      call OutputWriteToHeader(fid,'Trapped CO2 Mass in Gas Phase', &
+                               'kmol','',icol)
+    case(SCO2_MODE)
+      call OutputWriteToHeader(fid,'Global Water Mass in Water Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global CO2 Mass in Water Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Salt Mass in Water Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Water Mass in Gas Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global CO2 Mass in Gas Phase', &
+                               'kg','',icol)
+      call OutputWriteToHeader(fid,'Global Trapped CO2 Mass', &
+                               'kg','',icol)
+  end select
+
+  if (option%ntrandof > 0) then
+    select case(option%itranmode)
+      case(RT_MODE)
+        do i=1,reaction%naqcomp
+          if (reaction%primary_species_print(i)) then
+            string = 'Global ' // trim(reaction%primary_species_names(i))
+            if (reaction%print_total_mass_kg) then
+              call OutputWriteToHeader(fid,string,'kg','',icol)
+            else
+              call OutputWriteToHeader(fid,string,'mol','',icol)
+            endif
+          endif
+        enddo
+
+        do i=1,reaction%immobile%nimmobile
+          if (reaction%immobile%print_me(i)) then
+            string = 'Global ' // trim(reaction%immobile%names(i))
+            if (reaction%print_total_mass_kg) then
+              call OutputWriteToHeader(fid,string,'kg','',icol)
+            else
+              call OutputWriteToHeader(fid,string,'mol','',icol)
+            endif
+          endif
+        enddo
+
+        do i=1,reaction%gas%nactive_gas
+          if (reaction%gas%active_print_me(i)) then
+            string = 'Global ' // trim(reaction%gas%active_names(i))
+            if (reaction%print_total_mass_kg) then
+              call OutputWriteToHeader(fid,string,'kg','',icol)
+            else
+              call OutputWriteToHeader(fid,string,'mol','',icol)
+            endif
+          endif
+        enddo
+
+        if (option%mass_bal_detailed) then
+          do i=1,reaction%mineral%nkinmnrl
+            if (reaction%mineral%kinmnrl_print(i)) then
+              string = 'Global ' // trim(reaction%mineral%kinmnrl_names(i))
+              if (reaction%print_total_mass_kg) then
+                call OutputWriteToHeader(fid,string,'kg','',icol)
+              else
+                call OutputWriteToHeader(fid,string,'mol','',icol)
+              endif
+            endif
+          enddo
+        endif
+      case(NWT_MODE)
+        do i=1,reaction_nw%params%nspecies
+          if (reaction_nw%print_what%total_bulk_conc) then
+            string = 'Global ' // trim(reaction_nw%species_names(i)) // &
+                     ' Total Bulk '
+            call OutputWriteToHeader(fid,string,'mol','',icol)
+          endif
+          if (reaction_nw%print_what%aqueous_eq_conc) then
+            string = 'Global ' // trim(reaction_nw%species_names(i)) // &
+                     ' Aqueous '
+            call OutputWriteToHeader(fid,string,'mol','',icol)
+          endif
+          if (reaction_nw%print_what%sorb_eq_conc) then
+            string = 'Global ' // trim(reaction_nw%species_names(i)) // &
+                     ' Sorbed '
+            call OutputWriteToHeader(fid,string,'mol','',icol)
+          endif
+          if (reaction_nw%print_what%mnrl_eq_conc) then
+            string = 'Global ' // trim(reaction_nw%species_names(i)) // &
+                     ' Mineral '
+            call OutputWriteToHeader(fid,string,'mol','',icol)
+          endif
+        enddo
+    end select
+  endif
+
+end subroutine OutputCommonGlobalMassHeader
+
+! ************************************************************************** !
+
+subroutine OutputCommonFluxHeader(realization_base,name,fid,icol, &
+                                  include_energy)
+  !
+  ! Maps the formula weights for flow mode to an array
+  !
+  ! Author: Glenn Hammond
+  ! Date: 12/04/25
+  !
+  use Coupler_module
+  use Option_module
+  use NW_Transport_Aux_module
+  use Reaction_Aux_module
+
+  implicit none
+
+  class(realization_base_type), target :: realization_base
+  character(len=*) :: name
+  PetscInt :: fid
+  PetscInt :: icol
+  PetscBool :: include_energy
+
+  type(option_type), pointer :: option
+  type(output_option_type), pointer :: output_option
+  class(reaction_rt_type), pointer :: reaction
+  class(reaction_nw_type), pointer :: reaction_nw
+  character(len=MAXWORDLENGTH) :: units
+  character(len=MAXSTRINGLENGTH) :: string
+  PetscInt :: i
+
+  option => realization_base%option
+  reaction => ReactionAuxCast(realization_base%reaction_base)
+  reaction_nw => NWTReactionCast(realization_base%reaction_base)
+  output_option => realization_base%output_option
+
+  ! catch request of energy header when not supported
+  select case(option%iflowmode)
+    case(NULL_MODE,RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE)
+    case(TH_MODE,TH_TS_MODE)
+    case default
+      option%io_buffer = 'Energy headers must be added for flow mode "' // &
+        trim(option%flowmode) // &
+        '" in output_common.F90:OutputCommonFluxHeader().'
+      call PrintErrMsg(option)
+  end select
+
+  select case(option%iflowmode)
+    case(RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      units = 'kg/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+    case(ZFLOW_MODE)
+      string = trim(name) // ' Water Volume'
+      call OutputWriteToHeader(fid,string,'m^3','',icol)
+      units = 'm^3/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Volume'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+    case(TH_MODE,TH_TS_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      units = 'kg/' // trim(output_option%tunit) // ''
+      call OutputWriteToHeader(fid,string,units,'',icol)
+      if (include_energy) then
+        string = trim(name) // ' Energy'
+        call OutputWriteToHeader(fid,string,'MJ','',icol)
+        units = 'MJ/' // trim(output_option%tunit) // ''
+        call OutputWriteToHeader(fid,string,units,'',icol)
+      endif
+    case(H_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      string = trim(name) // ' Air Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      units = 'kg/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+      string = trim(name) // ' Air Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+    case(G_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      string = trim(name) // ' Air Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      units = 'kg/' // trim(output_option%tunit) // ''
+      if (option%nphase > 2) then
+        string = trim(name) // ' Salt Mass'
+        call OutputWriteToHeader(fid,string,'kg','',icol)
+        string = trim(name) // ' Water Mass'
+        call OutputWriteToHeader(fid,string,units,'',icol)
+        string = trim(name) // ' Air Mass'
+        call OutputWriteToHeader(fid,string,units,'',icol)
+        string = trim(name) // ' Salt Mass'
+        call OutputWriteToHeader(fid,string,units,'',icol)
+      else
+        string = trim(name) // ' Water Mass'
+        call OutputWriteToHeader(fid,string,units,'',icol)
+        string = trim(name) // ' Air Mass'
+        call OutputWriteToHeader(fid,string,units,'',icol)
+      endif
+    case(WF_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      string = trim(name) // ' Gas Component Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+
+      units = 'kg/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+      string = trim(name) // ' Gas Component Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+    case(MPH_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kmol','',icol)
+      string = trim(name) // ' CO2 Mass'
+      call OutputWriteToHeader(fid,string,'kmol','',icol)
+
+      units = 'kmol/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+      string = trim(name) // ' CO2 Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+    case(SCO2_MODE)
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+      string = trim(name) // ' CO2 Mass'
+      call OutputWriteToHeader(fid,string,'kg','',icol)
+
+      units = 'kg/' // trim(output_option%tunit) // ''
+      string = trim(name) // ' Water Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+      string = trim(name) // ' CO2 Mass'
+      call OutputWriteToHeader(fid,string,units,'',icol)
+  end select
+
+  if (option%ntrandof > 0) then
+    select case(option%itranmode)
+      case(RT_MODE)
+        do i=1,reaction%naqcomp
+          if (reaction%primary_species_print(i)) then
+            string = trim(name) // ' ' // &
+                     trim(reaction%primary_species_names(i))
+            call OutputWriteToHeader(fid,string,'mol','',icol)
+          endif
+        enddo
+
+        ! header for gas contributions to cumulative flux
+        if (reaction%gas%nactive_gas > 0) then
+          do i=1,reaction%naqcomp
+            if (reaction%primary_species_print(i)) then
+              string = trim(name) // ' ' // &
+                       trim(reaction%primary_species_names(i)) // &
+                       ' (gas phase)'
+              call OutputWriteToHeader(fid,string,'mol','',icol)
+            endif
+          enddo
+        endif
+
+        units = 'mol/' // trim(output_option%tunit) // ''
+        do i=1,reaction%naqcomp
+          if (reaction%primary_species_print(i)) then
+            string = trim(name) // ' ' // &
+                     trim(reaction%primary_species_names(i))
+            call OutputWriteToHeader(fid,string,units,'',icol)
+          endif
+        enddo
+
+        ! header for gas contributions to flux
+        if (reaction%gas%nactive_gas > 0) then
+          do i=1,reaction%naqcomp
+            if (reaction%primary_species_print(i)) then
+              string = trim(name) // ' ' // &
+                       trim(reaction%primary_species_names(i)) // &
+                       ' (gas phase)'
+              call OutputWriteToHeader(fid,string,units,'',icol)
+            endif
+          enddo
+        endif
+
+      case(NWT_MODE)
+        do i=1,reaction_nw%params%nspecies
+          string = trim(name) // ' ' // &
+                   trim(reaction_nw%species_names(i))
+          call OutputWriteToHeader(fid,string,'mol','',icol)
+        enddo
+
+        units = 'mol/' // trim(output_option%tunit) // ''
+        do i=1,reaction_nw%params%nspecies
+          string = trim(name) // ' ' // &
+                   trim(reaction_nw%species_names(i))
+          call OutputWriteToHeader(fid,string,units,'',icol)
+        enddo
+    end select
+  endif
+
+end subroutine OutputCommonFluxHeader
 
 end module Output_Common_module

@@ -91,7 +91,6 @@ module PM_RT_class
     procedure, public :: UpdateSolution => PMRTUpdateSolution1
     procedure, public :: UpdateAuxVars => PMRTUpdateAuxVars
     procedure, public :: MaxChange => PMRTMaxChange
-    procedure, public :: ComputeMassBalance => PMRTComputeMassBalance
     procedure, public :: SetTranWeights => SetTranWeights
     procedure, public :: CheckpointBinary => PMRTCheckpointBinary
     procedure, public :: CheckpointHDF5 => PMRTCheckpointHDF5
@@ -1743,6 +1742,13 @@ subroutine PMRTUpdateSolution2(this,update_kinetics)
     call IntegralFluxUpdate(this%realization%patch%integral_flux_list, &
                             this%realization%patch%internal_tran_fluxes, &
                             this%realization%patch%boundary_tran_fluxes, &
+                            this%realization%patch%ss_tran_fluxes, &
+                            INTEGRATE_TRANSPORT,this%option)
+    call IntegralFluxUpdate(this%realization%patch% &
+                              conservation_integral_flux_list, &
+                            this%realization%patch%internal_tran_fluxes, &
+                            this%realization%patch%boundary_tran_fluxes, &
+                            this%realization%patch%ss_tran_fluxes, &
                             INTEGRATE_TRANSPORT,this%option)
   endif
 
@@ -1784,28 +1790,6 @@ subroutine PMRTMaxChange(this)
 !  call RTMaxChange(this%realization)
 
 end subroutine PMRTMaxChange
-
-! ************************************************************************** !
-
-subroutine PMRTComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/14/13
-  !
-
-  use Reactive_Transport_module, only : RTComputeMassBalance
-
-  implicit none
-
-  class(pm_rt_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-#ifndef SIMPLIFY
-  call RTComputeMassBalance(this%realization, &
-       this%realization_base%patch%grid%nlmax,-999,mass_balance_array)
-#endif
-
-end subroutine PMRTComputeMassBalance
 
 ! ************************************************************************** !
 

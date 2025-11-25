@@ -71,6 +71,7 @@ STANDARD_CFG = \
 	default/condition/dataset/dataset.cfg \
 	default/condition/prescribed/prescribed.cfg \
 	default/condition/srcsink/srcsink.cfg \
+	default/conservation/conservation.cfg \
 	default/debug/debug.cfg \
 	default/discretization/discretization.cfg \
 	default/dispersion/dispersion.cfg \

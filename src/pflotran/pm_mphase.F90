@@ -30,7 +30,6 @@ module PM_Mphase_class
     procedure, public :: UpdateSolution => PMMphaseUpdateSolution
     procedure, public :: UpdateAuxVars => PMMphaseUpdateAuxVars
     procedure, public :: MaxChange => PMMphaseMaxChange
-    procedure, public :: ComputeMassBalance => PMMphaseComputeMassBalance
     procedure, public :: InputRecord => PMMphaseInputRecord
     procedure, public :: Destroy => PMMphaseDestroy
   end type pm_mphase_type
@@ -568,26 +567,6 @@ subroutine PMMphaseMaxChange(this)
   call PrintMsg(this%option)
 
 end subroutine PMMphaseMaxChange
-
-! ************************************************************************** !
-
-subroutine PMMphaseComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/14/13
-  !
-
-  use Mphase_module, only : MphaseComputeMassBalance
-
-  implicit none
-
-  class(pm_mphase_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  !geh: currently does not include "trapped" mass
-  !call MphaseComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMMphaseComputeMassBalance
 
 ! ************************************************************************** !
 

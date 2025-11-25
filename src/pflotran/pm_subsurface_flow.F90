@@ -1067,6 +1067,13 @@ subroutine PMSubsurfaceFlowUpdateSolution(this)
     call IntegralFluxUpdate(this%realization%patch%integral_flux_list, &
                             this%realization%patch%internal_flow_fluxes, &
                             this%realization%patch%boundary_flow_fluxes, &
+                            this%realization%patch%ss_flow_fluxes, &
+                            INTEGRATE_FLOW,this%option)
+    call IntegralFluxUpdate(this%realization%patch% &
+                              conservation_integral_flux_list, &
+                            this%realization%patch%internal_flow_fluxes, &
+                            this%realization%patch%boundary_flow_fluxes, &
+                            this%realization%patch%ss_flow_fluxes, &
                             INTEGRATE_FLOW,this%option)
   endif
   ! end from RealizationUpdate()

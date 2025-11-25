@@ -1,0 +1,202 @@
+#Description: 5x5x5 regression test with a single source term and two
+#             prescribed conditions that calculates total mass and energy
+#             conservation and outputs in the new conservation file format.
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE TH
+    /
+  /
+END
+
+SUBSURFACE
+
+REGRESSION
+  CELLS_PER_PROCESS 2
+/
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+
+  LINEAR_SOLVER
+#    SOLVER DIRECT
+  /
+
+END
+
+#=========================== discretization ===================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 5 5 5
+  DXYZ
+    0.5 1.2 3.2 0.6 5.
+    1.2 3.2 0.6 5. 0.5
+    3.2 0.5 1.2 0.6 5.
+  /
+  GRAVITY 0. 0. 0.
+END
+
+#=========================== fluid properties =================================
+EOS WATER
+  DENSITY CONSTANT 1000.
+  # T = 25 C
+  # p = 101325 Pa
+  # den_kg = 1000 kg/m^3 (this is hardwired)
+  # den_kmol = 55.50825 kmol/m^3 (this is hardwired based on den_kg)
+  # h = 1.8842674636969534 MJ/kmol
+  # u = h - p / den * 1.e-6
+  #   = 1.8842674636969534 - 101325 [N/m^2] / 55.50825 [kmol/m^3] * 1.e-6
+  #   = 1.882442059 MJ/kmol
+  # total water energy = 8 [m^3 bulk] * 0.25 [m^3 water/m^3 bulk] *
+  #                      55.50825 [kmol/m^3] * 1.882442 [MJ/kmol]
+  #                    = 208.982 MJ
+  # or 208.982 [MJ] / 2 [m^2 water] = 104.491 [MJ/m^3 water]
+END
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  PERMEABILITY
+    PERM_ISO 1.d-6
+  /
+  ROCK_DENSITY 2600.
+  SPECIFIC_HEAT 1000. J/kg-C
+  # Rock energy
+  # volume * (1-porosity) * rock density * specific heat * temperature
+  # [m^3 bulk] [m^3 rock/m^3 bulk] [kg rock/m^3 rock] [MJ/kg rock-C] [C] = [MJ]
+  # 8 * (1-.25) * 2600 * 1000. * 25. * 1.e-6 [J -> MJ] = 390 MJ
+
+  # COMBINED ENERGY @ 25C and Patm
+  # total energy = 208.982 (above) + 390 = 598.982 MJ
+  THERMAL_CONDUCTIVITY_DRY 0.5 W/m-C
+  THERMAL_CONDUCTIVITY_WET 0.5 W/m-C
+  CHARACTERISTIC_CURVES cc1
+END
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES cc1
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    ALPHA 1.d-4
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== output options ===================================
+OUTPUT
+  CONSERVATION_FILE
+    PERIODIC TIMESTEP 10
+  /
+  OBSERVATION_FILE
+    PERIODIC TIMESTEP 1
+  /
+  MASS_BALANCE_FILE
+    PERIODIC TIMESTEP 1
+  /
+END
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 1.d0 y
+  INITIAL_TIMESTEP_SIZE 0.1d0 y
+  MAXIMUM_TIMESTEP_SIZE 0.1d0 y
+END
+
+#=========================== regions ==========================================
+REGION all
+  INFINITE
+END
+
+REGION source
+  BLOCK 2 2 1 1 2 2
+END
+
+REGION outlet
+  BLOCK 4 4 3 3 4 4 
+END
+
+REGION outlet2 # intentionally specifying outlet and outlet2 as neighbors
+  BLOCK 4 4 4 4 4 4 
+END
+
+OBSERVATION
+  REGION source
+END
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial_pressure
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+  /
+  LIQUID_PRESSURE 101325.d0
+  TEMPERATURE 25.d0
+END
+
+FLOW_CONDITION recharge
+  TYPE
+    LIQUID_FLUX NEUMANN
+    TEMPERATURE DIRICHLET
+  /
+  LIQUID_FLUX 0.5d0 m/y
+  TEMPERATURE 25.d0
+  # Q = 1000 [kg/m^3] * 0.5 [m/y] * 4 [m^2] = 2000 [kg] or [kg/y]
+  # h (from above) = 1.8842674636969534 MJ/kmol
+  # 1.8842674636969534 [MJ/kmol] * 55.50825 [kmol/m^3] * 0.5 [m/y] * 4 [m^2]
+  # = 209.1848 [MJ] and [MJ/y]
+END
+
+FLOW_CONDITION source
+  TYPE
+    RATE MASS_RATE
+    TEMPERATURE DIRICHLET
+  /
+  RATE 1000. kg/y
+  # Q = 1000 [kg/y] = 1000 [kg] or [kg/y]
+  # h (from above) = 1.8842674636969534 MJ/kmol
+  # 1000 [kg/y] / 1000 [kg/m^3] * 55.50825 [kmol/m^3] * 
+  # 1.8842674636969534 [MJ/kmol]
+  # = 104.5924 [MJ] and [MJ/y]
+  TEMPERATURE 25.d0
+END
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial_pressure
+  REGION all
+END
+
+SOURCE_SINK source
+  FLOW_CONDITION source
+  REGION source
+END
+
+PRESCRIBED_CONDITION prescribed_outlet
+  FLOW_CONDITION initial_pressure
+  REGION outlet
+  # Q = -3000 [kg/y] = -3000 [kg] or [kg/y]
+  # h (from above) = 1.8842674636969534 MJ/kmol
+  # 1.8842674636969534 [MJ/kmol] * 55.50825 [kmol/m^3] * -1000 [kg/y] /
+  # 1000 [kg/m^3]
+  # = -104.592389 [MJ] and [MJ/y]
+END
+
+PRESCRIBED_CONDITION prescribed_outlet2
+  FLOW_CONDITION initial_pressure
+  REGION outlet2
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+END_SUBSURFACE

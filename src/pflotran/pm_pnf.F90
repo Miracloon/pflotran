@@ -32,7 +32,6 @@ module PM_PNF_class
     procedure, public :: UpdateSolution => PMPNFUpdateSolution
     procedure, public :: UpdateAuxVars => PMPNFUpdateAuxVars
     procedure, public :: MaxChange => PMPNFMaxChange
-    procedure, public :: ComputeMassBalance => PMPNFComputeMassBalance
     procedure, public :: InputRecord => PMPNFInputRecord
     procedure, public :: CheckpointBinary => PMPNFCheckpointBinary
     procedure, public :: RestartBinary => PMPNFRestartBinary
@@ -807,25 +806,6 @@ subroutine PMPNFMaxChange(this)
   this%max_pressure_change = max_change_global(1)
 
 end subroutine PMPNFMaxChange
-
-! ************************************************************************** !
-
-subroutine PMPNFComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 08/27/21
-  !
-
-  use PNF_module, only : PNFComputeMassBalance
-
-  implicit none
-
-  class(pm_pnf_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call PNFComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMPNFComputeMassBalance
 
 ! ************************************************************************** !
 

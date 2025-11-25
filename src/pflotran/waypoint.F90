@@ -18,6 +18,7 @@ module Waypoint_module
     PetscBool :: print_snap_output
     PetscBool :: print_obs_output
     PetscBool :: print_msbl_output
+    PetscBool :: print_cons_output
     PetscBool :: print_checkpoint
 !    type(output_option_type), pointer :: output_option
     PetscBool :: update_conditions
@@ -82,6 +83,7 @@ function WaypointCreate1()
   waypoint%print_snap_output = PETSC_FALSE
   waypoint%print_obs_output = PETSC_FALSE
   waypoint%print_msbl_output = PETSC_FALSE
+  waypoint%print_cons_output = PETSC_FALSE
   waypoint%print_checkpoint = PETSC_FALSE
   waypoint%final = PETSC_FALSE
   waypoint%update_conditions = PETSC_FALSE
@@ -117,6 +119,7 @@ function WaypointCreate2(original_waypoint)
   waypoint%print_snap_output = original_waypoint%print_snap_output
   waypoint%print_obs_output = original_waypoint%print_obs_output
   waypoint%print_msbl_output = original_waypoint%print_msbl_output
+  waypoint%print_cons_output = original_waypoint%print_cons_output
   waypoint%print_checkpoint = original_waypoint%print_checkpoint
   waypoint%final = original_waypoint%final
   waypoint%update_conditions = original_waypoint%update_conditions
@@ -549,6 +552,12 @@ subroutine WaypointMerge(old_waypoint,new_waypoint)
     old_waypoint%print_msbl_output = PETSC_FALSE
   endif
 
+  if (old_waypoint%print_cons_output .or. new_waypoint%print_cons_output) then
+    old_waypoint%print_cons_output = PETSC_TRUE
+  else
+    old_waypoint%print_cons_output = PETSC_FALSE
+  endif
+
   if (old_waypoint%update_conditions .or. new_waypoint%update_conditions) then
     old_waypoint%update_conditions = PETSC_TRUE
   else
@@ -839,6 +848,7 @@ function WaypointForceMatchToTime(waypoint)
       waypoint%print_snap_output .or. &
       waypoint%print_obs_output .or. &
       waypoint%print_msbl_output .or. &
+      waypoint%print_cons_output .or. &
       waypoint%print_checkpoint .or. &
       waypoint%final &
       ) then
@@ -920,6 +930,7 @@ subroutine WaypointPrint(waypoint,option,output_option)
     write(*,30) 'Print Snapshot Output', waypoint%print_snap_output
     write(*,30) 'Print Observation Output', waypoint%print_obs_output
     write(*,30) 'Print Mass Balance Output', waypoint%print_msbl_output
+    write(*,30) 'Print Conservation Output', waypoint%print_cons_output
     write(*,30) 'Print Checkpoint', waypoint%print_checkpoint
     write(*,30) 'Update Conditions', waypoint%update_conditions
     write(string,*) 'Max DT [' // trim(adjustl(output_option%tunit)) // ']'
@@ -938,6 +949,10 @@ subroutine WaypointPrint(waypoint,option,output_option)
                                                        waypoint%print_obs_output
     write(option%fid_out,30) 'Print Mass Balance Output', &
                                                       waypoint%print_msbl_output
+    write(option%fid_out,30) 'Print Conservation Output', &
+                                                      waypoint%print_cons_output
+    write(option%fid_out,30) 'Print Checkpoint', waypoint%print_checkpoint
+    write(option%fid_out,30) 'Update Conditions', waypoint%update_conditions
     write(option%fid_out,30) 'Print Checkpoint', waypoint%print_checkpoint
     write(option%fid_out,30) 'Update Conditions', waypoint%update_conditions
     write(string,*) 'Max DT [' // trim(adjustl(output_option%tunit)) // ']'

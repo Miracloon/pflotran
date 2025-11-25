@@ -470,7 +470,9 @@ subroutine TimestepperBaseSetTargetTime(this,sync_time,option,stop_flag, &
                                         sync_flag, &
                                         snapshot_plot_flag, &
                                         observation_plot_flag, &
-                                        massbal_plot_flag,checkpoint_flag)
+                                        mass_balance_plot_flag, &
+                                        conservation_plot_flag, &
+                                        checkpoint_flag)
   !
   ! Sets target time for timestepper
   !
@@ -489,7 +491,8 @@ subroutine TimestepperBaseSetTargetTime(this,sync_time,option,stop_flag, &
   PetscBool :: sync_flag
   PetscBool :: snapshot_plot_flag
   PetscBool :: observation_plot_flag
-  PetscBool :: massbal_plot_flag
+  PetscBool :: mass_balance_plot_flag
+  PetscBool :: conservation_plot_flag
   PetscBool :: checkpoint_flag
 
   PetscReal :: target_time
@@ -611,7 +614,10 @@ subroutine TimestepperBaseSetTargetTime(this,sync_time,option,stop_flag, &
           if (cur_waypoint%sync) sync_flag = PETSC_TRUE
           if (cur_waypoint%print_snap_output) snapshot_plot_flag = PETSC_TRUE
           if (cur_waypoint%print_obs_output) observation_plot_flag = PETSC_TRUE
-          if (cur_waypoint%print_msbl_output) massbal_plot_flag = PETSC_TRUE
+          if (cur_waypoint%print_msbl_output) &
+            mass_balance_plot_flag = PETSC_TRUE
+          if (cur_waypoint%print_cons_output) &
+            conservation_plot_flag = PETSC_TRUE
           if (cur_waypoint%print_checkpoint) checkpoint_flag = PETSC_TRUE
         endif
         if (equal_to_or_exceeds_sync_time) then
@@ -728,7 +734,10 @@ subroutine TimestepperBaseCutDT(this,process_model,icut,stop_flag, &
   PetscInt :: reason_int
   type(option_type) :: option
 
-  PetscBool :: snapshot_plot_flag, observation_plot_flag, massbal_plot_flag
+  PetscBool :: snapshot_plot_flag
+  PetscBool :: observation_plot_flag
+  PetscBool :: mass_balance_plot_flag
+  PetscBool :: conservation_plot_flag
 
   icut = icut + 1
   this%time_step_cut_flag = PETSC_TRUE
@@ -764,9 +773,11 @@ subroutine TimestepperBaseCutDT(this,process_model,icut,stop_flag, &
       '_cut_to_failure'
     snapshot_plot_flag = PETSC_TRUE
     observation_plot_flag = PETSC_FALSE
-    massbal_plot_flag = PETSC_FALSE
+    mass_balance_plot_flag = PETSC_FALSE
+    conservation_plot_flag = PETSC_FALSE
     call Output(process_model%realization_base,snapshot_plot_flag, &
-                observation_plot_flag,massbal_plot_flag)
+                observation_plot_flag,mass_balance_plot_flag, &
+                conservation_plot_flag)
     stop_flag = TS_STOP_FAILURE
     return
   endif

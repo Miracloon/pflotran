@@ -57,7 +57,6 @@ module PMC_Base_class
     procedure, public :: CheckpointHDF5 => PMCBaseCheckpointHDF5
     procedure, public :: RestartHDF5 => PMCBaseRestartHDF5
     procedure, public :: FinalizeRun => PMCBaseFinalizeRun
-    procedure, public :: OutputLocal
     procedure, public :: UpdateSolution => PMCBaseUpdateSolution
     procedure, public :: Destroy => PMCBaseDestroy
     procedure, public :: AccumulateAuxData
@@ -571,10 +570,12 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
   PetscBool :: snapshot_plot_at_this_time_flag
   PetscBool :: observation_plot_at_this_time_flag
   PetscBool :: massbal_plot_at_this_time_flag
+  PetscBool :: conserv_plot_at_this_time_flag
   PetscBool :: checkpoint_at_this_timestep_flag
   PetscBool :: snapshot_plot_at_this_timestep_flag
   PetscBool :: observation_plot_at_this_timestep_flag
   PetscBool :: massbal_plot_at_this_timestep_flag
+  PetscBool :: conserv_plot_at_this_timestep_flag
   PetscBool :: peer_already_run_to_time
   class(pm_base_type), pointer :: cur_pm
   PetscErrorCode :: ierr
@@ -601,10 +602,12 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
     snapshot_plot_at_this_time_flag = PETSC_FALSE
     observation_plot_at_this_time_flag = PETSC_FALSE
     massbal_plot_at_this_time_flag = PETSC_FALSE
+    conserv_plot_at_this_time_flag = PETSC_FALSE
     checkpoint_at_this_timestep_flag = PETSC_FALSE
     snapshot_plot_at_this_timestep_flag = PETSC_FALSE
     observation_plot_at_this_timestep_flag = PETSC_FALSE
     massbal_plot_at_this_timestep_flag = PETSC_FALSE
+    conserv_plot_at_this_timestep_flag = PETSC_FALSE
 
     call this%timestepper%SetTargetTime(sync_time,this%option, &
                                         local_stop_flag, &
@@ -612,6 +615,7 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
                                         snapshot_plot_at_this_time_flag, &
                                         observation_plot_at_this_time_flag, &
                                         massbal_plot_at_this_time_flag, &
+                                        conserv_plot_at_this_time_flag, &
                                         checkpoint_at_this_time_flag)
     call this%StepDT(local_stop_flag)
 
@@ -622,6 +626,7 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
       snapshot_plot_at_this_time_flag = PETSC_FALSE
       observation_plot_at_this_time_flag = PETSC_FALSE
       massbal_plot_at_this_time_flag = PETSC_FALSE
+      conserv_plot_at_this_time_flag = PETSC_FALSE
       checkpoint_at_this_time_flag = PETSC_FALSE
     endif
     if (local_stop_flag == TS_STOP_FAILURE) exit ! failure
@@ -663,6 +668,9 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
       massbal_plot_at_this_timestep_flag = &
         (mod(this%timestepper%steps,this%pm_list% &
               output_option%periodic_msbl_output_ts_imod) == 0)
+      conserv_plot_at_this_timestep_flag = &
+        (mod(this%timestepper%steps,this%pm_list% &
+              output_option%periodic_cons_output_ts_imod) == 0)
       if (this%pm_list%steady_state) &
         snapshot_plot_at_this_timestep_flag = PETSC_TRUE
     endif
@@ -692,7 +700,9 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
              observation_plot_at_this_time_flag .or. &
              observation_plot_at_this_timestep_flag .or. &
              massbal_plot_at_this_time_flag .or. &
-             massbal_plot_at_this_timestep_flag) .or. &
+             massbal_plot_at_this_timestep_flag .or. &
+             conserv_plot_at_this_time_flag .or. &
+             conserv_plot_at_this_timestep_flag) .or. &
           ! checkpointing
           (this%is_master .and. &
             (checkpoint_at_this_time_flag .or. &
@@ -714,7 +724,9 @@ recursive subroutine PMCBaseRunToTime(this,sync_time,stop_flag)
                        (observation_plot_at_this_time_flag .or. &
                         observation_plot_at_this_timestep_flag), &
                        (massbal_plot_at_this_time_flag .or. &
-                        massbal_plot_at_this_timestep_flag))
+                        massbal_plot_at_this_timestep_flag), &
+                       (conserv_plot_at_this_time_flag .or. &
+                        conserv_plot_at_this_timestep_flag))
     endif
 
     if (this%is_master) then
@@ -914,36 +926,6 @@ subroutine SetOutputFlags(this)
   endif
 
 end subroutine SetOutputFlags
-
-! ************************************************************************** !
-
-recursive subroutine OutputLocal(this)
-  !
-  ! Finalizes the time stepping
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/18/13
-  !
-
-  implicit none
-
-  class(pmc_base_type) :: this
-
-  class(pm_base_type), pointer :: cur_pm
-
-#ifdef DEBUG
-  call PrintMsg(this%option,'PMC%Output()')
-#endif
-
-  cur_pm => this%pm_list
-  do
-    if (.not.associated(cur_pm)) exit
-!    call Output(cur_pm%realization,snapshot_plot_flag,observation_plot_flag, &
-!                massbal_plot_flag)
-    cur_pm => cur_pm%next
-  enddo
-
-end subroutine OutputLocal
 
 ! ************************************************************************** !
 

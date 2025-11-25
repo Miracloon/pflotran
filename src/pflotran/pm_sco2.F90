@@ -62,7 +62,6 @@ module PM_SCO2_class
     procedure, public :: UpdateSolution => PMSCO2UpdateSolution
     procedure, public :: UpdateAuxVars => PMSCO2UpdateAuxVars
     procedure, public :: MaxChange => PMSCO2MaxChange
-    procedure, public :: ComputeMassBalance => PMSCO2ComputeMassBalance
     procedure, public :: InputRecord => PMSCO2InputRecord
     procedure, public :: CheckpointBinary => PMSCO2CheckpointBinary
     procedure, public :: RestartBinary => PMSCO2RestartBinary
@@ -2531,26 +2530,6 @@ subroutine PMSCO2MaxChange(this)
   this%max_temperature_change = max_change_global(6)
 
 end subroutine PMSCO2MaxChange
-
-! ************************************************************************** !
-
-subroutine PMSCO2ComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Michael Nole
-  ! Date: 01/26/24
-  !
-
-  use SCO2_module, only : SCO2ComputeMassBalance
-
-  implicit none
-
-  class(pm_sco2_type) :: this
-  PetscReal :: mass_balance_array(:)
-  PetscReal :: mass_trapped(this%realization%option%nphase)
-
-  call SCO2ComputeMassBalance(this%realization,mass_balance_array,mass_trapped)
-
-end subroutine PMSCO2ComputeMassBalance
 
 ! ************************************************************************** !
 

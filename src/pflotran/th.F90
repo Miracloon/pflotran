@@ -459,7 +459,7 @@ end subroutine THSetup
 
 ! ************************************************************************** !
 
-subroutine THComputeMassBalance(realization, mass_balance)
+subroutine THComputeMassBalance(realization, mass_balance, energy_balance)
   !
   ! THomputeMassBalance:
   ! Adapted from RichardsComputeMassBalance: need to be checked
@@ -478,7 +478,8 @@ subroutine THComputeMassBalance(realization, mass_balance)
   implicit none
 
   class(realization_subsurface_type) :: realization
-  PetscReal :: mass_balance(realization%option%nphase)
+  PetscReal :: mass_balance
+  PetscReal :: energy_balance
 
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
@@ -486,10 +487,12 @@ subroutine THComputeMassBalance(realization, mass_balance)
   type(grid_type), pointer :: grid
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
-  type(th_auxvar_type),pointer :: th_auxvars(:)
+  type(th_auxvar_type), pointer :: th_auxvars(:)
+  type(th_parameter_type), pointer :: th_parameter
 
   PetscInt :: local_id
   PetscInt :: ghosted_id
+  PetscReal :: mass_kmol
 
   option => realization%option
   patch => realization%patch
@@ -499,19 +502,31 @@ subroutine THComputeMassBalance(realization, mass_balance)
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
   th_auxvars => patch%aux%TH%auxvars
+  th_parameter => patch%aux%TH%th_parameter
 
   mass_balance = 0.d0
+  energy_balance = 0.d0
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
     if (patch%imat(ghosted_id) <= 0) cycle
-    ! mass = volume*saturation*density
 
-    mass_balance = mass_balance + &
-      th_auxvars(ghosted_id)%den_kg* &
-      th_auxvars(ghosted_id)%sat* &
-      material_auxvars(ghosted_id)%porosity* &
-      material_auxvars(ghosted_id)%volume
+    ! [kmol water]
+    mass_kmol = th_auxvars(ghosted_id)%den * &
+                th_auxvars(ghosted_id)%sat * &
+                material_auxvars(ghosted_id)%porosity * &
+                material_auxvars(ghosted_id)%volume
+
+    ! [kg water]
+    mass_balance = mass_balance + mass_kmol * FMWH2O
+
+    ! [MJ]
+    energy_balance = energy_balance + &
+      mass_kmol * th_auxvars(ghosted_id)%u + &  ! u units [MJ/kmol water]
+      (1.d0 - material_auxvars(ghosted_id)%porosity) * &
+      material_auxvars(ghosted_id)%volume * &
+      th_parameter%dencpr(patch%cct_id(ghosted_id)) * &
+      th_auxvars(ghosted_id)%temp
 
     if (option%flow%th_freezing) then
       ! mass = volume*saturation_ice*density_ice
@@ -520,6 +535,9 @@ subroutine THComputeMassBalance(realization, mass_balance)
         th_auxvars(ghosted_id)%ice%sat_ice* &
         material_auxvars(ghosted_id)%porosity* &
         material_auxvars(ghosted_id)%volume
+      option%io_buffer = 'THComputeMassBalance must be verified for ice &
+        &mass balance,'
+      call PrintErrMsg(option)
     endif
 
   enddo
@@ -4354,7 +4372,7 @@ subroutine THResidualSourceSink(r,realization,ierr)
                                            th_auxvars(ghosted_id)%den
       endif
       if (associated(patch%ss_flow_fluxes)) then
-        patch%ss_flow_fluxes(1,sum_connection) = qsrc_kmol
+        patch%ss_flow_fluxes(:,sum_connection) = Res_src(:)
       endif
 
 

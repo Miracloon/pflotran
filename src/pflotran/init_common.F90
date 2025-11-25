@@ -331,10 +331,11 @@ subroutine InitCommonAddOutputWaypoints(option,output_option,waypoint_list)
   ! Author: Glenn Hammond
   ! Date: 02/04/16
   !
-  use Output_Aux_module
-  use Waypoint_module
   use Option_module
+  use Output_Aux_module
+  use String_module
   use Utility_module
+  use Waypoint_module
 
   implicit none
 
@@ -347,7 +348,15 @@ subroutine InitCommonAddOutputWaypoints(option,output_option,waypoint_list)
   PetscReal :: temp_real
   PetscReal :: final_time
   PetscReal :: num_waypoints, warning_num_waypoints
-  PetscInt :: k
+  PetscInt :: itype, k
+
+  PetscReal :: time_increment
+  character(len=MAXWORDLENGTH) :: type_string
+  PetscBool :: snap_flag
+  PetscBool :: obs_flag
+  PetscBool :: msbl_flag
+  PetscBool :: cons_flag
+
 
   !geh: The repetitive summation of a time increment can result in slight
   !     error.   The perturbation is designed to allow for a slight shift
@@ -357,89 +366,62 @@ subroutine InitCommonAddOutputWaypoints(option,output_option,waypoint_list)
   final_time = final_time + temp_real
   warning_num_waypoints = 15000.0
 
-  ! Add waypoints for periodic snapshot output
-  if (output_option%periodic_snap_output_time_incr > 0.d0) then
-    temp_real = 0.d0
-    num_waypoints = final_time / output_option%periodic_snap_output_time_incr
-    if ((num_waypoints > warning_num_waypoints) .and. &
-        OptionPrintToScreen(option)) then
-       write(word,*) floor(num_waypoints)
-       write(*,*) 'WARNING: Large number (' // trim(adjustl(word)) // &
-                  ') of periodic snapshot output requested.'
-      write(*,'(a64)',advance='no') '         Creating periodic output &
-                                    &waypoints . . . Progress: 0%-'
-    endif
-    k = 0
-    do
-      k = k + 1
-      temp_real = temp_real + output_option%periodic_snap_output_time_incr
-      if (temp_real > final_time) exit
-      waypoint => WaypointCreate()
-      waypoint%time = temp_real
-      waypoint%print_snap_output = PETSC_TRUE
-      call WaypointInsertInList(waypoint,waypoint_list,option)
+  do itype = 1, 4
+    snap_flag = PETSC_FALSE
+    obs_flag = PETSC_FALSE
+    msbl_flag = PETSC_FALSE
+    cons_flag = PETSC_FALSE
+    select case(itype)
+      case(1) ! snapshot
+        type_string = 'snapshot'
+        time_increment = output_option%periodic_snap_output_time_incr
+        snap_flag = PETSC_TRUE
+      case(2) ! observation
+        type_string = 'observation'
+        time_increment = output_option%periodic_obs_output_time_incr
+        obs_flag = PETSC_TRUE
+      case(3) ! mass balance
+        type_string = 'mass balance'
+        time_increment = output_option%periodic_msbl_output_time_incr
+        msbl_flag = PETSC_TRUE
+      case(4) ! conservation
+        type_string = 'conservation'
+        time_increment = output_option%periodic_cons_output_time_incr
+        cons_flag = PETSC_TRUE
+    end select
+    ! Add waypoints for periodic output
+    ! Note that the time increment is zeroed earlier if read earlier and set
+    ! using "BETWEEN X and Y"
+    if (time_increment > 0.d0) then
+      temp_real = 0.d0
+      num_waypoints = final_time / time_increment
       if ((num_waypoints > warning_num_waypoints) .and. &
           OptionPrintToScreen(option)) then
-        call PrintProgressBarInt(num_waypoints,TEN_INTEGER,k)
+        write(word,*) floor(num_waypoints)
+        write(*,*) 'WARNING: Large number (' // StringWrite(floor(num_waypoints)) // &
+          ') of periodic ' // trim(type_string) // ' output requested.'
+        write(*,'(a64)',advance='no') '         Creating periodic output &
+                                      &waypoints . . . Progress: 0%-'
       endif
-    enddo
-  endif
-
-  ! Add waypoints for periodic observation output
-  if (output_option%periodic_obs_output_time_incr > 0.d0) then
-    temp_real = 0.d0
-    num_waypoints = final_time / output_option%periodic_obs_output_time_incr
-    if ((num_waypoints > warning_num_waypoints) .and. &
-        OptionPrintToScreen(option)) then
-       write(word,*) floor(num_waypoints)
-       write(*,*) 'WARNING: Large number (' // trim(adjustl(word)) // &
-                  ') of periodic observation output requested.'
-      write(*,'(a64)',advance='no') '         Creating periodic output &
-                                    &waypoints . . . Progress: 0%-'
+      k = 0
+      do
+        k = k + 1
+        temp_real = temp_real + time_increment
+        if (temp_real > final_time) exit
+        waypoint => WaypointCreate()
+        waypoint%time = temp_real
+        waypoint%print_snap_output = snap_flag
+        waypoint%print_obs_output = obs_flag
+        waypoint%print_msbl_output = msbl_flag
+        waypoint%print_cons_output = cons_flag
+        call WaypointInsertInList(waypoint,waypoint_list,option)
+        if (num_waypoints > warning_num_waypoints) then
+          call UpdateProgressBar(num_waypoints,TEN_INTEGER,k, &
+                                 OptionPrintToScreen(option))
+        endif
+      enddo
     endif
-    k = 0
-    do
-      k = k + 1
-      temp_real = temp_real + output_option%periodic_obs_output_time_incr
-      if (temp_real > final_time) exit
-      waypoint => WaypointCreate()
-      waypoint%time = temp_real
-      waypoint%print_obs_output = PETSC_TRUE
-      call WaypointInsertInList(waypoint,waypoint_list,option)
-      if ((num_waypoints > warning_num_waypoints) .and. &
-          OptionPrintToScreen(option)) then
-        call PrintProgressBarInt(num_waypoints,TEN_INTEGER,k)
-      endif
-    enddo
-  endif
-
-  ! Add waypoints for periodic mass balance output
-  if (output_option%periodic_msbl_output_time_incr > 0.d0) then
-    temp_real = 0.d0
-    num_waypoints = final_time / output_option%periodic_msbl_output_time_incr
-    if ((num_waypoints > warning_num_waypoints) .and. &
-        OptionPrintToScreen(option)) then
-       write(word,*) floor(num_waypoints)
-       write(*,*) 'WARNING: Large number (' // trim(adjustl(word)) // &
-                  ') of periodic mass balance output requested.'
-      write(*,'(a64)',advance='no') '         Creating periodic output &
-                                    &waypoints . . . Progress: 0%-'
-    endif
-    k = 0
-    do
-      k = k + 1
-      temp_real = temp_real + output_option%periodic_msbl_output_time_incr
-      if (temp_real > final_time) exit
-      waypoint => WaypointCreate()
-      waypoint%time = temp_real
-      waypoint%print_msbl_output = PETSC_TRUE
-      call WaypointInsertInList(waypoint,waypoint_list,option)
-      if ((num_waypoints > warning_num_waypoints) .and. &
-          OptionPrintToScreen(option)) then
-        call PrintProgressBarInt(num_waypoints,TEN_INTEGER,k)
-      endif
-    enddo
-  endif
+  enddo
 
 end subroutine InitCommonAddOutputWaypoints
 

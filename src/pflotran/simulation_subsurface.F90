@@ -414,7 +414,8 @@ subroutine SimSubsurfJumpStart(this)
   type(debug_type), pointer :: debug
   type(option_type), pointer :: option
   type(output_option_type), pointer :: output_option
-  PetscBool :: snapshot_plot_flag, observation_plot_flag, massbal_plot_flag
+  PetscBool :: snapshot_plot_flag, observation_plot_flag, &
+               mass_balance_plot_flag, conservation_plot_flag
   PetscInt :: stop_flag
   PetscErrorCode :: ierr
   PetscBool :: bypass_final_time_check
@@ -433,7 +434,8 @@ subroutine SimSubsurfJumpStart(this)
   nullify(tran_timestepper)
   snapshot_plot_flag = PETSC_FALSE
   observation_plot_flag = PETSC_FALSE
-  massbal_plot_flag = PETSC_FALSE
+  mass_balance_plot_flag = PETSC_FALSE
+  conservation_plot_flag = PETSC_FALSE
 
   option => this%option
   output_option => this%output_option
@@ -493,9 +495,11 @@ subroutine SimSubsurfJumpStart(this)
       master_timestepper%max_time_step >= 0) then
     snapshot_plot_flag = output_option%print_initial_snap
     observation_plot_flag = output_option%print_initial_obs
-    massbal_plot_flag = output_option%print_initial_massbal
+    mass_balance_plot_flag = output_option%print_initial_massbal
+    ! conservation is only printed if print_conservation is set internally
+    conservation_plot_flag = PETSC_TRUE
     call Output(this%realization,snapshot_plot_flag,observation_plot_flag, &
-                massbal_plot_flag)
+                mass_balance_plot_flag,conservation_plot_flag)
   endif
 
   !if TIMESTEPPER->MAX_STEPS < 1, print out initial condition only

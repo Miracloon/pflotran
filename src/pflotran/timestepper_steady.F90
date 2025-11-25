@@ -136,7 +136,9 @@ subroutine TimestepperSteadySetTargetTime(this,sync_time,option,stop_flag, &
                                           sync_flag, &
                                           snapshot_plot_flag, &
                                           observation_plot_flag, &
-                                          massbal_plot_flag,checkpoint_flag)
+                                          mass_balance_plot_flag, &
+                                          conservation_plot_flag, &
+                                          checkpoint_flag)
   !
   ! Sets target time for steady state ts, which
   !
@@ -156,7 +158,8 @@ subroutine TimestepperSteadySetTargetTime(this,sync_time,option,stop_flag, &
   PetscBool :: sync_flag
   PetscBool :: snapshot_plot_flag
   PetscBool :: observation_plot_flag
-  PetscBool :: massbal_plot_flag
+  PetscBool :: mass_balance_plot_flag
+  PetscBool :: conservation_plot_flag
   PetscBool :: checkpoint_flag
 
   this%target_time = sync_time
@@ -171,7 +174,9 @@ subroutine TimestepperSteadySetTargetTime(this,sync_time,option,stop_flag, &
         if (this%cur_waypoint%print_obs_output) &
           observation_plot_flag = PETSC_TRUE
         if (this%cur_waypoint%print_msbl_output) &
-          massbal_plot_flag = PETSC_TRUE
+          mass_balance_plot_flag = PETSC_TRUE
+        if (this%cur_waypoint%print_cons_output) &
+          conservation_plot_flag = PETSC_TRUE
         if (this%cur_waypoint%print_checkpoint) &
           checkpoint_flag = PETSC_TRUE
       endif
@@ -220,7 +225,8 @@ subroutine TimestepperSteadyStepDT(this,process_model,stop_flag)
   PetscInt :: num_linear_iterations
 
   PetscReal :: fnorm, inorm, scaled_fnorm
-  PetscBool :: snapshot_plot_flag, observation_plot_flag, massbal_plot_flag
+  PetscBool :: snapshot_plot_flag, observation_plot_flag, mass_balance_plot_flag, &
+               conservation_plot_flag
   Vec :: residual_vec
   PetscErrorCode :: ierr
 
@@ -278,9 +284,11 @@ subroutine TimestepperSteadyStepDT(this,process_model,stop_flag)
       '_cut_to_failure'
     snapshot_plot_flag = PETSC_TRUE
     observation_plot_flag = PETSC_FALSE
-    massbal_plot_flag = PETSC_FALSE
+    mass_balance_plot_flag = PETSC_FALSE
+    conservation_plot_flag = PETSC_FALSE
     call Output(process_model%realization_base,snapshot_plot_flag, &
-                observation_plot_flag,massbal_plot_flag)
+                observation_plot_flag,mass_balance_plot_flag, &
+                conservation_plot_flag)
     option%io_buffer = 'Newton solver failed to converge in steady-state &
                        &solve: ' // trim(StringWrite(snes_reason%v))
     call PrintMsg(option)

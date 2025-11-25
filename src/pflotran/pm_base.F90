@@ -63,7 +63,6 @@ module PM_Base_class
     procedure, public :: UpdateSolution => PMBaseThisOnly
     procedure, public :: UpdateAuxVars => PMBaseThisOnly
     procedure, public :: MaxChange => PMBaseThisOnly
-    procedure, public :: ComputeMassBalance => PMBaseComputeMassBalance
     procedure, public :: Destroy => PMBaseDestroy
     procedure, public :: RHSFunction => PMBaseRHSFunction
     procedure, public :: IFunction => PMBaseIFunction
@@ -441,16 +440,6 @@ function PMBaseFunctionThisOnly(this)
   PMBaseFunctionThisOnly = PETSC_TRUE
   call this%PrintErrMsg('PMBaseFunctionThisOnly')
 end function PMBaseFunctionThisOnly
-
-! ************************************************************************** !
-
-subroutine PMBaseComputeMassBalance(this,mass_balance_array)
-  implicit none
-  class(pm_base_type) :: this
-  PetscReal :: mass_balance_array(:)
-  call this%PrintErrMsg('PMBaseComputeMassBalance')
-end subroutine PMBaseComputeMassBalance
-
 
 ! ************************************************************************** !
 

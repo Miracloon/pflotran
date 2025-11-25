@@ -46,7 +46,6 @@ module PM_Richards_class
     procedure, public :: UpdateSolution => PMRichardsUpdateSolution
     procedure, public :: UpdateAuxVars => PMRichardsUpdateAuxVars
     procedure, public :: MaxChange => PMRichardsMaxChange
-    procedure, public :: ComputeMassBalance => PMRichardsComputeMassBalance
     procedure, public :: InputRecord => PMRichardsInputRecord
     procedure, public :: Destroy => PMRichardsDestroy
   end type pm_richards_type
@@ -1116,25 +1115,6 @@ subroutine PMRichardsMaxChange(this)
   call PrintMsg(this%option)
 
 end subroutine PMRichardsMaxChange
-
-! ************************************************************************** !
-
-subroutine PMRichardsComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/14/13
-  !
-
-  use Richards_module, only : RichardsComputeMassBalance
-
-  implicit none
-
-  class(pm_richards_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call RichardsComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMRichardsComputeMassBalance
 
 ! ************************************************************************** !
 

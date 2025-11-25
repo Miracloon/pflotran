@@ -55,7 +55,6 @@ module PM_General_class
     procedure, public :: UpdateSolution => PMGeneralUpdateSolution
     procedure, public :: UpdateAuxVars => PMGeneralUpdateAuxVars
     procedure, public :: MaxChange => PMGeneralMaxChange
-    procedure, public :: ComputeMassBalance => PMGeneralComputeMassBalance
     procedure, public :: InputRecord => PMGeneralInputRecord
     procedure, public :: CheckpointBinary => PMGeneralCheckpointBinary
     procedure, public :: RestartBinary => PMGeneralRestartBinary
@@ -1960,29 +1959,6 @@ subroutine PMGeneralMaxChange(this)
   deallocate(max_change_global)
 
 end subroutine PMGeneralMaxChange
-! ************************************************************************** !
-
-subroutine PMGeneralComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/14/13
-  !
-
-  use General_module, only : GeneralComputeMassBalance
-
-  implicit none
-
-  class(pm_general_type) :: this
-  PetscReal :: mass_balance_array(:)
-  PetscInt :: cell_ids(this%realization_base%patch%grid%nlmax)
-  PetscInt :: i
-
-  cell_ids = (/ (i, i=1, this%realization_base%patch%grid%nlmax) /)
-
-  call GeneralComputeMassBalance(this%realization, cell_ids, &
-                                 mass_balance_array)
-
-end subroutine PMGeneralComputeMassBalance
 
 ! ************************************************************************** !
 

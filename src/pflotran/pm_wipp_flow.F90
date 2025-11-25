@@ -104,7 +104,6 @@ module PM_WIPP_Flow_class
     procedure, public :: UpdateSolution => PMWIPPFloUpdateSolution
     procedure, public :: UpdateAuxVars => PMWIPPFloUpdateAuxVars
     procedure, public :: MaxChange => PMWIPPFloMaxChange
-    procedure, public :: ComputeMassBalance => PMWIPPFloComputeMassBalance
     procedure, public :: InputRecord => PMWIPPFloInputRecord
     procedure, public :: CheckpointBinary => PMWIPPFloCheckpointBinary
     procedure, public :: CheckpointHDF5 => PMWIPPFloCheckpointHDF5
@@ -2507,25 +2506,6 @@ subroutine PMWIPPFloMaxChange(this)
   this%max_saturation_change = max_change_global(3)
 
 end subroutine PMWIPPFloMaxChange
-
-! ************************************************************************** !
-
-subroutine PMWIPPFloComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 07/11/17
-  !
-
-  use WIPP_Flow_module, only : WIPPFloComputeMassBalance
-
-  implicit none
-
-  class(pm_wippflo_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call WIPPFloComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMWIPPFloComputeMassBalance
 
 ! ************************************************************************** !
 

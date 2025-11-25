@@ -47,7 +47,6 @@ module PM_ZFlow_class
     procedure, public :: UpdateSolution => PMZFlowUpdateSolution
     procedure, public :: UpdateAuxVars => PMZFlowUpdateAuxVars
     procedure, public :: MaxChange => PMZFlowMaxChange
-    procedure, public :: ComputeMassBalance => PMZFlowComputeMassBalance
     procedure, public :: InputRecord => PMZFlowInputRecord
     procedure, public :: CheckpointBinary => PMZFlowCheckpointBinary
     procedure, public :: RestartBinary => PMZFlowRestartBinary
@@ -1187,25 +1186,6 @@ subroutine PMZFlowMaxChange(this)
   deallocate(max_change_global)
 
 end subroutine PMZFlowMaxChange
-
-! ************************************************************************** !
-
-subroutine PMZFlowComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Glenn Hammond
-  ! Date: 08/13/21
-  !
-
-  use ZFlow_module, only : ZFlowComputeMassBalance
-
-  implicit none
-
-  class(pm_zflow_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call ZFlowComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMZFlowComputeMassBalance
 
 ! ************************************************************************** !
 

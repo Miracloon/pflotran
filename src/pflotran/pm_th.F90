@@ -50,7 +50,6 @@ module PM_TH_class
     procedure, public :: UpdateSolution => PMTHUpdateSolution
     procedure, public :: UpdateAuxVars => PMTHUpdateAuxVars
     procedure, public :: MaxChange => PMTHMaxChange
-    procedure, public :: ComputeMassBalance => PMTHComputeMassBalance
     procedure, public :: InputRecord => PMTHInputRecord
     procedure, public :: Destroy => PMTHDestroy
   end type pm_th_type
@@ -1168,27 +1167,6 @@ subroutine PMTHMaxChange(this)
   call PrintMsg(this%option)
 
 end subroutine PMTHMaxChange
-
-! ************************************************************************** !
-
-subroutine PMTHComputeMassBalance(this,mass_balance_array)
-  !
-  ! This routine
-  !
-  ! Author: Gautam Bisht, LBNL
-  ! Date: 03/90/13
-  !
-
-  use TH_module, only : THComputeMassBalance
-
-  implicit none
-
-  class(pm_th_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-  call THComputeMassBalance(this%realization,mass_balance_array)
-
-end subroutine PMTHComputeMassBalance
 
 ! ************************************************************************** !
 

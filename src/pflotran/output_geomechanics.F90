@@ -49,7 +49,8 @@ end subroutine OutputGeomechInit
 ! ************************************************************************** !
 
 subroutine OutputGeomechanics(geomech_realization,snapshot_plot_flag, &
-                              observation_plot_flag,massbal_plot_flag)
+                              observation_plot_flag,massbal_plot_flag, &
+                              conserv_plot_flag)
   !
   ! Main driver for all geomechanics output
   !
@@ -67,6 +68,7 @@ subroutine OutputGeomechanics(geomech_realization,snapshot_plot_flag, &
   PetscBool :: snapshot_plot_flag
   PetscBool :: observation_plot_flag
   PetscBool :: massbal_plot_flag
+  PetscBool :: conserv_plot_flag
 
   character(len=MAXSTRINGLENGTH) :: string
   PetscErrorCode :: ierr
@@ -111,6 +113,9 @@ subroutine OutputGeomechanics(geomech_realization,snapshot_plot_flag, &
 
 !......................................
   if (massbal_plot_flag) then
+  endif
+
+  if (conserv_plot_flag) then
   endif
 
   ! Increment the plot number

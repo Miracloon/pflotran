@@ -1184,6 +1184,13 @@ subroutine PMNWTUpdateSolution(this)
     call IntegralFluxUpdate(this%realization%patch%integral_flux_list, &
                             this%realization%patch%internal_tran_fluxes, &
                             this%realization%patch%boundary_tran_fluxes, &
+                            this%realization%patch%ss_tran_fluxes, &
+                            INTEGRATE_TRANSPORT,this%option)
+    call IntegralFluxUpdate(this%realization%patch% &
+                              conservation_integral_flux_list, &
+                            this%realization%patch%internal_tran_fluxes, &
+                            this%realization%patch%boundary_tran_fluxes, &
+                            this%realization%patch%ss_tran_fluxes, &
                             INTEGRATE_TRANSPORT,this%option)
   endif
 
@@ -1799,26 +1806,6 @@ subroutine PMNWTSetTranWeights(this)
                             flow_dt)
 
 end subroutine PMNWTSetTranWeights
-
-! ************************************************************************** !
-
-subroutine PMNWTComputeMassBalance(this,mass_balance_array)
-  !
-  ! Author: Jenn Frederick
-  ! Date: 05/27/2019
-  !
-
-  implicit none
-
-  class(pm_nwt_type) :: this
-  PetscReal :: mass_balance_array(:)
-
-#ifndef SIMPLIFY
-  ! passing in dummy -999 for max_size doesn't do anything, so why even call it?
-  !call NWTComputeMassBalance(this%realization,-999,mass_balance_array)
-#endif
-
-end subroutine PMNWTComputeMassBalance
 
 ! ************************************************************************** !
 

@@ -55,6 +55,7 @@ module Output_Aux_module
 
     PetscBool :: print_observation
     PetscBool :: print_column_ids
+    PetscBool :: print_conservation
 
     PetscBool :: print_explicit_primal_grid    ! prints primal grid if true
     PetscBool :: print_explicit_dual_grid      ! prints voronoi (dual) grid if true
@@ -65,10 +66,12 @@ module Output_Aux_module
     PetscInt :: periodic_snap_output_ts_imod
     PetscInt :: periodic_obs_output_ts_imod
     PetscInt :: periodic_msbl_output_ts_imod
+    PetscInt :: periodic_cons_output_ts_imod
 
     PetscReal :: periodic_snap_output_time_incr
     PetscReal :: periodic_obs_output_time_incr
     PetscReal :: periodic_msbl_output_time_incr
+    PetscReal :: periodic_cons_output_time_incr
 
     PetscBool :: filter_non_state_variables
     PetscBool :: force_synchronized_output
@@ -231,6 +234,7 @@ function OutputOptionCreate()
 
   output_option%print_observation = PETSC_FALSE
   output_option%print_column_ids = PETSC_FALSE
+  output_option%print_conservation = PETSC_FALSE
 
   output_option%print_explicit_primal_grid = PETSC_FALSE
   output_option%print_explicit_dual_grid = PETSC_FALSE
@@ -241,10 +245,12 @@ function OutputOptionCreate()
   output_option%periodic_snap_output_ts_imod  = 100000000
   output_option%periodic_obs_output_ts_imod  = 100000000
   output_option%periodic_msbl_output_ts_imod  = 100000000
+  output_option%periodic_cons_output_ts_imod  = 100000000
 
-  output_option%periodic_snap_output_time_incr = 0
-  output_option%periodic_obs_output_time_incr = 0
-  output_option%periodic_msbl_output_time_incr = 0
+  output_option%periodic_snap_output_time_incr = 0.d0
+  output_option%periodic_obs_output_time_incr = 0.d0
+  output_option%periodic_msbl_output_time_incr = 0.d0
+  output_option%periodic_cons_output_time_incr = 0.d0
 
   output_option%filter_non_state_variables = PETSC_TRUE
   output_option%force_synchronized_output = PETSC_TRUE
@@ -354,6 +360,7 @@ function OutputOptionDuplicate(output_option)
 
   output_option2%print_observation = output_option%print_observation
   output_option2%print_column_ids = output_option%print_column_ids
+  output_option2%print_conservation = output_option%print_conservation
 
   output_option2%print_explicit_primal_grid = &
     output_option%print_explicit_primal_grid
@@ -369,6 +376,8 @@ function OutputOptionDuplicate(output_option)
     output_option%periodic_obs_output_ts_imod
   output_option2%periodic_msbl_output_ts_imod = &
     output_option%periodic_msbl_output_ts_imod
+  output_option2%periodic_cons_output_ts_imod = &
+    output_option%periodic_cons_output_ts_imod
 
   output_option2%periodic_snap_output_time_incr = &
     output_option%periodic_snap_output_time_incr
@@ -376,6 +385,8 @@ function OutputOptionDuplicate(output_option)
     output_option%periodic_obs_output_time_incr
   output_option2%periodic_msbl_output_time_incr = &
     output_option%periodic_msbl_output_time_incr
+  output_option2%periodic_cons_output_time_incr = &
+    output_option%periodic_cons_output_time_incr
 
   output_option2%filter_non_state_variables = &
     output_option%filter_non_state_variables

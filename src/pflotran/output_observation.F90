@@ -87,6 +87,7 @@ subroutine OutputObservation(realization_base)
 
   class(realization_base_type) :: realization_base
 
+  !TODO(geh): this conditional is not needed
   if (realization_base%output_option%print_observation) then
     call OutputObservationTecplotColumnTXT(realization_base)
     call OutputAggregateToFile(realization_base)
@@ -2235,6 +2236,7 @@ subroutine OutputIntegralFlux(realization_base)
       call IntegralFluxGetInstantaneous(integral_flux, &
                                         patch%internal_flow_fluxes, &
                                         patch%boundary_flow_fluxes, &
+                                        patch%ss_flow_fluxes, &
                                         option%nflowdof, &
                                         instantaneous_array,option)
       array(istart:iend,1) = &
@@ -2249,6 +2251,7 @@ subroutine OutputIntegralFlux(realization_base)
       call IntegralFluxGetInstantaneous(integral_flux, &
                                         patch%internal_tran_fluxes, &
                                         patch%boundary_tran_fluxes, &
+                                        patch%ss_tran_fluxes, &
                                         option%ntrandof, &
                                         instantaneous_array,option)
       array(istart:iend,1) = &
@@ -2404,6 +2407,7 @@ subroutine OutputMassBalance(realization_base)
   PetscReal :: sum_trapped(realization_base%option%nphase)
   PetscReal :: sum_trapped_global(realization_base%option%nphase)
 
+  PetscReal :: dummy_energy
   PetscMPIInt :: int_mpi
   PetscBool :: bcs_done
   PetscErrorCode :: ierr
@@ -2767,9 +2771,9 @@ subroutine OutputMassBalance(realization_base)
         do
           if (.not. associated(coupler)) exit
           string = 'Well ' // trim(coupler%well_name) // ' Total Water Mass'
-                call OutputWriteToHeader(fid,string,'kg','',icol)
+          call OutputWriteToHeader(fid,string,'kg','',icol)
           string = 'Well ' // trim(coupler%well_name) // ' Total Gas Mass'
-                call OutputWriteToHeader(fid,string,'kg','',icol)
+          call OutputWriteToHeader(fid,string,'kg','',icol)
           if (option%ntrandof > 0) then
             ! Total mass through a given well
             do i=1,reaction%naqcomp
@@ -3001,7 +3005,8 @@ subroutine OutputMassBalance(realization_base)
           case(ZFLOW_MODE)
             call ZFlowComputeMassBalance(realization_base,sum_kg(1,:))
           case(TH_MODE,TH_TS_MODE)
-            call THComputeMassBalance(realization_base,sum_kg(1,:))
+            call THComputeMassBalance(realization_base,sum_kg(1,1), &
+                                      dummy_energy)
           case(MPH_MODE)
             call MphaseComputeMassBalance(realization_base,sum_kg(:,:), &
                                           sum_trapped(:))

@@ -96,7 +96,8 @@ module Realization_Subsurface_class
             RealizationReadGeopSurveyFile, &
             RealizationCheckConsistency, &
             RealizationPrintStateAtCells, &
-            RealizationProcessOutputVarList
+            RealizationProcessOutputVarList, &
+            RealizSetupPrescribedConservation
 
 contains
 
@@ -3025,6 +3026,183 @@ subroutine RealizationProcessOutputVarList(output_variable_list,realization)
   endif
 
 end subroutine RealizationProcessOutputVarList
+
+! ************************************************************************** !
+
+subroutine RealizSetupPrescribedConservation(realization)
+  !
+  !
+  ! Sets up infrastructured for calculating mass balance on prescribed
+  ! boundaries
+  !
+  ! Author: Glenn Hammond
+  ! Date: 11/24/25
+  !
+  use Coupler_module
+  use Integral_Flux_module
+  use Option_module
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+
+  type(option_type), pointer :: option
+  type(coupler_type), pointer :: cur_coupler
+  type(integral_flux_type), pointer :: integral_flux
+
+  if (realization%output_option%print_conservation) then
+    option => realization%option
+    cur_coupler => realization%patch%prescribed_condition_list%first
+    do
+      if (.not.associated(cur_coupler)) exit
+      realization%output_option%print_observation = PETSC_TRUE
+      integral_flux => IntegralFluxCreate()
+      integral_flux%name = cur_coupler%name
+      call RealizGetPrescribedConnections(realization,cur_coupler, &
+                                          integral_flux%internal_connections, &
+                                          option)
+      call IntegralFluxSizeStorage(integral_flux,option)
+      call IntegralFluxAddToList(integral_flux, &
+                            realization%patch%conservation_integral_flux_list)
+      nullify(integral_flux)
+      cur_coupler => cur_coupler%next
+    enddo
+  endif
+
+end subroutine RealizSetupPrescribedConservation
+
+! ************************************************************************** !
+
+subroutine RealizGetPrescribedConnections(realization,prescribed_condition, &
+                                          list_of_connections,option)
+  !
+  !
+  ! Returns a list of internal connection ids for cell interfaces between
+  ! cells in a prescribed condition and non-prescribed cells. Interfaces
+  ! between two prescribed condition cells are excluded.
+  !
+  ! Author: Glenn Hammond
+  ! Date: 11/24/25
+  !
+  use Connection_module
+  use Coupler_module
+  use Discretization_module
+  use Field_module
+  use Grid_module
+  use Option_module
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+  type(coupler_type) :: prescribed_condition
+  PetscInt, pointer :: list_of_connections(:)
+  type(option_type) :: option
+
+  type(field_type), pointer :: field
+  type(patch_type), pointer :: patch
+  type(grid_type), pointer :: grid
+  type(connection_set_type), pointer :: cur_connection_set
+  PetscInt, allocatable :: int_array(:)
+  PetscInt :: iconn
+  PetscInt :: i
+  PetscInt :: local_id
+  PetscInt :: local_id_up
+  PetscInt :: local_id_dn
+  PetscInt :: ghosted_id_up
+  PetscInt :: ghosted_id_dn
+  PetscInt :: maximum_number_of_connections
+  PetscReal, pointer :: vec_ptr(:)
+  PetscErrorCode :: ierr
+
+  patch => realization%patch
+  field => realization%field
+  grid => realization%patch%grid
+
+  ! calculate maximum number of connections for each local grid cell
+  allocate(int_array(grid%ngmax))
+  ! int_array will store the maximum number of connections for each local cell
+  int_array = 0
+  cur_connection_set => grid%internal_connection_set_list%first
+  do
+    if (.not.associated(cur_connection_set)) exit
+    do iconn = 1, cur_connection_set%num_connections
+      ghosted_id_up = cur_connection_set%id_up(iconn)
+      ghosted_id_dn = cur_connection_set%id_dn(iconn)
+      if (patch%imat(ghosted_id_up) <= 0 .or.  &
+          patch%imat(ghosted_id_dn) <= 0) cycle
+      int_array(ghosted_id_up) = int_array(ghosted_id_up) + 1
+      int_array(ghosted_id_dn) = int_array(ghosted_id_dn) + 1
+    enddo
+    cur_connection_set => cur_connection_set%next
+  enddo
+  maximum_number_of_connections = maxval(int_array)
+  deallocate(int_array)
+
+  ! flag cells that are prescribed (have to perform global to local to
+  ! flag prescribed ghost cells on neighboring processes).
+  call VecSet(field%work,0.d0,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%work,vec_ptr,ierr);CHKERRQ(ierr)
+  cur_connection_set => prescribed_condition%connection_set
+  do iconn = 1, cur_connection_set%num_connections
+    local_id = cur_connection_set%id_dn(iconn)
+    vec_ptr(local_id) = 1.d0
+  enddo
+  call VecRestoreArray(field%work,vec_ptr,ierr);CHKERRQ(ierr)
+  call DiscretizationGlobalToLocal(realization%discretization,field%work, &
+                                   field%work_loc,ONEDOF)
+  call VecGetArray(field%work_loc,vec_ptr,ierr);CHKERRQ(ierr)
+
+  ! generate list of connections between prescribed and non-prescribed cells
+  if (prescribed_condition%connection_set%num_connections > 0) then
+    allocate(int_array(maximum_number_of_connections * &
+                       prescribed_condition%connection_set%num_connections))
+    int_array = 0
+    i = 0
+    ! generate list of neighboring cells for each cell.
+    cur_connection_set => grid%internal_connection_set_list%first
+    do
+      if (.not.associated(cur_connection_set)) exit
+      do iconn = 1, cur_connection_set%num_connections
+        ghosted_id_up = cur_connection_set%id_up(iconn)
+        ghosted_id_dn = cur_connection_set%id_dn(iconn)
+        local_id_up = grid%nG2L(ghosted_id_up) ! = zero for ghost nodes
+        local_id_dn = grid%nG2L(ghosted_id_dn) ! Ghost to local mapping
+        if (patch%imat(ghosted_id_up) <= 0 .or.  &
+            patch%imat(ghosted_id_dn) <= 0) cycle
+        if (vec_ptr(ghosted_id_up) > 0.5d0 .and. &
+            vec_ptr(ghosted_id_dn) < 0.5d0) then
+          ! upwind cell is prescribed, downwind is normal
+          !geh: this check below may not be necessary as two neighboring
+          !     prescribed cells will never be included and the prescribed
+          !     connection will never point to a ghost cell
+          if (local_id_up > 0) then
+            ! only store if prescribed cell is local
+            i = i + 1
+            int_array(i) = iconn
+          endif
+        elseif (vec_ptr(ghosted_id_up) < 0.5d0 .and. &
+                vec_ptr(ghosted_id_dn) > 0.5d0) then
+          ! downwind cell is prescribed, upwind is normal (flip direction)
+          if (local_id_dn > 0) then
+            ! only store if prescribed cell is local
+            i = i + 1
+            int_array(i) = -iconn
+          endif
+        !else skip the connection
+        endif
+      enddo
+      cur_connection_set => cur_connection_set%next
+    enddo
+    if (i > 0) then
+      allocate(list_of_connections(i))
+      list_of_connections(:) = int_array(1:i)
+    endif
+    deallocate(int_array)
+  endif
+
+  call VecRestoreArray(field%work_loc,vec_ptr,ierr);CHKERRQ(ierr)
+
+end subroutine RealizGetPrescribedConnections
 
 ! ************************************************************************** !
 

@@ -447,6 +447,7 @@ subroutine FactorySubsurfSetupRealization(simulation)
   use PM_RT_class
   use EOS_module !to be removed as already present above
   use Discretization_module
+  use Output_Conservation_module
 
   implicit none
 
@@ -575,7 +576,9 @@ subroutine FactorySubsurfSetupRealization(simulation)
   ! SubsurfSandboxesSetup() must be called after
   ! SubsurfAssignVolsToMatAuxVars() where volumes are assigned to Material
   ! objects
+  call RealizSetupPrescribedConservation(realization)
   call SubsurfSandboxesSetup(realization)
+  call OutputConservationMapCouplers(realization)
   call RealizationInitAllCouplerAuxVars(realization)
   if (option%ntrandof > 0) then
     call PrintMsg(option,"  Setting up TRAN Realization ")

@@ -1466,9 +1466,8 @@ subroutine PMWellSetupGrid(this,realization,option)
 
         call GridGetLocalIDFromCoordinate(res_grid,dummy_h,option,local_id)
         progress = j/nsegments * well_length
-        if (option%comm%io_rank == option%myrank) then
-          call PrintProgressBarInt(nsegments+1.d-10,5,j)
-        endif
+        call UpdateProgressBar(nsegments+1.d-10,5,j, &
+                               OptionPrintToScreen(option))
 
         if (k == 0 .and. Initialized(local_id)) then
           cur_id = local_id
@@ -1836,7 +1835,8 @@ subroutine PMWellSetupGrid(this,realization,option)
 
         call GridGetLocalIDFromCoordinate(res_grid,dummy_h,option,local_id)
         if (cum_z_int > cur_cum_z_int) then
-          call PrintProgressBarInt(diff_z,5,cum_z_int)
+          call UpdateProgressBar(diff_z,5,cum_z_int, &
+                                 OptionPrintToScreen(option))
           cur_cum_z_int = cum_z_int
         endif
 

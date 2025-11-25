@@ -201,6 +201,7 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   PetscBool :: snapshot_plot_flag
   PetscBool :: observation_plot_flag
   PetscBool :: massbal_plot_flag
+  PetscBool :: conserv_plot_flag
   PetscBool :: checkpoint_flag
   PetscBool :: peer_already_run_to_time
 
@@ -222,12 +223,14 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   snapshot_plot_flag = PETSC_FALSE
   observation_plot_flag = PETSC_FALSE
   massbal_plot_flag = PETSC_FALSE
+  conserv_plot_flag = PETSC_FALSE
 
   call this%timestepper%SetTargetTime(sync_time,this%option,local_stop_flag, &
                                       sync_flag, &
                                       snapshot_plot_flag, &
                                       observation_plot_flag, &
-                                      massbal_plot_flag,checkpoint_flag)
+                                      massbal_plot_flag, &
+                                      conserv_plot_flag,checkpoint_flag)
 
   ! overwrites target time and dt for geomech when flow is the master pm
   select case(this%option%geomechanics%split_scheme)
@@ -296,9 +299,14 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
           periodic_msbl_output_ts_imod) == 0) then
     massbal_plot_flag = PETSC_TRUE
   endif
+  if (mod(this%timestepper%steps,this%pm_list%output_option% &
+          periodic_cons_output_ts_imod) == 0) then
+    conserv_plot_flag = PETSC_TRUE
+  endif
 
   call OutputGeomechanics(this%geomech_realization,snapshot_plot_flag, &
-                          observation_plot_flag,massbal_plot_flag)
+                          observation_plot_flag,massbal_plot_flag, &
+                          conserv_plot_flag)
   ! Set data needed by process-model
   call this%SetAuxData()
 
