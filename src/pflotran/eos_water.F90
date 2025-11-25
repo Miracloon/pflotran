@@ -1386,10 +1386,10 @@ subroutine EOSWaterSaturationPressureIF97(T, calculate_derivatives, &
   T_temp = T + T273K
 
   if (T_temp > 623.15d0) then
-    PS = 0.34805185628969d3 - 0.11671859879975d1*T_temp + &
-            0.10192970039326d-2 * T_temp*T_temp
+    PS = 1.d6*(0.34805185628969d3 - 0.11671859879975d1*T_temp + &
+               0.10192970039326d-2 * T_temp*T_temp)
     if (calculate_derivatives) then
-      dPS_DT = -0.11671859879975d1 + 2.d0 * 0.10192970039326d-2 *T_temp
+      dPS_DT = 1.d6*(-0.11671859879975d1 + 2.d0 * 0.10192970039326d-2 * T_temp)
     else
       dPS_DT = UNINITIALIZED_DOUBLE
     endif
@@ -1419,15 +1419,15 @@ subroutine EOSWaterSaturationPressureIF97(T, calculate_derivatives, &
 
 end subroutine EOSWaterSaturationPressureIF97
 
-
 ! ************************************************************************** !
-subroutine EOSWaterSaturationPressureHaasExt(T, aux, calculate_derivatives, PS, &
-                                          dPS_dT, ierr)
+
+subroutine EOSWaterSaturationPressureHaasExt(T, aux, calculate_derivatives, &
+                                             PS, dPS_dT, ierr)
 
   ! Water saturation pressure with dissolved halite
   ! Haas, 1976
-  ! Physical properties of the coexisting phases and thermochemical properties of
-  ! the H2O component in boiling NaCl solutions
+  ! Physical properties of the coexisting phases and thermochemical properties
+  ! of the H2O component in boiling NaCl solutions
   !
   ! Author: David Fukuyama
   ! Date: 12/20/21
