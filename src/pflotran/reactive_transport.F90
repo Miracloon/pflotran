@@ -1346,6 +1346,11 @@ subroutine RTUpdateFixedAccumulation(realization)
 #if defined(DEBUG_RT_RES_ACCUMULATION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'fac: ', grid%nG2A(ghosted_id)
+#if defined(DEBUG_RT_VERBOSE)
+        print *, ' vol: ', material_auxvars(ghosted_id)%volume
+        print *, ' por: ', material_auxvars(ghosted_id)%porosity
+        print *, ' lsat: ', global_auxvars(ghosted_id)%sat(LIQUID_PHASE)
+#endif
         print *, ' Res: ', accum_p(istart:iendall)
       endif
 #endif
@@ -2745,6 +2750,11 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 #if defined(DEBUG_RT_RES_ACCUMULATION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
         print *, 'rac: ', grid%nG2A(ghosted_id)
+#if defined(DEBUG_RT_VERBOSE)
+        print *, ' vol: ', material_auxvars(ghosted_id)%volume
+        print *, ' por: ', material_auxvars(ghosted_id)%porosity
+        print *, ' lsat: ', global_auxvars(ghosted_id)%sat(LIQUID_PHASE)
+#endif
         print *, ' Res: ', Res
       endif
 #endif
