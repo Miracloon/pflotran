@@ -1343,6 +1343,13 @@ subroutine RTUpdateFixedAccumulation(realization)
                         reaction,option, &
                         accum_p(istart:iendall))
 
+#if defined(DEBUG_RT_RES_ACCUMULATION)
+      if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
+        print *, 'fac: ', grid%nG2A(ghosted_id)
+        print *, ' Res: ', accum_p(istart:iendall)
+      endif
+#endif
+
     if (option%use_sc) then
       accum_p(istart:iendall) = accum_p(istart:iendall)* &
         rt_sec_transport_vars(ghosted_id)%epsilon
