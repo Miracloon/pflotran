@@ -33,18 +33,18 @@ module Output_HDF5_module
             OutputHDF5OpenFile, &
             OutputHDF5CloseFile, &
             OutputHDF5WriteSnapShotAtts, &
-            OutputHDF5PrintExplicitFlowrates
+            OutputHDF5WriteExplicitFlowrates
 
   public :: OutputH5OpenFile, &
             OutputH5CloseFile, &
             OutputH5OpenGroup, &
             OutputH5CloseGroup, &
             OutputXMFOpenFile, &
-            DetermineNumVertices, &
+            OutputHDF5DetermineNumVertices, &
             OutputHDF5WriteStructCoordGroup, &
-            WriteHDF5CoordinatesUGridXDMF, &
-            OutputHDF5PrintRegionsStructured, &
-            OutputHDF5PrintRegionsXMF
+            OutputHDF5WriteCoordUGridXDMF, &
+            OutputHDF5WriteRegionsStructured, &
+            OutputHDF5WriteRegionsXMF
 
 contains
 
@@ -257,34 +257,34 @@ subroutine OutputHDF5(realization_base,var_list_type)
     ! internal flux velocities
     if (grid%structured_grid%nx > 1) then
         string = "Liquid X-Flux Velocities"
-        call WriteHDF5FluxVelocities(string,realization_base,LIQUID_PHASE, &
-                                     X_DIRECTION,grp_id)
+        call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                           LIQUID_PHASE,X_DIRECTION,grp_id)
         if (include_gas_phase) then
           string = "Gas X-Flux Velocities"
-          call WriteHDF5FluxVelocities(string,realization_base,GAS_PHASE, &
-                                       X_DIRECTION,grp_id)
+          call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                             GAS_PHASE,X_DIRECTION,grp_id)
         endif
     endif
 
     if (grid%structured_grid%ny > 1) then
         string = "Liquid Y-Flux Velocities"
-        call WriteHDF5FluxVelocities(string,realization_base,LIQUID_PHASE, &
-                                     Y_DIRECTION,grp_id)
+        call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                           LIQUID_PHASE,Y_DIRECTION,grp_id)
         if (include_gas_phase) then
           string = "Gas Y-Flux Velocities"
-          call WriteHDF5FluxVelocities(string,realization_base,GAS_PHASE, &
-                                       Y_DIRECTION,grp_id)
+          call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                             GAS_PHASE,Y_DIRECTION,grp_id)
         endif
     endif
 
     if (grid%structured_grid%nz > 1) then
         string = "Liquid Z-Flux Velocities"
-        call WriteHDF5FluxVelocities(string,realization_base,LIQUID_PHASE, &
-                                     Z_DIRECTION,grp_id)
+        call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                           LIQUID_PHASE,Z_DIRECTION,grp_id)
         if (include_gas_phase) then
           string = "Gas Z-Flux Velocities"
-          call WriteHDF5FluxVelocities(string,realization_base,GAS_PHASE, &
-                                       Z_DIRECTION,grp_id)
+          call OutputHDF5WriteFluxVelocities(string,realization_base, &
+                                             GAS_PHASE,Z_DIRECTION,grp_id)
         endif
     endif
 
@@ -518,7 +518,7 @@ subroutine OutputHDF5UGridXDMF(realization_base,var_list_type)
   if (first) then
     call HDF5FileOpen(filename_path,file_id,PETSC_TRUE,option)
   else if (Uninitialized(realization_base%output_option%xmf_vert_len)) then
-    call DetermineNumVertices(realization_base,option)
+    call OutputHDF5DetermineNumVertices(realization_base,option)
   endif
 
   if (first) then
@@ -532,7 +532,7 @@ subroutine OutputHDF5UGridXDMF(realization_base,var_list_type)
     ! create a group for the coordinates data set
     string = "Domain"
     call HDF5GroupCreate(file_id,string,grp_id,option)
-    call WriteHDF5CoordinatesUGridXDMF(realization_base,option,grp_id)
+    call OutputHDF5WriteCoordUGridXDMF(realization_base,option,grp_id)
     call HDF5GroupClose(grp_id,option)
   endif
 
@@ -642,13 +642,13 @@ subroutine OutputHDF5UGridXDMF(realization_base,var_list_type)
         call OutputGetFaceFlowrateUGrid(realization_base)
         if (output_option%print_hdf5_mass_flowrate.or.&
            output_option%print_hdf5_energy_flowrate) then
-          call WriteHDF5FlowratesUGrid(realization_base,option,grp_id, &
+          call OutputHDF5WriteFlowratesUGrid(realization_base,option,grp_id, &
                                        var_list_type)
         endif
       case (AVERAGED_VARS)
         if (output_option%print_hdf5_aveg_mass_flowrate.or.&
            output_option%print_hdf5_aveg_energy_flowrate) then
-          call WriteHDF5FlowratesUGrid(realization_base,option,grp_id, &
+          call OutputHDF5WriteFlowratesUGrid(realization_base,option,grp_id, &
                                        var_list_type)
         endif
     end select
@@ -726,7 +726,7 @@ subroutine OutputHDF5UGridXDMF(realization_base,var_list_type)
       case (INSTANTANEOUS_VARS)
         call OutputGetFaceVelUGrid(realization_base)
         if (output_option%print_hdf5_vel_face) then
-          call WriteHDF5FaceVelUGrid(realization_base,option,grp_id, &
+          call OutputHDF5WriteFaceVelUGrid(realization_base,option,grp_id, &
                                      var_list_type)
         endif
       case (AVERAGED_VARS)
@@ -911,7 +911,7 @@ subroutine OutputHDF5UGridXDMFExplicit(realization_base,var_list_type)
                   domain_filename) > 0)) then
     if (output_option%print_explicit_primal_grid) then
       ! for primal grid output, num_cells is set in the call to
-      ! WriteHDF5CoordinatesUGridXDMFExplicit() below.  Therefore, this value
+      ! OutputHDF5WriteCoordUGridXDMFExp() below.  Therefore, this value
       ! for num_cells will be overwritten the first time called.
       num_cells = realization_base%output_option%xmf_vert_len
       num_vertices = grid%unstructured_grid%explicit_grid%num_vertices
@@ -968,7 +968,7 @@ subroutine OutputHDF5UGridXDMFExplicit(realization_base,var_list_type)
     ! create a group for the coordinates data set
     string = "Domain"
     call HDF5GroupCreate(new_file_id,string,new_grp_id,option)
-    call WriteHDF5CoordinatesUGridXDMFExplicit(realization_base,option, &
+    call OutputHDF5WriteCoordUGridXDMFExp(realization_base,option, &
                                                new_grp_id)
     num_cells = realization_base%output_option%xmf_vert_len
     call HDF5GroupClose(new_grp_id,option)
@@ -1241,7 +1241,7 @@ end function OutputHDF5FilenameID
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5FluxVelocities(name,realization_base,iphase,direction, &
+subroutine OutputHDF5WriteFluxVelocities(name,realization_base,iphase,direction, &
                                    file_id)
   !
   ! Print flux velocities to HDF5 file
@@ -1370,7 +1370,7 @@ subroutine WriteHDF5FluxVelocities(name,realization_base,iphase,direction, &
   deallocate(array)
   trick_hdf5 = PETSC_FALSE
 
-end subroutine WriteHDF5FluxVelocities
+end subroutine OutputHDF5WriteFluxVelocities
 
 ! ************************************************************************** !
 
@@ -1410,7 +1410,7 @@ subroutine OutputHDF5WriteStructCoordGroup(file_id,discretization,grid,option)
   do i=2,grid%structured_grid%nx+1
     array(i) = array(i-1) + grid%structured_grid%dx_global(i-1)
   enddo
-  call WriteHDF5Coordinates(string,option,grid%structured_grid%nx+1, &
+  call OutputHDF5WriteCoordinates(string,option,grid%structured_grid%nx+1, &
                             array,grp_id)
   deallocate(array)
 
@@ -1420,7 +1420,7 @@ subroutine OutputHDF5WriteStructCoordGroup(file_id,discretization,grid,option)
   do i=2,grid%structured_grid%ny+1
     array(i) = array(i-1) + grid%structured_grid%dy_global(i-1)
   enddo
-  call WriteHDF5Coordinates(string,option,grid%structured_grid%ny+1, &
+  call OutputHDF5WriteCoordinates(string,option,grid%structured_grid%ny+1, &
                             array,grp_id)
   deallocate(array)
 
@@ -1430,7 +1430,7 @@ subroutine OutputHDF5WriteStructCoordGroup(file_id,discretization,grid,option)
   do i=2,grid%structured_grid%nz+1
     array(i) = array(i-1) + grid%structured_grid%dz_global(i-1)
   enddo
-  call WriteHDF5Coordinates(string,option,grid%structured_grid%nz+1, &
+  call OutputHDF5WriteCoordinates(string,option,grid%structured_grid%nz+1, &
                             array,grp_id)
   deallocate(array)
   !GEH - Structured Grid Dependence - End
@@ -1441,7 +1441,7 @@ end subroutine OutputHDF5WriteStructCoordGroup
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5Coordinates(name,option,length,array,file_id)
+subroutine OutputHDF5WriteCoordinates(name,option,length,array,file_id)
   !
   ! Writes structured coordinates to HDF5 file
   !
@@ -1501,11 +1501,11 @@ subroutine WriteHDF5Coordinates(name,option,length,array,file_id)
   call PetscLogEventEnd(logging%event_output_coordinates_hdf5, &
                         ierr);CHKERRQ(ierr)
 
-end subroutine WriteHDF5Coordinates
+end subroutine OutputHDF5WriteCoordinates
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5CoordinatesUGrid(grid,option,file_id)
+subroutine OutputHDF5WriteCoordinatesUGrid(grid,option,file_id)
   !
   ! This subroutine writes unstructured coordinates to HDF5 file
   !
@@ -1764,11 +1764,11 @@ subroutine WriteHDF5CoordinatesUGrid(grid,option,file_id)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
   call UGridDMDestroy(ugdm_element)
 
-end subroutine WriteHDF5CoordinatesUGrid
+end subroutine OutputHDF5WriteCoordinatesUGrid
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5CoordinatesUGridXDMF(realization_base,option,file_id)
+subroutine OutputHDF5WriteCoordUGridXDMF(realization_base,option,file_id)
   !
   ! This routine writes unstructured coordinates to HDF5 file in XDMF format
   !
@@ -2273,11 +2273,11 @@ subroutine WriteHDF5CoordinatesUGridXDMF(realization_base,option,file_id)
 
   call UGridDMDestroy(ugdm_cell)
 
-end subroutine WriteHDF5CoordinatesUGridXDMF
+end subroutine OutputHDF5WriteCoordUGridXDMF
 
 ! ************************************************************************** !
 
-subroutine DetermineNumVertices(realization_base,option)
+subroutine OutputHDF5DetermineNumVertices(realization_base,option)
   !
   ! Determine the number of vertices written out in the output HDF5 file
   !
@@ -2337,15 +2337,14 @@ subroutine DetermineNumVertices(realization_base,option)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
   call UGridDMDestroy(ugdm_element)
 
-end subroutine DetermineNumVertices
+end subroutine OutputHDF5DetermineNumVertices
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5CoordinatesUGridXDMFExplicit(realization_base,option, &
+subroutine OutputHDF5WriteCoordUGridXDMFExp(realization_base,option, &
                                                  file_id)
   !
-  ! Writes the coordinates of
-  ! explicit grid to HDF5 file
+  ! Writes the coordinates of explicit grid to HDF5 file
   !
   ! Author: Satish Karra, LANL
   ! Date: 07/17/2013
@@ -2588,11 +2587,11 @@ subroutine WriteHDF5CoordinatesUGridXDMFExplicit(realization_base,option, &
   call VecRestoreArray(natural_vec,vec_ptr,ierr);CHKERRQ(ierr)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
 
-end subroutine WriteHDF5CoordinatesUGridXDMFExplicit
+end subroutine OutputHDF5WriteCoordUGridXDMFExp
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5FlowratesUGrid(realization_base,option,file_id, &
+subroutine OutputHDF5WriteFlowratesUGrid(realization_base,option,file_id, &
                                    var_list_type)
   !
   ! This routine writes (mass/energy) flowrate for unstructured grid.
@@ -2812,11 +2811,11 @@ subroutine WriteHDF5FlowratesUGrid(realization_base,option,file_id, &
   ! Free up memory
   deallocate(double_array)
 
-end subroutine WriteHDF5FlowratesUGrid
+end subroutine OutputHDF5WriteFlowratesUGrid
 
 ! ************************************************************************** !
 
-subroutine WriteHDF5FaceVelUGrid(realization_base,option,file_id, &
+subroutine OutputHDF5WriteFaceVelUGrid(realization_base,option,file_id, &
                                  var_list_type)
   !
   ! This routine writes velocity at cell faces for unstructured grid.
@@ -3017,7 +3016,7 @@ subroutine WriteHDF5FaceVelUGrid(realization_base,option,file_id, &
   ! Free up memory
   deallocate(double_array)
 
-end subroutine WriteHDF5FaceVelUGrid
+end subroutine OutputHDF5WriteFaceVelUGrid
 
 ! ************************************************************************** !
 
@@ -3328,7 +3327,7 @@ end subroutine OutputHDF5WriteSnapShotAtts
 
 ! ************************************************************************** !
 
-subroutine OutputHDF5PrintRegionsStructured(realization_base)
+subroutine OutputHDF5WriteRegionsStructured(realization_base)
   !
   ! Print to HDF5 file
   !
@@ -3410,11 +3409,11 @@ subroutine OutputHDF5PrintRegionsStructured(realization_base)
   call HDF5GroupClose(grp_id,option)
   call OutputHDF5CloseFile(option, file_id)
 
-end subroutine OutputHDF5PrintRegionsStructured
+end subroutine OutputHDF5WriteRegionsStructured
 
 ! ************************************************************************** !
 
-subroutine OutputHDF5PrintRegionsXMF(realization_base)
+subroutine OutputHDF5WriteRegionsXMF(realization_base)
   !
   ! Prints out the number of connections to each cell in a region in HDF5.
   !
@@ -3480,7 +3479,7 @@ subroutine OutputHDF5PrintRegionsXMF(realization_base)
   call OutputXMFOpenFile(option,xmf_filename,OUTPUT_UNIT)
 
   if (Uninitialized(output_option%xmf_vert_len)) then
-    call DetermineNumVertices(realization_base,option)
+    call OutputHDF5DetermineNumVertices(realization_base,option)
   endif
 
   !TODO(geh): move conditional inside of OutputXMFHeader
@@ -3496,7 +3495,7 @@ subroutine OutputHDF5PrintRegionsXMF(realization_base)
   ! create a group for the coordinates data set
   group_name = "Domain"
   call OutputH5OpenGroup(option,group_name,h5file_id,grp_id)
-  call WriteHDF5CoordinatesUGridXDMF(realization_base,option,grp_id)
+  call OutputHDF5WriteCoordUGridXDMF(realization_base,option,grp_id)
   call OutputH5CloseGroup(option,grp_id)
 
   group_name = '0 Time 0.'
@@ -3565,7 +3564,7 @@ subroutine OutputHDF5PrintRegionsXMF(realization_base)
   call VecDestroy(all_vec,ierr);CHKERRQ(ierr)
   call OutputH5Destroy(h5obj)
 
-end subroutine OutputHDF5PrintRegionsXMF
+end subroutine OutputHDF5WriteRegionsXMF
 
 ! ************************************************************************** !
 
@@ -3692,7 +3691,8 @@ end subroutine OutputH5CloseGroup
 
 ! ************************************************************************** !
 
-subroutine WriteGridHDF5_Int(file_id, grp_id, dataspace_id, dims, dataset_name, to_write, option)
+subroutine OutputHDF5WriteGrid_Int(file_id, grp_id, dataspace_id, dims, &
+                                   dataset_name, to_write, option)
   !
   ! Writes an integer array to an existing file_id and grp_id
   !
@@ -3713,7 +3713,8 @@ subroutine WriteGridHDF5_Int(file_id, grp_id, dataspace_id, dims, dataset_name, 
   character(len=*) :: dataset_name
   PetscInt, pointer :: to_write(:)
 
-  call h5dcreate_f(grp_id, dataset_name, H5T_STD_U32LE, dataspace_id, dataset_id, error)
+  call h5dcreate_f(grp_id, dataset_name, H5T_STD_U32LE, dataspace_id, &
+                   dataset_id, error)
   if (error < 0) then
     option%io_buffer = 'Could not create dataset ' // trim(dataset_name)
     call PrintErrMsg(option)
@@ -3728,11 +3729,12 @@ subroutine WriteGridHDF5_Int(file_id, grp_id, dataspace_id, dims, dataset_name, 
     option%io_buffer = 'Could not close dataset ' // trim(dataset_name)
     call PrintErrMsg(option)
   endif
-end subroutine WriteGridHDF5_Int
+end subroutine OutputHDF5WriteGrid_Int
 
 ! ************************************************************************** !
 
-subroutine WriteGridHDF5_Real8(file_id, grp_id, dataspace_id, dims, dataset_name, to_write, option)
+subroutine OutputHDF5WriteGrid_Real8(file_id, grp_id, dataspace_id, dims, &
+                               dataset_name, to_write, option)
   !
   ! Writes a real array to an existing file_id and grp_id
   !
@@ -3753,7 +3755,8 @@ subroutine WriteGridHDF5_Real8(file_id, grp_id, dataspace_id, dims, dataset_name
   character(len=*) :: dataset_name
   PetscReal, pointer :: to_write(:)
 
-  call h5dcreate_f(grp_id, dataset_name, H5T_IEEE_F64LE, dataspace_id, dataset_id, error)
+  call h5dcreate_f(grp_id, dataset_name, H5T_IEEE_F64LE, dataspace_id, &
+                   dataset_id, error)
   if (error < 0) then
     option%io_buffer = 'Could not create dataset ' // trim(dataset_name)
     call PrintErrMsg(option)
@@ -3768,11 +3771,11 @@ subroutine WriteGridHDF5_Real8(file_id, grp_id, dataspace_id, dims, dataset_name
     option%io_buffer = 'Could not close dataset ' // trim(dataset_name)
     call PrintErrMsg(option)
   endif
-end subroutine WriteGridHDF5_Real8
+end subroutine OutputHDF5WriteGrid_Real8
 
 ! ************************************************************************** !
 
-subroutine OutputHDF5PrintExplicitFlowrates(realization_base)
+subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   !
   ! Prints out the flow rate through a voronoi face
   ! for explicit grid. This will be used for particle tracking.
@@ -3788,7 +3791,7 @@ subroutine OutputHDF5PrintExplicitFlowrates(realization_base)
   use HDF5_Aux_module
   use PFLOTRAN_Constants_module
   use hdf5
-  use petscdm
+  use Utility_module, only : DeallocateArray
 
   implicit none
 
@@ -3830,8 +3833,7 @@ subroutine OutputHDF5PrintExplicitFlowrates(realization_base)
   call OutputGetExplicitFlowrates(realization_base,count,vec_proc,flowrates, &
                                   darcy,area)
   if (output_density) then
-    call OutputGetExplicitAuxVars(realization_base,count,vec_proc, &
-                                  density)
+    call OutputGetExplicitDensity(realization_base,count,vec_proc,density)
   endif
 
   if (OptionIsIORank(option)) then
@@ -3851,25 +3853,30 @@ subroutine OutputHDF5PrintExplicitFlowrates(realization_base)
     option%io_buffer = 'Could not create dataspace for ' // trim(string)
     call PrintErrMsg(option)
   endif
-  call WriteGridHDF5_Int(file_id, grp_conn_id, dataspace_id, dims, "Cell1", nat_ids_up, option)
-  call WriteGridHDF5_Int(file_id, grp_conn_id, dataspace_id, dims, "Cell2", nat_ids_dn, option)
-  call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Flux", darcy, option)
+  call OutputHDF5WriteGrid_Int(file_id, grp_conn_id, dataspace_id, dims, &
+                         "Cell1", nat_ids_up, option)
+  call OutputHDF5WriteGrid_Int(file_id, grp_conn_id, dataspace_id, dims, &
+                         "Cell2", nat_ids_dn, option)
+  call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+                           "Flux", darcy, option)
   if (output_density) then
-    call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Density", density, option)
+    call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+                             "Density", density, option)
   endif
-  call WriteGridHDF5_Real8(file_id, grp_conn_id, dataspace_id, dims, "Area", area, option)
+  call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+                           "Area", area, option)
   call h5sclose_f(dataspace_id, error)
   call HDF5GroupClose(grp_conn_id, option)
   call HDF5GroupClose(grp_dom_id, option)
   call HDF5FileClose(file_id, option)
 
-  deallocate(flowrates)
-  deallocate(darcy)
-  deallocate(nat_ids_up)
-  deallocate(nat_ids_dn)
-  deallocate(density)
-  deallocate(area)
+  call DeallocateArray(flowrates)
+  call DeallocateArray(darcy)
+  call DeallocateArray(nat_ids_up)
+  call DeallocateArray(nat_ids_dn)
+  call DeallocateArray(density)
+  call DeallocateArray(area)
 
-end subroutine OutputHDF5PrintExplicitFlowrates
+end subroutine OutputHDF5WriteExplicitFlowrates
 
 end module Output_HDF5_module

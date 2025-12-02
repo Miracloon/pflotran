@@ -63,7 +63,7 @@ subroutine InitCommonVerifyCoupler(realization,coupler_list)
   use Condition_module
   use Grid_module
   use Output_module
-  use Output_Tecplot_module, only : OutputVectorTecplot
+  use Output_Tecplot_module, only : OutputTecplotWriteVector
   use Patch_module
 
   implicit none
@@ -127,7 +127,7 @@ subroutine InitCommonVerifyCoupler(realization,coupler_list)
                    trim(adjustl(word))
     dataset_name = dataset_name(1:28)
     filename = trim(dataset_name) // '.tec'
-    call OutputVectorTecplot(filename,dataset_name,realization,global_vec)
+    call OutputTecplotWriteVector(filename,dataset_name,realization,global_vec)
 
     coupler => coupler%next
   enddo

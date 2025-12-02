@@ -19,17 +19,17 @@ module Output_Tecplot_module
 
   public :: OutputTecplotBlock, &
             OutputTecplotPoint, &
-            OutputVelocitiesTecplotBlock, &
-            OutputFluxVelocitiesTecplotBlk, &
-            OutputVelocitiesTecplotPoint, &
-            OutputVectorTecplot, &
-            OutputGetCellVerticesTecplot, &
-            WriteTecplotDatasetFromVec, &
-            WriteTecplotDatasetNumPerLine, &
-            WriteTecplotDataset, &
-            OutputPrintExplicitFlowrates, &
-            OutputSecondaryContinuumTecplot, &
-            OutputTecplotPrintRegions
+            OutputTecplotWriteVelocitiesBlk, &
+            OutputTecplotWriteFluxVelBlock, &
+            OutputTecplotVelocitiesPoint, &
+            OutputTecplotWriteVector, &
+            OutputTecplotGetCellVertices, &
+            OutputTecplotWriteDatasetFromVec, &
+            OutputTecplotWriteDsetNumPerLine, &
+            OutputTecplotWriteDataset, &
+            OutputTecplotWriteExplFlowrates, &
+            OutputTecplotSecondaryContinuum, &
+            OutputTecplotWriteRegions
 
 contains
 
@@ -88,14 +88,14 @@ subroutine OutputTecplotHeader(fid,realization_base,icolumn)
 
   !geh: due to pgi bug, cannot embed functions with calls to write() within
   !     write statement
-  call OutputWriteTecplotZoneHeader(fid,realization_base,variable_count, &
+  call OutputTecplotWriteZoneHeader(fid,realization_base,variable_count, &
                                     output_option%tecplot_format)
 
 end subroutine OutputTecplotHeader
 
 ! ************************************************************************** !
 
-subroutine OutputWriteTecplotZoneHeader(fid,realization_base,variable_count, &
+subroutine OutputTecplotWriteZoneHeader(fid,realization_base,variable_count, &
                                         tecplot_format)
   !
   ! Print zone header to Tecplot file
@@ -210,7 +210,7 @@ subroutine OutputWriteTecplotZoneHeader(fid,realization_base,variable_count, &
 
   write(fid,'(a)') trim(string) // trim(string2)
 
-end subroutine OutputWriteTecplotZoneHeader
+end subroutine OutputTecplotWriteZoneHeader
 
 ! ************************************************************************** !
 
@@ -277,9 +277,9 @@ subroutine OutputTecplotBlock(realization_base)
 
   ! write out coordinates
   if (realization_base%discretization%itype == STRUCTURED_GRID) then
-    call WriteTecplotStructuredGrid(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteStructuredGrid(OUTPUT_UNIT,realization_base)
   else
-    call WriteTecplotUGridVertices(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridVertices(OUTPUT_UNIT,realization_base)
   endif
 
   ! loop over snapshot variables and write to file
@@ -290,10 +290,10 @@ subroutine OutputTecplotBlock(realization_base)
     call DiscretizationGlobalToNatural(discretization,global_vec, &
                                         natural_vec,ONEDOF)
     if (cur_variable%iformat == 0) then
-      call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+      call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                       natural_vec,TECPLOT_REAL)
     else
-      call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+      call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                       natural_vec,TECPLOT_INTEGER)
     endif
     cur_variable => cur_variable%next
@@ -305,25 +305,25 @@ subroutine OutputTecplotBlock(realization_base)
   if (realization_base%discretization%itype == UNSTRUCTURED_GRID .and. &
       realization_base%discretization%grid%itype == &
       IMPLICIT_UNSTRUCTURED_GRID)  then
-    call WriteTecplotUGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridElements(OUTPUT_UNIT,realization_base)
   endif
 
   if (realization_base%discretization%grid%itype ==  &
         EXPLICIT_UNSTRUCTURED_GRID .or. &
         realization_base%discretization%grid%itype ==  &
         ECLIPSE_UNSTRUCTURED_GRID) then
-    call WriteTecplotExpGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteExpGridElem(OUTPUT_UNIT,realization_base)
   endif
 
   if (realization_base%discretization%grid%itype == &
       POLYHEDRA_UNSTRUCTURED_GRID) then
-    call WriteTecplotPolyUGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWritePolyUGridElem(OUTPUT_UNIT,realization_base)
   endif
 
   if (OptionIsIORank(option)) close(OUTPUT_UNIT)
 
   if (output_option%print_tecplot_vel_cent) then
-    call OutputVelocitiesTecplotBlock(realization_base)
+    call OutputTecplotWriteVelocitiesBlk(realization_base)
   endif
 
   if (realization_base%discretization%itype /= STRUCTURED_GRID .and. &
@@ -354,20 +354,20 @@ subroutine OutputTecplotBlock(realization_base)
     end select
     if (grid%structured_grid%nx > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
-                                            X_DIRECTION,PETSC_FALSE)
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
+                                              X_DIRECTION,PETSC_FALSE)
       enddo
     endif
     if (grid%structured_grid%ny > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
-                                            Y_DIRECTION,PETSC_FALSE)
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
+                                              Y_DIRECTION,PETSC_FALSE)
       enddo
     endif
     if (grid%structured_grid%nz > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
-                                            Z_DIRECTION,PETSC_FALSE)
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
+                                              Z_DIRECTION,PETSC_FALSE)
       enddo
     endif
   endif
@@ -397,19 +397,19 @@ subroutine OutputTecplotBlock(realization_base)
     end select
     if (grid%structured_grid%nx > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
                                             X_DIRECTION,PETSC_TRUE)
       enddo
     endif
     if (grid%structured_grid%ny > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
                                             Y_DIRECTION,PETSC_TRUE)
       enddo
     endif
     if (grid%structured_grid%nz > 1) then
       do i = 1, tempint(0)
-        call OutputFluxVelocitiesTecplotBlk(realization_base,tempint(i), &
+        call OutputTecplotWriteFluxVelBlock(realization_base,tempint(i), &
                                             Z_DIRECTION,PETSC_TRUE)
       enddo
     endif
@@ -419,7 +419,7 @@ end subroutine OutputTecplotBlock
 
 ! ************************************************************************** !
 
-subroutine OutputVelocitiesTecplotBlock(realization_base)
+subroutine OutputTecplotWriteVelocitiesBlk(realization_base)
   !
   ! Print velocities to Tecplot file in BLOCK format
   !
@@ -494,7 +494,7 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
     string = trim(string) // ',"Material_ID"'
     write(OUTPUT_UNIT,'(a)') trim(string)
 
-    call OutputWriteTecplotZoneHeader(OUTPUT_UNIT,realization_base, &
+    call OutputTecplotWriteZoneHeader(OUTPUT_UNIT,realization_base, &
                                       variable_count,TECPLOT_BLOCK_FORMAT)
   endif
 
@@ -510,9 +510,9 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
 
   ! write out coorindates
   if (realization_base%discretization%itype == STRUCTURED_GRID)  then
-    call WriteTecplotStructuredGrid(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteStructuredGrid(OUTPUT_UNIT,realization_base)
   else
-    call WriteTecplotUGridVertices(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridVertices(OUTPUT_UNIT,realization_base)
   endif
 
   call OutputGetCellCenteredVelocities(realization_base,global_vec_vx, &
@@ -521,17 +521,17 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
 
   call DiscretizationGlobalToNatural(discretization,global_vec_vx, &
                                      natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                   natural_vec,TECPLOT_REAL)
 
   call DiscretizationGlobalToNatural(discretization,global_vec_vy, &
                                      natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                   natural_vec,TECPLOT_REAL)
 
   call DiscretizationGlobalToNatural(discretization,global_vec_vz, &
                                      natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                   natural_vec,TECPLOT_REAL)
 
   if (option%nphase > 1 .or. option%transport%nphase > 1) then
@@ -540,17 +540,17 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
 
     call DiscretizationGlobalToNatural(discretization,global_vec_vx, &
                                        natural_vec,ONEDOF)
-    call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+    call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                     natural_vec,TECPLOT_REAL)
 
     call DiscretizationGlobalToNatural(discretization,global_vec_vy, &
                                        natural_vec,ONEDOF)
-    call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+    call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                     natural_vec,TECPLOT_REAL)
 
     call DiscretizationGlobalToNatural(discretization,global_vec_vz, &
                                        natural_vec,ONEDOF)
-    call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+    call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                     natural_vec,TECPLOT_REAL)
   endif
 
@@ -559,7 +559,7 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
                               MATERIAL_ID,ZERO_INTEGER)
   call DiscretizationGlobalToNatural(discretization,global_vec, &
                                      natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base, &
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base, &
                                      natural_vec,TECPLOT_INTEGER)
 
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
@@ -571,23 +571,23 @@ subroutine OutputVelocitiesTecplotBlock(realization_base)
   if (realization_base%discretization%itype == UNSTRUCTURED_GRID .and. &
       realization_base%discretization%grid%itype == &
       IMPLICIT_UNSTRUCTURED_GRID)  then
-    call WriteTecplotUGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridElements(OUTPUT_UNIT,realization_base)
   endif
 
   if (realization_base%discretization%grid%itype ==  &
       EXPLICIT_UNSTRUCTURED_GRID .or. &
       realization_base%discretization%grid%itype ==  &
       ECLIPSE_UNSTRUCTURED_GRID) then
-    call WriteTecplotExpGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteExpGridElem(OUTPUT_UNIT,realization_base)
   endif
 
   if (OptionIsIORank(option)) close(OUTPUT_UNIT)
 
-end subroutine OutputVelocitiesTecplotBlock
+end subroutine OutputTecplotWriteVelocitiesBlk
 
 ! ************************************************************************** !
 
-subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
+subroutine OutputTecplotWriteFluxVelBlock(realization_base,iphase, &
                                           direction,output_flux)
   !
   ! Print intercellular fluxes to Tecplot file
@@ -846,7 +846,7 @@ subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call WriteTecplotDataSet(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
                            adjusted_size)
   ! since the array has potentially been resized, must reallocate
   deallocate(array)
@@ -872,7 +872,7 @@ subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call WriteTecplotDataSet(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
                            adjusted_size)
   deallocate(array)
   nullify(array)
@@ -897,7 +897,7 @@ subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call WriteTecplotDataSet(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
                            adjusted_size)
   deallocate(array)
   nullify(array)
@@ -914,7 +914,7 @@ subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call WriteTecplotDataSet(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
                            adjusted_size)
   deallocate(array)
   deallocate(indices)
@@ -924,7 +924,7 @@ subroutine OutputFluxVelocitiesTecplotBlk(realization_base,iphase, &
   call PetscLogEventEnd(logging%event_output_write_flux_tecplot, &
                         ierr);CHKERRQ(ierr)
 
-end subroutine OutputFluxVelocitiesTecplotBlk
+end subroutine OutputTecplotWriteFluxVelBlock
 
 ! ************************************************************************** !
 
@@ -1020,7 +1020,7 @@ subroutine OutputTecplotPoint(realization_base)
   if (OptionIsIORank(option)) close(OUTPUT_UNIT)
 
   if (output_option%print_tecplot_vel_cent) then
-    call OutputVelocitiesTecplotPoint(realization_base)
+    call OutputTecplotVelocitiesPoint(realization_base)
   endif
 
   if (output_option%print_tecplot_vel_face) then
@@ -1033,7 +1033,7 @@ end subroutine OutputTecplotPoint
 
 ! ************************************************************************** !
 
-subroutine OutputVelocitiesTecplotPoint(realization_base)
+subroutine OutputTecplotVelocitiesPoint(realization_base)
   !
   ! Print velocities to Tecplot file in POINT format
   !
@@ -1208,11 +1208,12 @@ subroutine OutputVelocitiesTecplotPoint(realization_base)
 
   if (OptionIsIORank(option)) close(OUTPUT_UNIT)
 
-end subroutine OutputVelocitiesTecplotPoint
+end subroutine OutputTecplotVelocitiesPoint
 
 ! ************************************************************************** !
 
-subroutine OutputVectorTecplot(filename,dataset_name,realization_base,vector)
+subroutine OutputTecplotWriteVector(filename,dataset_name,realization_base, &
+                                    vector)
   !
   ! Print a vector to a Tecplot file in BLOCK format
   !
@@ -1276,7 +1277,7 @@ subroutine OutputVectorTecplot(filename,dataset_name,realization_base,vector)
 
     !geh: due to pgi bug, cannot embed functions with calls to write() within
     !     write statement
-    call OutputWriteTecplotZoneHeader(OUTPUT_UNIT,realization_base, &
+    call OutputTecplotWriteZoneHeader(OUTPUT_UNIT,realization_base, &
                                       FIVE_INTEGER,TECPLOT_BLOCK_FORMAT)
   endif
 
@@ -1290,17 +1291,17 @@ subroutine OutputVectorTecplot(filename,dataset_name,realization_base,vector)
   ! write out coorindates
 
   if (realization_base%discretization%itype == STRUCTURED_GRID)  then
-    call WriteTecplotStructuredGrid(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteStructuredGrid(OUTPUT_UNIT,realization_base)
   else
-    call WriteTecplotUGridVertices(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridVertices(OUTPUT_UNIT,realization_base)
   endif
 
   call DiscretizationGlobalToNatural(discretization,vector,natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base,natural_vec,TECPLOT_REAL)
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base,natural_vec,TECPLOT_REAL)
 
   call RealizationGetVariable(realization_base,global_vec,MATERIAL_ID,ZERO_INTEGER)
   call DiscretizationGlobalToNatural(discretization,global_vec,natural_vec,ONEDOF)
-  call WriteTecplotDataSetFromVec(OUTPUT_UNIT,realization_base,natural_vec,TECPLOT_INTEGER)
+  call OutputTecplotWriteDatasetFromVec(OUTPUT_UNIT,realization_base,natural_vec,TECPLOT_INTEGER)
 
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
   call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
@@ -1308,18 +1309,18 @@ subroutine OutputVectorTecplot(filename,dataset_name,realization_base,vector)
   if (realization_base%discretization%itype == UNSTRUCTURED_GRID .and. &
       realization_base%discretization%grid%itype == &
       IMPLICIT_UNSTRUCTURED_GRID)  then
-    call WriteTecplotUGridElements(OUTPUT_UNIT,realization_base)
+    call OutputTecplotWriteUGridElements(OUTPUT_UNIT,realization_base)
   endif
 
   close(OUTPUT_UNIT)
 
   call PetscLogEventEnd(logging%event_output_vec_tecplot,ierr);CHKERRQ(ierr)
 
-end subroutine OutputVectorTecplot
+end subroutine OutputTecplotWriteVector
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotStructuredGrid(fid,realization_base)
+subroutine OutputTecplotWriteStructuredGrid(fid,realization_base)
   !
   ! Writes structured grid face coordinates
   !
@@ -1437,11 +1438,11 @@ subroutine WriteTecplotStructuredGrid(fid,realization_base)
   call PetscLogEventEnd(logging%event_output_str_grid_tecplot, &
                         ierr);CHKERRQ(ierr)
 
-end subroutine WriteTecplotStructuredGrid
+end subroutine OutputTecplotWriteStructuredGrid
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotUGridVertices(fid,realization_base)
+subroutine OutputTecplotWriteUGridVertices(fid,realization_base)
   !
   ! Writes unstructured grid vertices
   !
@@ -1489,7 +1490,7 @@ subroutine WriteTecplotUGridVertices(fid,realization_base)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex x-coordinate'
-      call WriteTecplotDataSet(fid,realization_base,vec_ptr,TECPLOT_REAL, &
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
       local_size)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
@@ -1497,7 +1498,7 @@ subroutine WriteTecplotUGridVertices(fid,realization_base)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex y-coordinate'
-      call WriteTecplotDataSet(fid,realization_base,vec_ptr,TECPLOT_REAL, &
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
       local_size)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
@@ -1505,7 +1506,7 @@ subroutine WriteTecplotUGridVertices(fid,realization_base)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex z-coordinate'
-      call WriteTecplotDataSet(fid,realization_base,vec_ptr,TECPLOT_REAL, &
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
       local_size)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
@@ -1555,11 +1556,11 @@ subroutine WriteTecplotUGridVertices(fid,realization_base)
       endif
   end select
 
-end subroutine WriteTecplotUGridVertices
+end subroutine OutputTecplotWriteUGridVertices
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotExpGridElements(fid,realization_base)
+subroutine OutputTecplotWriteExpGridElem(fid,realization_base)
   !
   ! Writes unstructured explicit grid elements
   !
@@ -1664,11 +1665,11 @@ subroutine WriteTecplotExpGridElements(fid,realization_base)
 
   deallocate(temp_int)
 
-end subroutine WriteTecplotExpGridElements
+end subroutine OutputTecplotWriteExpGridElem
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotUGridElements(fid,realization_base)
+subroutine OutputTecplotWriteUGridElements(fid,realization_base)
   !
   ! Writes unstructured grid elements
   !
@@ -1706,13 +1707,13 @@ subroutine WriteTecplotUGridElements(fid,realization_base)
                            GLOBAL,option)
   call UGridDMCreateVector(grid%unstructured_grid,ugdm_element,natural_vec, &
                            NATURAL,option)
-  call OutputGetCellVerticesTecplot(grid,global_vec)
+  call OutputTecplotGetCellVertices(grid,global_vec)
   call VecScatterBegin(ugdm_element%scatter_gton,global_vec,natural_vec, &
                        INSERT_VALUES,SCATTER_FORWARD,ierr);CHKERRQ(ierr)
   call VecScatterEnd(ugdm_element%scatter_gton,global_vec,natural_vec, &
                      INSERT_VALUES,SCATTER_FORWARD,ierr);CHKERRQ(ierr)
   call VecGetArray(natural_vec,vec_ptr,ierr);CHKERRQ(ierr)
-  call WriteTecplotDataSetNumPerLine(fid,realization_base,vec_ptr, &
+  call OutputTecplotWriteDsetNumPerLine(fid,realization_base,vec_ptr, &
                                      TECPLOT_INTEGER, &
                                      grid%unstructured_grid%nlmax*8, &
                                      EIGHT_INTEGER)
@@ -1721,11 +1722,11 @@ subroutine WriteTecplotUGridElements(fid,realization_base)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
   call UGridDMDestroy(ugdm_element)
 
-end subroutine WriteTecplotUGridElements
+end subroutine OutputTecplotWriteUGridElements
 
 ! ************************************************************************** !
 
-subroutine OutputGetCellVerticesTecplot(grid, vec)
+subroutine OutputTecplotGetCellVertices(grid, vec)
   !
   ! OutputGetCellVertices: This routine returns a vector containing vertex ids
   ! in natural order of local cells.
@@ -1831,11 +1832,11 @@ subroutine OutputGetCellVerticesTecplot(grid, vec)
 
   call VecRestoreArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
 
-end subroutine OutputGetCellVerticesTecplot
+end subroutine OutputTecplotGetCellVertices
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotDataSetFromVec(fid,realization_base,vec,datatype)
+subroutine OutputTecplotWriteDatasetFromVec(fid,realization_base,vec,datatype)
   !
   ! Writes data from a Petsc Vec within a block
   ! of a Tecplot file
@@ -1857,14 +1858,14 @@ subroutine WriteTecplotDataSetFromVec(fid,realization_base,vec,datatype)
   PetscReal, pointer :: vec_ptr(:)
 
   call VecGetArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
-  call WriteTecplotDataSet(fid,realization_base,vec_ptr,datatype,ZERO_INTEGER)
+  call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,datatype,ZERO_INTEGER)
   call VecRestoreArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
 
-end subroutine WriteTecplotDataSetFromVec
+end subroutine OutputTecplotWriteDatasetFromVec
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotDataSet(fid,realization_base,array,datatype,size_flag)
+subroutine OutputTecplotWriteDataset(fid,realization_base,array,datatype,size_flag)
   !
   ! Writes data from an array within a block
   ! of a Tecplot file
@@ -1888,14 +1889,14 @@ subroutine WriteTecplotDataSet(fid,realization_base,array,datatype,size_flag)
 
   PetscInt, parameter :: num_per_line = 10
 
-  call WriteTecplotDataSetNumPerLine(fid,realization_base,array,datatype, &
+  call OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype, &
                                      size_flag,num_per_line)
 
-end subroutine WriteTecplotDataSet
+end subroutine OutputTecplotWriteDataset
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotDataSetNumPerLine(fid,realization_base,array,datatype, &
+subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype, &
                                          size_flag,num_per_line)
   !
   ! Writes data from an array within a block
@@ -1951,7 +1952,7 @@ subroutine WriteTecplotDataSetNumPerLine(fid,realization_base,array,datatype, &
   ! if num_per_line exceeds 100, need to change the format statement below
   if (num_per_line > 100) then
     option%io_buffer = 'Number of values to be written to line in ' // &
-      'WriteTecplotDataSetNumPerLine() exceeds 100.  ' // &
+      'OutputTecplotWriteDsetNumPerLine() exceeds 100.  ' // &
       'Must fix format statements.'
     call PrintErrMsg(option)
   endif
@@ -2168,11 +2169,11 @@ subroutine WriteTecplotDataSetNumPerLine(fid,realization_base,array,datatype, &
   call PetscLogEventEnd(logging%event_output_write_tecplot, &
                         ierr);CHKERRQ(ierr)
 
-end subroutine WriteTecplotDataSetNumPerLine
+end subroutine OutputTecplotWriteDsetNumPerLine
 
 ! ************************************************************************** !
 
-subroutine OutputPrintExplicitFlowrates(realization_base)
+subroutine OutputTecplotWriteExplFlowrates(realization_base)
   !
   ! Prints out the flow rate through a voronoi face
   ! for explicit grid. This will be used for particle tracking.
@@ -2230,8 +2231,7 @@ subroutine OutputPrintExplicitFlowrates(realization_base)
                                      nat_ids_up,nat_ids_dn)
   call OutputGetExplicitFlowrates(realization_base,count,vec_proc,flowrates, &
                                   darcy,area)
-  call OutputGetExplicitAuxVars(realization_base,count,vec_proc, &
-                                density)
+  call OutputGetExplicitDensity(realization_base,count,vec_proc,density)
 
   if (OptionIsIORank(option)) then
     option%io_buffer = ' --> write rate output file: ' // &
@@ -2293,11 +2293,11 @@ subroutine OutputPrintExplicitFlowrates(realization_base)
   deallocate(density)
   deallocate(pressure)
 
-end subroutine OutputPrintExplicitFlowrates
+end subroutine OutputTecplotWriteExplFlowrates
 
 ! ************************************************************************** !
 
-subroutine OutputSecondaryContinuumTecplot(realization_base)
+subroutine OutputTecplotSecondaryContinuum(realization_base)
   !
   ! Print secondary continuum variables
   ! in tecplot format. The output is at a given primary continuum node,
@@ -2417,7 +2417,7 @@ subroutine OutputSecondaryContinuumTecplot(realization_base)
         string = '"dist [m]"'
         write(OUTPUT_UNIT,'(a)',advance='no') trim(string)
       endif
-      call WriteTecplotHeaderForCoordSec(OUTPUT_UNIT,realization_base, &
+      call OutputTPWriteHeaderForCoordSec(OUTPUT_UNIT,realization_base, &
                                          observation%region, &
                                          observation% &
                                          print_secondary_data, &
@@ -2428,7 +2428,7 @@ subroutine OutputSecondaryContinuumTecplot(realization_base)
           string = '"dist [m]"'
           write(OUTPUT_UNIT,'(a)',advance='no') trim(string)
         endif
-        call WriteTecplotHeaderForCellSec(OUTPUT_UNIT,realization_base, &
+        call OutputTPWriteHeaderForCellSec(OUTPUT_UNIT,realization_base, &
                                           observation%region,icell, &
                                           observation% &
                                           print_secondary_data, &
@@ -2535,11 +2535,11 @@ subroutine OutputSecondaryContinuumTecplot(realization_base)
     count = count + 1
   enddo
 
-end subroutine OutputSecondaryContinuumTecplot
+end subroutine OutputTecplotSecondaryContinuum
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotHeaderForCellSec(fid,realization_base,region,icell, &
+subroutine OutputTPWriteHeaderForCellSec(fid,realization_base,region,icell, &
                                         print_secondary_data, &
                                         icolumn)
   !
@@ -2586,14 +2586,14 @@ subroutine WriteTecplotHeaderForCellSec(fid,realization_base,region,icell, &
                 ' ' // trim(adjustl(y_string)) // &
                 ' ' // trim(adjustl(z_string)) // ')'
 
-  call WriteTecplotHeaderSec(fid,realization_base,cell_string, &
+  call OutputTecplotWriteHeaderSec(fid,realization_base,cell_string, &
                                  print_secondary_data,icolumn)
 
-end subroutine WriteTecplotHeaderForCellSec
+end subroutine OutputTPWriteHeaderForCellSec
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotHeaderForCoordSec(fid,realization_base,region, &
+subroutine OutputTPWriteHeaderForCoordSec(fid,realization_base,region, &
                                          print_secondary_data, &
                                          icolumn)
   !
@@ -2630,14 +2630,14 @@ subroutine WriteTecplotHeaderForCoordSec(fid,realization_base,region, &
                 trim(adjustl(y_string)) // ' ' // &
                 trim(adjustl(z_string)) // ')'
 
-  call WriteTecplotHeaderSec(fid,realization_base,cell_string, &
+  call OutputTecplotWriteHeaderSec(fid,realization_base,cell_string, &
                              print_secondary_data,icolumn)
 
-end subroutine WriteTecplotHeaderForCoordSec
+end subroutine OutputTPWriteHeaderForCoordSec
 
 ! ************************************************************************** !
 
-subroutine WriteTecplotHeaderSec(fid,realization_base,cell_string, &
+subroutine OutputTecplotWriteHeaderSec(fid,realization_base,cell_string, &
                                  print_secondary_data,icolumn)
   !
   ! Print a header for secondary continuum data
@@ -2727,7 +2727,7 @@ subroutine WriteTecplotHeaderSec(fid,realization_base,cell_string, &
     end select
   endif
 
-end subroutine WriteTecplotHeaderSec
+end subroutine OutputTecplotWriteHeaderSec
 
 ! ************************************************************************** !
 !> This routine writes polyhedra unstructured grid elements.
@@ -2737,7 +2737,7 @@ end subroutine WriteTecplotHeaderSec
 !!
 !! date: 12/29/13
 ! ************************************************************************** !
-subroutine WriteTecplotPolyUGridElements(fid,realization_base)
+subroutine OutputTecplotWritePolyUGridElem(fid,realization_base)
 
   use Realization_Base_class, only : realization_base_type
   use Grid_module
@@ -2759,38 +2759,38 @@ subroutine WriteTecplotPolyUGridElements(fid,realization_base)
   option => realization_base%option
 
   write(fid,'(a)') '# number of vertices/nodes per face'
-  call WriteTecplotDataSetNumPerLine(fid, realization_base, &
+  call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
                       grid%unstructured_grid%polyhedra_grid%uface_nverts*1.d0, &
                       TECPLOT_INTEGER, &
                       grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
                       TEN_INTEGER)
 
   write(fid,'(a)') '# id of vertices/nodes forming a face'
-  call WriteTecplotDataSetNumPerLine(fid, realization_base, &
+  call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
                   grid%unstructured_grid%polyhedra_grid%uface_natvertids*1.d0, &
                   TECPLOT_INTEGER, &
                   grid%unstructured_grid%polyhedra_grid%num_verts_of_ufaces_local, &
                   FOUR_INTEGER)
 
   write(fid,'(a)') '# id of control-volume/element left of a face'
-  call WriteTecplotDataSetNumPerLine(fid, realization_base, &
+  call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
              grid%unstructured_grid%polyhedra_grid%uface_left_natcellids*1.d0, &
              TECPLOT_INTEGER, &
              grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
              TEN_INTEGER)
 
   write(fid,'(a)') '# id of control-volume/element right of a face'
-  call WriteTecplotDataSetNumPerLine(fid, realization_base, &
+  call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
             grid%unstructured_grid%polyhedra_grid%uface_right_natcellids*1.d0, &
             TECPLOT_INTEGER, &
             grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
             TEN_INTEGER)
 
-end subroutine WriteTecplotPolyUGridElements
+end subroutine OutputTecplotWritePolyUGridElem
 
 ! ************************************************************************** !
 
-subroutine OutputTecplotPrintRegions(realization_base)
+subroutine OutputTecplotWriteRegions(realization_base)
   !
   ! Prints out the number of connections to each cell in a region.
   !
@@ -2826,10 +2826,10 @@ subroutine OutputTecplotPrintRegions(realization_base)
     call VecRestoreArray(field%work,vec_ptr,ierr);CHKERRQ(ierr)
     word = 'REGION ' // trim(cur_region%name)
     string = 'region_' // trim(cur_region%name) // '.tec'
-    call OutputVectorTecplot(string,word,realization_base,field%work)
+    call OutputTecplotWriteVector(string,word,realization_base,field%work)
     cur_region => cur_region%next
   enddo
 
-end subroutine OutputTecplotPrintRegions
+end subroutine OutputTecplotWriteRegions
 
 end module Output_Tecplot_module

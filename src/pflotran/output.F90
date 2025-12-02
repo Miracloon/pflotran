@@ -1115,9 +1115,9 @@ subroutine Output(realization_base,snapshot_plot_flag, &
       call PetscLogEventBegin(logging%event_output_tecplot, &
                               ierr);CHKERRQ(ierr)
       if (realization_base%output_option%print_explicit_flowrate_hdf5) then
-        call OutputHDF5PrintExplicitFlowrates(realization_base)
+        call OutputHDF5WriteExplicitFlowrates(realization_base)
       else
-        call OutputPrintExplicitFlowrates(realization_base)
+        call OutputTecplotWriteExplFlowrates(realization_base)
       endif
       call PetscLogEventEnd(logging%event_output_tecplot,ierr);CHKERRQ(ierr)
       call PetscTime(tend,ierr);CHKERRQ(ierr)
@@ -1144,7 +1144,7 @@ subroutine Output(realization_base,snapshot_plot_flag, &
         call PetscTime(tstart,ierr);CHKERRQ(ierr)
         call PetscLogEventBegin(logging%event_output_secondary_tecplot, &
                                 ierr);CHKERRQ(ierr)
-        call OutputSecondaryContinuumTecplot(realization_base)
+        call OutputTecplotSecondaryContinuum(realization_base)
         call PetscLogEventEnd(logging%event_output_secondary_tecplot, &
                               ierr);CHKERRQ(ierr)
         call PetscTime(tend,ierr);CHKERRQ(ierr)
@@ -1977,7 +1977,7 @@ subroutine OutputPrintCouplers(realization_base,debug,istep)
         string = trim(string) // trim(option%group_prefix)
       endif
       string = trim(string) // '.tec'
-      call OutputVectorTecplot(string,word,realization_base,field%work)
+      call OutputTecplotWriteVector(string,word,realization_base,field%work)
     enddo
 
   enddo
@@ -2122,7 +2122,7 @@ subroutine OutputPrintCouplersH5(realization_base,debug,istep)
   call OutputXMFOpenFile(option,xmf_filename,OUTPUT_UNIT)
 
   if (Uninitialized(output_option%xmf_vert_len)) then
-    call DetermineNumVertices(realization_base,option)
+    call OutputHDF5DetermineNumVertices(realization_base,option)
   endif
 
   !TODO(geh): move conditional inside of OutputXMFHeader
@@ -2138,7 +2138,7 @@ subroutine OutputPrintCouplersH5(realization_base,debug,istep)
   ! create a group for the coordinates data set
   group_name = "Domain"
   call OutputH5OpenGroup(option,group_name,h5file_id,grp_id)
-  call WriteHDF5CoordinatesUGridXDMF(realization_base,option,grp_id)
+  call OutputHDF5WriteCoordUGridXDMF(realization_base,option,grp_id)
   call OutputH5CloseGroup(option,grp_id)
 
   group_name = '0 Time 0.'
@@ -2234,17 +2234,17 @@ subroutine OutputPrintRegions(realization_base,debug)
   type(debug_type) :: debug
 
   if (debug%print_regions_tec) then
-    call OutputTecplotPrintRegions(realization_base)
+    call OutputTecplotWriteRegions(realization_base)
   endif
 
   if (debug%print_regions_hdf5) then
     select case (realization_base%discretization%itype)
       case(STRUCTURED_GRID)
-        call OutputHDF5PrintRegionsStructured(realization_base)
+        call OutputHDF5WriteRegionsStructured(realization_base)
       case(UNSTRUCTURED_GRID)
         if (realization_base%discretization%grid%itype == &
             IMPLICIT_UNSTRUCTURED_GRID) then
-          call OutputHDF5PrintRegionsXMF(realization_base)
+          call OutputHDF5WriteRegionsXMF(realization_base)
         endif
     end select
   endif

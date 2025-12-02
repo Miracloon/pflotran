@@ -42,7 +42,7 @@ module Output_Common_module
 !            OutputXMFHeaderExplicit, &
 !            OutputXMFAttributeExplicit, &
             OutputGetExplicitIDsFlowrates, &
-            OutputGetExplicitAuxVars, &
+            OutputGetExplicitDensity, &
             OutputGetExplicitCellInfo, &
             OutputCollectVelocityOrFlux, &
             OutputCommonMapFlowFormulaWeight, &
@@ -1598,7 +1598,7 @@ end subroutine OutputGetExplicitFlowrates
 
 ! ************************************************************************** !
 
-subroutine OutputGetExplicitAuxVars(realization_base,count,vec_proc,density)
+subroutine OutputGetExplicitDensity(realization_base,count,vec_proc,density)
   !
   ! Calculates density at the face
   ! between a connection
@@ -1711,7 +1711,7 @@ subroutine OutputGetExplicitAuxVars(realization_base,count,vec_proc,density)
   call VecRestoreArray(vec_proc,vec_proc_ptr,ierr);CHKERRQ(ierr)
 
 
-end subroutine OutputGetExplicitAuxVars
+end subroutine OutputGetExplicitDensity
 
 ! ************************************************************************** !
 
