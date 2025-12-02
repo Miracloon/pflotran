@@ -47,6 +47,7 @@ module SCO2_Aux_module
   PetscBool, public :: sco2_stomp_fluxes = PETSC_TRUE
   PetscBool, public :: sco2_update_surface_tension = PETSC_FALSE
   PetscBool, public :: sco2_zero_rxn_source_w_no_gas = PETSC_FALSE
+  PetscReal, public :: sco2_vap_pres_lowering_pc_exp = UNINITIALIZED_DOUBLE
 
   ! Output Control
   PetscBool, public :: sco2_print_state_transition = PETSC_TRUE
@@ -1875,12 +1876,19 @@ subroutine SCO2VaporPressureBrine(T,P_sat,Pc,rho_kg,x_salt,P_vap,extended)
   mw_mix = x_salt*fmw_comp(3) + (1.d0-x_salt)*fmw_comp(1)
 
   if (Pc > epsilon) then
-    if (extended) then
-      P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * Pc / &
-              (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
+    if (sco2_vap_pres_lowering_pc_exp > UNINITIALIZED_DOUBLE) then
+      P_vap = P_sat * &
+              exp(-1.d0 *fmw_comp(1) * &
+                  (Pc ** sco2_vap_pres_lowering_pc_exp) / &
+                  (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
     else
-      P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * (Pc ** 1.25d0) / &
-              (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
+      if (extended) then
+        P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * Pc / &
+                (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
+      else
+        P_vap = P_sat * exp(-1.d0 *fmw_comp(1) * (Pc ** 1.25d0) / &
+                (rho_kg * IDEAL_GAS_CONSTANT * 1.d3 * T_k))
+      endif
     endif
   else
     P_vap = P_sat

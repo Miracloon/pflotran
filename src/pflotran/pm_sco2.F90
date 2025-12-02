@@ -366,6 +366,9 @@ subroutine PMSCO2ReadSimOptionsBlock(this,input)
         sco2_zero_rxn_source_w_no_gas = PETSC_TRUE
       case('UPDATE_SURFACE_TENSION')
         sco2_update_surface_tension = PETSC_TRUE
+      case('VAPOR_PRESSURE_LOWERING_PC_EXP')
+        call InputReadDouble(input,option,sco2_vap_pres_lowering_pc_exp)
+        call InputErrorMsg(input,option,keyword,error_string)
       case default
         call InputKeywordUnrecognized(input,keyword,'SCO2 Mode',option)
     end select
