@@ -2205,7 +2205,7 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
   PetscReal, pointer :: flowrates(:,:)
   PetscReal, pointer :: darcy(:), area(:)
   PetscInt, pointer :: nat_ids_up(:),nat_ids_dn(:)
-  PetscReal, pointer :: density(:)
+  PetscReal, pointer :: density_kg(:)
   Vec :: vec_proc
   PetscInt :: i, icell, num_cells
   PetscInt, pointer :: ids(:)
@@ -2231,7 +2231,7 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
                                      nat_ids_up,nat_ids_dn)
   call OutputGetExplicitFlowrates(realization_base,count,vec_proc,flowrates, &
                                   darcy,area)
-  call OutputGetExplicitDensity(realization_base,count,vec_proc,density)
+  call OutputGetExplicitDensity(realization_base,count,vec_proc,density_kg)
 
   if (OptionIsIORank(option)) then
     option%io_buffer = ' --> write rate output file: ' // &
@@ -2244,17 +2244,16 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
 1001 format(i10,1x)
 
  ! Order of printing for the 1st file
- ! id1 id2 darcy_vel[m/s] density[kg/m3]
+ ! id1 id2 darcy_vel[m/s] density_kg[kg/m3]
 
   write(string,*) option%myrank
   string = trim(filename) // '-rank' // trim(adjustl(string)) // '.dat'
   open(unit=OUTPUT_UNIT,file=trim(string),action="write")
   do i = 1, count
-    density(i) = density(i)*FMWH2O
     write(OUTPUT_UNIT,1001,advance='no') nat_ids_up(i)
     write(OUTPUT_UNIT,1001,advance='no') nat_ids_dn(i)
     write(OUTPUT_UNIT,1000,advance='no') darcy(i)
-    write(OUTPUT_UNIT,1000,advance='no') density(i)
+    write(OUTPUT_UNIT,1000,advance='no') density_kg(i)
     write(OUTPUT_UNIT,1000,advance='no') area(i)
     write(OUTPUT_UNIT,'(a)')
   enddo
@@ -2264,24 +2263,23 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
   deallocate(darcy)
   deallocate(nat_ids_up)
   deallocate(nat_ids_dn)
-  deallocate(density)
+  deallocate(density_kg)
   deallocate(area)
 
  ! Order of printing for the 2nd file
- ! cellid saturation porosity density[kg/m3] pressure[Pa]
+ ! cellid saturation porosity density_kg[kg/m3] pressure[Pa]
 
   call OutputGetExplicitCellInfo(realization_base,num_cells,ids,sat,por, &
-                                 density,pressure)
+                                 density_kg,pressure)
 
   write(string,*) option%myrank
   string = trim(filename2) // '-rank' // trim(adjustl(string)) // '.dat'
   open(unit=OUTPUT_UNIT,file=trim(string),action="write")
   do icell = 1, num_cells
-    density(icell) = density(icell)*FMWH2O
     write(OUTPUT_UNIT,1001,advance='no') ids(icell)
     write(OUTPUT_UNIT,1000,advance='no') sat(icell)
     write(OUTPUT_UNIT,1000,advance='no') por(icell)
-    write(OUTPUT_UNIT,1000,advance='no') density(icell)
+    write(OUTPUT_UNIT,1000,advance='no') density_kg(icell)
     write(OUTPUT_UNIT,1000,advance='no') pressure(icell)
     write(OUTPUT_UNIT,'(a)')
   enddo
@@ -2290,7 +2288,7 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
   deallocate(ids)
   deallocate(sat)
   deallocate(por)
-  deallocate(density)
+  deallocate(density_kg)
   deallocate(pressure)
 
 end subroutine OutputTecplotWriteExplFlowrates

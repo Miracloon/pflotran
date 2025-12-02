@@ -3804,7 +3804,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   PetscReal, pointer :: flowrates(:,:)
   PetscReal, pointer :: darcy(:), area(:)
   PetscInt, pointer :: nat_ids_up(:),nat_ids_dn(:)
-  PetscReal, pointer :: density(:)
+  PetscReal, pointer :: density_kg(:)
   Vec :: vec_proc
   PetscBool :: output_density
 
@@ -3833,7 +3833,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   call OutputGetExplicitFlowrates(realization_base,count,vec_proc,flowrates, &
                                   darcy,area)
   if (output_density) then
-    call OutputGetExplicitDensity(realization_base,count,vec_proc,density)
+    call OutputGetExplicitDensity(realization_base,count,vec_proc,density_kg)
   endif
 
   if (OptionIsIORank(option)) then
@@ -3861,7 +3861,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
                            "Flux", darcy, option)
   if (output_density) then
     call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
-                             "Density", density, option)
+                             "Density", density_kg, option)
   endif
   call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
                            "Area", area, option)
@@ -3874,7 +3874,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   call DeallocateArray(darcy)
   call DeallocateArray(nat_ids_up)
   call DeallocateArray(nat_ids_dn)
-  call DeallocateArray(density)
+  call DeallocateArray(density_kg)
   call DeallocateArray(area)
 
 end subroutine OutputHDF5WriteExplicitFlowrates

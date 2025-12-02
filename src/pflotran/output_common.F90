@@ -1598,7 +1598,8 @@ end subroutine OutputGetExplicitFlowrates
 
 ! ************************************************************************** !
 
-subroutine OutputGetExplicitDensity(realization_base,count,vec_proc,density)
+subroutine OutputGetExplicitDensity(realization_base,count,vec_proc, &
+                                    density_kg)
   !
   ! Calculates density at the face
   ! between a connection
@@ -1633,7 +1634,7 @@ subroutine OutputGetExplicitDensity(realization_base,count,vec_proc,density)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
 
   PetscReal, pointer :: vec_proc_ptr(:)
-  PetscReal, pointer :: density(:)
+  PetscReal, pointer :: density_kg(:)
   PetscInt :: iconn
   PetscErrorCode :: ierr
   PetscInt :: ghosted_id_up, ghosted_id_dn
@@ -1654,7 +1655,7 @@ subroutine OutputGetExplicitDensity(realization_base,count,vec_proc,density)
   material_parameter => patch%aux%Material%material_parameter
 
   is_flowing = PETSC_FALSE
-  allocate(density(count))
+  allocate(density_kg(count))
   call VecGetArray(vec_proc,vec_proc_ptr,ierr);CHKERRQ(ierr)
   connection_set_list => grid%internal_connection_set_list
   cur_connection_set => connection_set_list%first
@@ -1699,8 +1700,9 @@ subroutine OutputGetExplicitDensity(realization_base,count,vec_proc,density)
             upweight = 1.d0
           endif
 
-          density(count) = upweight*global_auxvar(ghosted_id_up)%den(1)+ &
-                  (1.D0 - upweight)*global_auxvar(ghosted_id_dn)%den(1)
+          density_kg(count) = &
+            upweight*global_auxvar(ghosted_id_up)%den_kg(1)+ &
+            (1.D0 - upweight)*global_auxvar(ghosted_id_dn)%den_kg(1)
         endif
       endif
 
@@ -1716,7 +1718,7 @@ end subroutine OutputGetExplicitDensity
 ! ************************************************************************** !
 
 subroutine OutputGetExplicitCellInfo(realization_base,num_cells,ids,sat,por, &
-                                     density,pressure)
+                                     density_kg,pressure)
   !
   ! Calculates porosity, saturation, density
   ! and pressure in a cell (explicit)
@@ -1745,7 +1747,7 @@ subroutine OutputGetExplicitCellInfo(realization_base,num_cells,ids,sat,por, &
   PetscInt :: num_cells
   PetscReal, pointer :: sat(:)
   PetscReal, pointer :: por(:)
-  PetscReal, pointer :: density(:)
+  PetscReal, pointer :: density_kg(:)
   PetscReal, pointer :: pressure(:)
   PetscInt, pointer :: ids(:)
   PetscInt :: local_id, ghosted_id
@@ -1760,7 +1762,7 @@ subroutine OutputGetExplicitCellInfo(realization_base,num_cells,ids,sat,por, &
   allocate(sat(num_cells))
   allocate(por(num_cells))
   allocate(ids(num_cells))
-  allocate(density(num_cells))
+  allocate(density_kg(num_cells))
   allocate(pressure(num_cells))
 
   do local_id = 1, num_cells
@@ -1768,7 +1770,7 @@ subroutine OutputGetExplicitCellInfo(realization_base,num_cells,ids,sat,por, &
     ids(local_id) = grid%nG2A(ghosted_id)
     sat(local_id) = global_auxvar(ghosted_id)%sat(1)
     por(local_id) = patch%aux%Material%auxvars(ghosted_id)%porosity
-    density(local_id) = global_auxvar(ghosted_id)%den(1)
+    density_kg(local_id) = global_auxvar(ghosted_id)%den_kg(1)
     pressure(local_id) = global_auxvar(ghosted_id)%pres(1)
   enddo
 
