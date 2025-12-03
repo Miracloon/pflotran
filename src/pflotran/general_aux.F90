@@ -714,12 +714,6 @@ subroutine GeneralAuxVarCompute(x,gen_auxvar,global_auxvar,material_auxvar, &
       gen_auxvar%temp = x(GENERAL_ENERGY_DOF)
 
       gen_auxvar%xmol(wid,lid) = 1.d0 - gen_auxvar%xmol(acid,lid)
-      ! with the gas state, we must calculate the mole fraction of air in
-      ! in the liquid phase, even though the liquid phase does not exist
-      ! due to air diffusion between neighboring GAS and LIQUID cells (this
-      ! is more of an issue on a boundary condition).  this is not
-      ! necessary for water since we do not calculate water diffusion
-      ! explicitly.  set mole fractions to zero in gas phase.
       gen_auxvar%xmol(:,gid) = 0.d0
       gen_auxvar%sat(lid) = 1.d0
       gen_auxvar%sat(gid) = 0.d0
