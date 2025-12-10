@@ -317,6 +317,7 @@ subroutine OutputAggregateToFile(realization_base)
   type(observation_type), pointer :: observation
   type(observation_aggregate_type), pointer :: aggregate
   PetscInt :: icolumn
+  PetscErrorCode :: ierr
 
   call PetscLogEventBegin(logging%event_output_observation_agg, &
                           ierr);CHKERRQ(ierr)
