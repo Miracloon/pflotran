@@ -171,12 +171,6 @@ subroutine PMCSubsurfaceSetupSolvers_TimestepperSNES(this)
     class is(pm_subsurface_flow_type)
       call PrintMsg(option,"  Beginning setup of FLOW SNES ")
       call SolverCreateSNES(solver,option%mycomm,'flow_',option)
-      if (solver%M_mat_type == MATAIJ .and. &
-          option%iflowmode /= RICHARDS_MODE) then
-        option%io_buffer = 'AIJ matrix not supported for current &
-          &mode: '// option%flowmode
-        call PrintErrMsg(option)
-      endif
       write(option%io_buffer,'(" number of dofs = ",i3,", number of &
                 &phases = ",i3,i2)') option%nflowdof,option%nphase
       call PrintMsg(option)

@@ -126,12 +126,6 @@ subroutine PMCGeomechanicsSetupSolvers(this)
   call KSPSetOptionsPrefix(solver%ksp,"geomech_",ierr);CHKERRQ(ierr)
   call SolverCheckCommandLine(solver)
 
-  if (solver%M_mat_type == MATAIJ) then
-    option%io_buffer = 'AIJ matrix not supported for geomechanics.'
-    call PrintErrMsg(option)
-  endif
-
-
   if (Uninitialized(solver%Mpre_mat_type) .and. &
       Uninitialized(solver%M_mat_type)) then
     ! Matrix types not specified, so set to default.
