@@ -777,8 +777,23 @@ subroutine PMERTSetupSolvers(this)
   call KSPSetOptionsPrefix(solver%ksp,"geop_",ierr);CHKERRQ(ierr)
   call SolverCheckCommandLine(solver)
 
-  solver%M_mat_type = MATAIJ
-  solver%Mpre_mat_type = MATAIJ
+  ! Default to MATAIJ (not MATBAIJ, the default in most other process models)
+  ! if the user has not specified otherwise.
+  if (Uninitialized(solver%Mpre_mat_type) .and. &
+      Uninitialized(solver%M_mat_type)) then
+        ! Matrix types not specified, so set to default.
+    solver%M_mat_type = MATAIJ
+    solver%Mpre_mat_type = MATAIJ
+  else if (Uninitialized(solver%Mpre_mat_type)) then
+    if (solver%M_mat_type == MATMFFD) then
+      solver%Mpre_mat_type = MATAIJ
+    else
+      solver%Mpre_mat_type = solver%M_mat_type
+    endif
+  else if (Uninitialized(solver%M_mat_type)) then
+    solver%M_mat_type = solver%Mpre_mat_type
+  endif
+
   call DiscretizationCreateMatrix(this%realization%discretization, &
                                   ONEDOF, &
                                   solver%Mpre_mat_type, &
