@@ -592,7 +592,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
      rt_sec_transport_vars => patch%aux%SC_RT%sec_transport_vars
   endif
 
-  if (reaction%immobile%nimmobile > 0 .and. reaction%print_total_mass_kg) then
+  if (reaction%immobile%nimmobile > 0 .and. reaction%print%total_mass_kg) then
     option%io_buffer = 'Conversion of moles to mass must be implemented &
       &for immobile species in reactive_transport.F90:RTComputeMassBalance'
     call PrintErrMsg(option)
@@ -658,7 +658,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
           reaction%mineral%kinmnrlstoich(i,imnrl) * tempreal
       enddo
       sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) + tempreal
-      if (reaction%print_total_mass_kg) then
+      if (reaction%print%total_mass_kg) then
         sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) * &
           reaction%mineral%kinmnrl_molar_wt(imnrl) * 1.d-3
       endif
@@ -668,7 +668,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
     do i = 1, reaction%immobile%nimmobile
       sum_mol_by_im(i) = sum_mol_by_im(i) + &
           rt_auxvars(ghosted_id)%immobile(i) * volume
-      if (reaction%print_total_mass_kg) then
+      if (reaction%print%total_mass_kg) then
         sum_mol_by_im(i) = sum_mol_by_im(i) * &
           reaction%immobile%list%molar_weight
       endif
@@ -688,7 +688,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
           ! m^3 gas
           (1.d0-liquid_saturation) * porosity * volume
       enddo
-      if (reaction%print_total_mass_kg) then
+      if (reaction%print%total_mass_kg) then
          sum_mol_by_gas(1:reaction%gas%nactive_gas) = &
            sum_mol_by_gas(1:reaction%gas%nactive_gas) * &
                                   ! 1.d-3 to convert g -> kg
@@ -742,7 +742,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
                        reaction%mineral%kinmnrlstoich(i,imnrl) * tempreal
                 enddo
                 sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) + tempreal
-                if (reaction%print_total_mass_kg) then
+                if (reaction%print%total_mass_kg) then
                   sum_mol_by_mnrl(imnrl) = sum_mol_by_mnrl(imnrl) * &
                        reaction%mineral%kinmnrl_molar_wt(imnrl) * 1.d-3
                 endif
@@ -751,7 +751,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
               ! immobile
               do i = 1, reaction%immobile%nimmobile
                 sum_mol_by_im(i) = sum_mol_by_im(i) + rtsec%immobile(i) * (Vsec*wj)
-                if (reaction%print_total_mass_kg) then
+                if (reaction%print%total_mass_kg) then
                   sum_mol_by_im(i) = sum_mol_by_im(i) * &
                        reaction%immobile%list%molar_weight * 1.d-3
                 endif
@@ -777,7 +777,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
     endif
   enddo
 
-  if (reaction%print_total_mass_kg) then
+  if (reaction%print%total_mass_kg) then
     ! [mol] * [g/mol] * [kg/g] = [kg]
     sum_mol_aq(1:naqcomp) = sum_mol_aq(1:naqcomp) * &
       reaction%primary_spec_molar_wt(:) * 1.d-3

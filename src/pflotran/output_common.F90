@@ -2173,7 +2173,7 @@ subroutine OutputCommonGlobalMassHeader(realization_base,fid,icol, &
         do i=1,reaction%naqcomp
           if (reaction%primary_species_print(i)) then
             string = 'Global ' // trim(reaction%primary_species_names(i))
-            if (reaction%print_total_mass_kg) then
+            if (reaction%print%total_mass_kg) then
               call OutputWriteToHeader(fid,string,'kg','',icol)
             else
               call OutputWriteToHeader(fid,string,'mol','',icol)
@@ -2184,7 +2184,7 @@ subroutine OutputCommonGlobalMassHeader(realization_base,fid,icol, &
         do i=1,reaction%immobile%nimmobile
           if (reaction%immobile%print_me(i)) then
             string = 'Global ' // trim(reaction%immobile%names(i))
-            if (reaction%print_total_mass_kg) then
+            if (reaction%print%total_mass_kg) then
               call OutputWriteToHeader(fid,string,'kg','',icol)
             else
               call OutputWriteToHeader(fid,string,'mol','',icol)
@@ -2195,7 +2195,7 @@ subroutine OutputCommonGlobalMassHeader(realization_base,fid,icol, &
         do i=1,reaction%gas%nactive_gas
           if (reaction%gas%active_print_me(i)) then
             string = 'Global ' // trim(reaction%gas%active_names(i))
-            if (reaction%print_total_mass_kg) then
+            if (reaction%print%total_mass_kg) then
               call OutputWriteToHeader(fid,string,'kg','',icol)
             else
               call OutputWriteToHeader(fid,string,'mol','',icol)
@@ -2207,7 +2207,7 @@ subroutine OutputCommonGlobalMassHeader(realization_base,fid,icol, &
           do i=1,reaction%mineral%nkinmnrl
             if (reaction%mineral%kinmnrl_print(i)) then
               string = 'Global ' // trim(reaction%mineral%kinmnrl_names(i))
-              if (reaction%print_total_mass_kg) then
+              if (reaction%print%total_mass_kg) then
                 call OutputWriteToHeader(fid,string,'kg','',icol)
               else
                 call OutputWriteToHeader(fid,string,'mol','',icol)

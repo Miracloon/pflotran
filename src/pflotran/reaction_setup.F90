@@ -1325,14 +1325,14 @@ subroutine ReactionSetupPrimaryPrint(reaction,option)
   do
     if (.not.associated(cur_pri_aq_spec)) exit
     reaction%primary_species_print(ispec) = cur_pri_aq_spec%print_me .or. &
-                                            reaction%print_all_primary_species
+                                            reaction%print%all_primary_species
     reaction%kd_print(ispec) = (cur_pri_aq_spec%print_me .or. &
-                                reaction%print_all_primary_species) .and. &
-                                reaction%print_kd
+                                reaction%print%all_primary_species) .and. &
+                                reaction%print%kd
     if (reaction%nsorb > 0) then
       reaction%total_sorb_print(ispec) = (cur_pri_aq_spec%print_me .or. &
-                                  reaction%print_all_primary_species) .and. &
-                                  reaction%print_total_sorb
+                                  reaction%print%all_primary_species) .and. &
+                                  reaction%print%total_sorb
     endif
     ispec = ispec + 1
     cur_pri_aq_spec => cur_pri_aq_spec%next

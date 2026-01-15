@@ -921,25 +921,25 @@ subroutine ReactionReadPass1(reaction,input,option)
                    reaction%surface_complexation%nkinmrsrfcplxrxn + &
                    reaction%surface_complexation%nkinsrfcplxrxn
 
-  if (Uninitialized(reaction%print_free_conc_type)) then
+  if (Uninitialized(reaction%print%free_conc_type)) then
     if (reaction%initialize_with_molality) then
-      reaction%print_free_conc_type = PRIMARY_MOLALITY
+      reaction%print%free_conc_type = PRIMARY_MOLALITY
     else
-      reaction%print_free_conc_type = PRIMARY_MOLARITY
+      reaction%print%free_conc_type = PRIMARY_MOLARITY
     endif
   endif
-  if (Uninitialized(reaction%print_tot_conc_type)) then
+  if (Uninitialized(reaction%print%tot_conc_type)) then
     if (reaction%initialize_with_molality) then
-      reaction%print_tot_conc_type = TOTAL_MOLALITY
+      reaction%print%tot_conc_type = TOTAL_MOLALITY
     else
-      reaction%print_tot_conc_type = TOTAL_MOLARITY
+      reaction%print%tot_conc_type = TOTAL_MOLARITY
     endif
   endif
-  if (Uninitialized(reaction%print_secondary_conc_type)) then
+  if (Uninitialized(reaction%print%secondary_conc_type)) then
     if (reaction%initialize_with_molality) then
-      reaction%print_secondary_conc_type = SECONDARY_MOLALITY
+      reaction%print%secondary_conc_type = SECONDARY_MOLALITY
     else
-      reaction%print_secondary_conc_type = SECONDARY_MOLARITY
+      reaction%print%secondary_conc_type = SECONDARY_MOLARITY
     endif
   endif
   if (reaction%neqcplx + reaction%nsorb + reaction%mineral%nmnrl + &
@@ -2545,7 +2545,7 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
                                 reaction%eqcplx_logK(icplx)
     enddo
 
-    if (reaction%print_verbose_constraints) then
+    if (reaction%print%verbose_constraints) then
       !print speciation precentages
       write(option%fid_out,92)
       92 format(/)
@@ -2846,7 +2846,7 @@ subroutine ReactionPrintConstraint(global_auxvar,rt_auxvar, &
                                 mineral_reaction%mnrl_logK(i)
     enddo
 
-    if (reaction%print_verbose_constraints) then
+    if (reaction%print%verbose_constraints) then
       write(option%fid_out,92)
       137 format(2x,'minerals                              log SI')
       138 format(2x,a30,2x,f12.4)
@@ -3218,35 +3218,35 @@ subroutine ReactionReadOutput(reaction,input,option)
     select case(keyword)
       case('OFF')
         do_not_print_anything = PETSC_TRUE
-        reaction%print_all_species = PETSC_FALSE
-        reaction%print_all_primary_species = PETSC_FALSE
-        reaction%print_all_secondary_species = PETSC_FALSE
+        reaction%print%all_species = PETSC_FALSE
+        reaction%print%all_primary_species = PETSC_FALSE
+        reaction%print%all_secondary_species = PETSC_FALSE
         reaction%gas%print_all = PETSC_FALSE
         reaction%mineral%print_all = PETSC_FALSE
-        reaction%print_pH = PETSC_FALSE
-        reaction%print_Eh = PETSC_FALSE
-        reaction%print_pe = PETSC_FALSE
-        reaction%print_O2 = PETSC_FALSE
-        reaction%print_kd = PETSC_FALSE
-        reaction%print_total_sorb = PETSC_FALSE
-        reaction%print_total_sorb_mobile = PETSC_FALSE
-        reaction%print_h2o_act_coef = PETSC_FALSE
-        reaction%print_act_coefs = PETSC_FALSE
-        reaction%print_total_component = PETSC_FALSE
-        reaction%print_free_ion = PETSC_FALSE
+        reaction%print%pH = PETSC_FALSE
+        reaction%print%Eh = PETSC_FALSE
+        reaction%print%pe = PETSC_FALSE
+        reaction%print%O2 = PETSC_FALSE
+        reaction%print%kd = PETSC_FALSE
+        reaction%print%total_sorb = PETSC_FALSE
+        reaction%print%total_sorb_mobile = PETSC_FALSE
+        reaction%print%h2o_act_coef = PETSC_FALSE
+        reaction%print%act_coefs = PETSC_FALSE
+        reaction%print%total_component = PETSC_FALSE
+        reaction%print%free_ion = PETSC_FALSE
       case('ALL')
         print_something = PETSC_TRUE
-        reaction%print_all_species = PETSC_TRUE
-        reaction%print_all_primary_species = PETSC_TRUE
- !       reaction%print_all_secondary_species = PETSC_TRUE
+        reaction%print%all_species = PETSC_TRUE
+        reaction%print%all_primary_species = PETSC_TRUE
+ !       reaction%print%all_secondary_species = PETSC_TRUE
  !       reaction%gas%print_all = PETSC_TRUE
         reaction%mineral%print_all = PETSC_TRUE
         reaction%immobile%print_all = PETSC_TRUE
-!        reaction%print_pH = PETSC_TRUE
+!        reaction%print%pH = PETSC_TRUE
       case('PRIMARY_SPECIES')
         print_something = PETSC_TRUE
-        reaction%print_all_primary_species = PETSC_TRUE
-!        reaction%print_pH = PETSC_TRUE
+        reaction%print%all_primary_species = PETSC_TRUE
+!        reaction%print%pH = PETSC_TRUE
       case('GASES')
         print_something = PETSC_TRUE
         reaction%gas%print_all = PETSC_TRUE
@@ -3273,31 +3273,31 @@ subroutine ReactionReadOutput(reaction,input,option)
         reaction%immobile%print_all = PETSC_TRUE
       case('PH')
         print_something = PETSC_TRUE
-        reaction%print_pH = PETSC_TRUE
+        reaction%print%pH = PETSC_TRUE
       case('IONIC_STRENGTH')
         print_something = PETSC_TRUE
-        reaction%print_ionic_strength = PETSC_TRUE
+        reaction%print%ionic_strength = PETSC_TRUE
       case('EH')
         print_something = PETSC_TRUE
-        reaction%print_Eh = PETSC_TRUE
+        reaction%print%Eh = PETSC_TRUE
       case('PE')
         print_something = PETSC_TRUE
-        reaction%print_pe = PETSC_TRUE
+        reaction%print%pe = PETSC_TRUE
       case('O2')
         print_something = PETSC_TRUE
-        reaction%print_O2 = PETSC_TRUE
+        reaction%print%O2 = PETSC_TRUE
       case('KD')
         print_something = PETSC_TRUE
-        reaction%print_kd = PETSC_TRUE
+        reaction%print%kd = PETSC_TRUE
       case('TOTAL_SORBED')
         print_something = PETSC_TRUE
-        reaction%print_total_sorb = PETSC_TRUE
+        reaction%print%total_sorb = PETSC_TRUE
       case('TOTAL_BULK')
         print_something = PETSC_TRUE
-        reaction%print_total_bulk = PETSC_TRUE
+        reaction%print%total_bulk = PETSC_TRUE
       case('TOTAL_SORBED_MOBILE')
         print_something = PETSC_TRUE
-        reaction%print_total_sorb_mobile = PETSC_TRUE
+        reaction%print%total_sorb_mobile = PETSC_TRUE
       case('FREE_ION','TOTAL','SECONDARY_SPECIES')
         call InputReadWord(input,option,word,PETSC_TRUE)
         ! optional concentration type
@@ -3316,34 +3316,34 @@ subroutine ReactionReadOutput(reaction,input,option)
         endif
         select case(keyword)
           case('FREE_ION')
-            reaction%print_free_ion = PETSC_TRUE
+            reaction%print%free_ion = PETSC_TRUE
             if (Initialized(conc_type)) then
-              reaction%print_free_conc_type = conc_type
+              reaction%print%free_conc_type = conc_type
             endif
           case('TOTAL')
-            reaction%print_total_component = PETSC_TRUE
+            reaction%print%total_component = PETSC_TRUE
             if (Initialized(conc_type)) then
-              reaction%print_tot_conc_type = conc_type
+              reaction%print%tot_conc_type = conc_type
             endif
           case('SECONDARY_SPECIES')
             print_something = PETSC_TRUE
-            reaction%print_all_secondary_species = PETSC_TRUE
+            reaction%print%all_secondary_species = PETSC_TRUE
             if (Initialized(conc_type)) then
-              reaction%print_secondary_conc_type = conc_type
+              reaction%print%secondary_conc_type = conc_type
             endif
         end select
       case('WATER_ACTIVITY_COEFFICIENT')
         print_something = PETSC_TRUE
-        reaction%print_h2o_act_coef = PETSC_TRUE
+        reaction%print%h2o_act_coef = PETSC_TRUE
       case('ACTIVITY_COEFFICIENTS')
         print_something = PETSC_TRUE
-        reaction%print_act_coefs = PETSC_TRUE
+        reaction%print%act_coefs = PETSC_TRUE
       case('MOLARITY')
-        reaction%print_free_conc_type = PRIMARY_MOLARITY
-        reaction%print_tot_conc_type = TOTAL_MOLARITY
+        reaction%print%free_conc_type = PRIMARY_MOLARITY
+        reaction%print%tot_conc_type = TOTAL_MOLARITY
       case('MOLALITY')
-        reaction%print_free_conc_type = PRIMARY_MOLALITY
-        reaction%print_tot_conc_type = TOTAL_MOLALITY
+        reaction%print%free_conc_type = PRIMARY_MOLALITY
+        reaction%print%tot_conc_type = TOTAL_MOLALITY
       case('GAS_PARTIAL_PRESSURE')
         print_something = PETSC_TRUE
         reaction%gas%print_partial_pressure = PETSC_TRUE
@@ -3352,18 +3352,18 @@ subroutine ReactionReadOutput(reaction,input,option)
         reaction%gas%print_concentration = PETSC_TRUE
       case('AGE')
         print_something = PETSC_TRUE
-        reaction%print_age = PETSC_TRUE
+        reaction%print%age = PETSC_TRUE
       case('AUXILIARY')
-        reaction%print_auxiliary = PETSC_TRUE
+        reaction%print%auxiliary = PETSC_TRUE
       case('PRINT_VERBOSE_CONSTRAINTS')
-        reaction%print_verbose_constraints = PETSC_TRUE
+        reaction%print%verbose_constraints = PETSC_TRUE
       case('PRINT_TOTAL_MASS_KG')
         if (.not.reaction%read_reaction_database) then
           option%io_buffer = 'FORCE_READ_REACTION_DATABASE must be specified &
                               &when using PRINT_TOTAL_MASS_KG'
           call PrintErrMsg(option)
         endif
-          reaction%print_total_mass_kg = PETSC_TRUE
+          reaction%print%total_mass_kg = PETSC_TRUE
       case ('SITE_DENSITY')
         call InputReadWord(input,option,name,PETSC_TRUE)
         call InputErrorMsg(input,option,'Site Name', &
@@ -3511,10 +3511,10 @@ subroutine ReactionReadOutput(reaction,input,option)
     cur_aq_spec => cur_aq_spec%next
   enddo
 
-  if ((found .or. reaction%print_all_primary_species .or. &
-       reaction%print_all_species) .and. &
-      .not.(reaction%print_total_component .or. &
-            reaction%print_free_ion)) then
+  if ((found .or. reaction%print%all_primary_species .or. &
+       reaction%print%all_species) .and. &
+      .not.(reaction%print%total_component .or. &
+            reaction%print%free_ion)) then
     option%io_buffer = 'FREE_ION or TOTAL must be specified to print a &
       &primary species.'
     call PrintErrMsg(option)
@@ -4615,9 +4615,6 @@ function RIonicStrength(rt_auxvar,reaction)
   ! Author: Glenn Hammond
   ! Date: 10/20/25
   !
-
-  use Option_module
-
   implicit none
 
   type(reactive_transport_auxvar_type) :: rt_auxvar
@@ -6110,56 +6107,56 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
   character(len=2) :: free_mol_char, tot_mol_char, sec_mol_char
   PetscInt :: i
 
-  if (reaction%print_free_conc_type == PRIMARY_MOLALITY) then
+  if (reaction%print%free_conc_type == PRIMARY_MOLALITY) then
     free_mol_char = 'm'
   else
     free_mol_char = 'M'
   endif
 
-  if (reaction%print_tot_conc_type == TOTAL_MOLALITY) then
+  if (reaction%print%tot_conc_type == TOTAL_MOLALITY) then
     tot_mol_char = 'm'
   else
     tot_mol_char = 'M'
   endif
 
-  if (reaction%print_secondary_conc_type == SECONDARY_MOLALITY) then
+  if (reaction%print%secondary_conc_type == SECONDARY_MOLALITY) then
     sec_mol_char = 'm'
   else
     sec_mol_char = 'M'
   endif
 
   if (associated(reaction%species_idx)) then
-    if ((reaction%print_pH .or. reaction%print_EH .or. &
-         reaction%print_pe) .and. reaction%species_idx%h_ion_id == 0) then
+    if ((reaction%print%pH .or. reaction%print%EH .or. &
+         reaction%print%pe) .and. reaction%species_idx%h_ion_id == 0) then
       option%io_buffer = 'pH, Eh or pe may not be printed when H+ &
           &is not defined as a species.'
       call PrintErrMsg(option)
     endif
-    if ((reaction%print_EH .or. reaction%print_pe .or. &
-         reaction%print_O2) .and. reaction%species_idx%pas_o2_gas_id == 0) then
+    if ((reaction%print%EH .or. reaction%print%pe .or. &
+         reaction%print%O2) .and. reaction%species_idx%pas_o2_gas_id == 0) then
       option%io_buffer = 'logfO2, Eh or pe may not be printed when O2(g) &
           &is not defined as a species.'
       call PrintErrMsg(option)
     endif
-    if (reaction%print_pH) then
+    if (reaction%print%pH) then
       name = 'pH'
       units = ''
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units,PH, &
                                   reaction%species_idx%h_ion_id)
     endif
-    if (reaction%print_EH) then
+    if (reaction%print%EH) then
       name = 'Eh'
       units = 'V'
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units,EH, &
                                   reaction%species_idx%h_ion_id)
     endif
-    if (reaction%print_pe) then
+    if (reaction%print%pe) then
       name = 'pe'
       units = ''
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units,PE, &
                                   reaction%species_idx%h_ion_id)
     endif
-    if (reaction%print_O2) then
+    if (reaction%print%O2) then
       name = 'logfO2'
       units = 'bars'
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units,O2, &
@@ -6167,24 +6164,24 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     endif
   endif
 
-  if (reaction%print_total_component) then
+  if (reaction%print%total_component) then
     do i=1,reaction%naqcomp
       if (reaction%primary_species_print(i)) then
         name = 'Total ' // trim(reaction%primary_species_names(i))
         units = trim(tot_mol_char)
         call OutputVariableAddToList(list,name,OUTPUT_CONCENTRATION,units, &
-                                     reaction%print_tot_conc_type,i)
+                                     reaction%print%tot_conc_type,i)
       endif
     enddo
   endif
 
-  if (reaction%print_free_ion) then
+  if (reaction%print%free_ion) then
     do i=1,reaction%naqcomp
       if (reaction%primary_species_print(i)) then
         name = 'Free ' // trim(reaction%primary_species_names(i))
         units = trim(free_mol_char)
         call OutputVariableAddToList(list,name,OUTPUT_CONCENTRATION,units, &
-                                      reaction%print_free_conc_type,i)
+                                      reaction%print%free_conc_type,i)
       endif
     enddo
   endif
@@ -6238,7 +6235,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     enddo
   endif
 
-  if (reaction%print_total_bulk) then
+  if (reaction%print%total_bulk) then
     do i=1,reaction%naqcomp
       if (reaction%primary_species_print(i)) then
         name = 'Total Bulk ' // trim(reaction%primary_species_names(i))
@@ -6249,14 +6246,14 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     enddo
   endif
 
-  if (reaction%print_h2o_act_coef) then
+  if (reaction%print%h2o_act_coef) then
     name = 'Gamma H2O'
     units = ''
     call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                  WATER_ACTIVITY_COEFFICIENT)
   endif
 
-  if (reaction%print_act_coefs) then
+  if (reaction%print%act_coefs) then
     do i=1,reaction%naqcomp
       if (reaction%primary_species_print(i)) then
         name = 'Gamma ' // trim(reaction%primary_species_names(i))
@@ -6272,7 +6269,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
       name = trim(reaction%secondary_species_names(i))
       units = trim(sec_mol_char)
       call OutputVariableAddToList(list,name,OUTPUT_CONCENTRATION,units, &
-                                   reaction%print_secondary_conc_type,i)
+                                   reaction%print%secondary_conc_type,i)
     endif
   enddo
 
@@ -6411,7 +6408,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     enddo
   endif
 
-  if (reaction%print_age) then
+  if (reaction%print%age) then
     if (reaction%species_idx%tracer_age_id > 0) then
       name = 'Tracer Age'
       units = trim(time_unit) // '-molar'
@@ -6421,14 +6418,14 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     endif
   endif
 
-  if (reaction%print_ionic_strength) then
+  if (reaction%print%ionic_strength) then
     name = 'Ionic Strength'
     units = ''
     call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                  IONIC_STRENGTH)
   endif
 
-  if (reaction%print_auxiliary) then
+  if (reaction%print%auxiliary) then
     call RSandboxAuxiliaryPlotVariables(list,reaction,option)
   endif
 

@@ -1617,14 +1617,14 @@ subroutine ReactionDBInitBasis(reaction,option)
     reaction%primary_spec_molar_wt(ispec) = cur_pri_aq_spec%molar_weight
     reaction%primary_spec_a0(ispec) = cur_pri_aq_spec%a0
     reaction%primary_species_print(ispec) = cur_pri_aq_spec%print_me .or. &
-                                            reaction%print_all_primary_species
+                                            reaction%print%all_primary_species
     reaction%kd_print(ispec) = (cur_pri_aq_spec%print_me .or. &
-                                reaction%print_all_primary_species) .and. &
-                                reaction%print_kd
+                                reaction%print%all_primary_species) .and. &
+                                reaction%print%kd
     if (reaction%nsorb > 0) then
       reaction%total_sorb_print(ispec) = (cur_pri_aq_spec%print_me .or. &
-                                  reaction%print_all_primary_species) .and. &
-                                  reaction%print_total_sorb
+                                  reaction%print%all_primary_species) .and. &
+                                  reaction%print%total_sorb
     endif
     ispec = ispec + 1
     cur_pri_aq_spec => cur_pri_aq_spec%next
@@ -1702,7 +1702,7 @@ subroutine ReactionDBInitBasis(reaction,option)
       reaction%secondary_species_names(isec_spec) = &
         cur_sec_aq_spec%name
       reaction%secondary_species_print(isec_spec) = &
-        (cur_sec_aq_spec%print_me .or. reaction%print_all_secondary_species)
+        (cur_sec_aq_spec%print_me .or. reaction%print%all_secondary_species)
       ispec = 0
       do i = 1, cur_sec_aq_spec%dbaserxn%reaction_equation%nspec
 
@@ -2690,7 +2690,7 @@ subroutine ReactionDBInitBasis(reaction,option)
       !     data structure and print flag.
       if (surface_complexation%neqsrfcplxrxn > 0) then
         surface_complexation%srfcplx_print(isrfcplx) = &
-          cur_srfcplx%print_me .or. reaction%print_all_species
+          cur_srfcplx%print_me .or. reaction%print%all_species
       endif
       surface_complexation%srfcplx_free_site_stoich(isrfcplx) =  &
         cur_srfcplx%free_site_stoich
@@ -2947,10 +2947,10 @@ subroutine ReactionDBInitBasis(reaction,option)
         cur_srfcplx_rxn%free_site_name
       surface_complexation%srfcplxrxn_site_print(irxn) = &
                                   cur_srfcplx_rxn%free_site_print_me .or. &
-                                  reaction%print_all_species
+                                  reaction%print%all_species
       surface_complexation%srfcplxrxn_site_density_print(irxn) = &
                                 cur_srfcplx_rxn%site_density_print_me .or. &
-                                reaction%print_all_species
+                                reaction%print%all_species
       surface_complexation%srfcplxrxn_surf_type(irxn) = &
         cur_srfcplx_rxn%surface_itype
       select case(cur_srfcplx_rxn%surface_itype)

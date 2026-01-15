@@ -117,45 +117,50 @@ module Reaction_Aux_module
     PetscReal, pointer :: conc(:)
   end type guess_constraint_type
 
+  type, public :: rt_print_type
+    PetscBool :: all_species
+    PetscBool :: all_primary_species
+    PetscBool :: all_secondary_species
+    PetscBool :: pH
+    PetscBool :: Eh
+    PetscBool :: pe
+    PetscBool :: O2
+    PetscBool :: kd
+    PetscBool :: total_sorb
+    PetscBool :: total_sorb_mobile
+    PetscBool :: h2o_act_coef
+    PetscBool :: act_coefs
+    PetscBool :: total_component
+    PetscBool :: free_ion
+    PetscBool :: total_bulk ! total in aq and sorbed phases
+    PetscBool :: total_mass_kg
+    PetscBool :: age
+    PetscBool :: ionic_strength
+    PetscBool :: auxiliary
+    PetscBool :: verbose_constraints
+    PetscInt :: free_conc_type
+    PetscInt :: tot_conc_type
+    PetscInt :: secondary_conc_type
+    PetscInt :: electrical_conductivity_type
+  end type rt_print_type
+
   type, public, extends(reaction_base_type) :: reaction_rt_type
     character(len=MAXSTRINGLENGTH) :: database_filename
     PetscBool :: read_reaction_database
     PetscReal :: truncated_concentration
     PetscBool :: check_update
-    PetscBool :: print_all_species
-    PetscBool :: print_all_primary_species
-    PetscBool :: print_all_secondary_species
-    PetscBool :: print_pH
-    PetscBool :: print_Eh
-    PetscBool :: print_pe
-    PetscBool :: print_O2
-    PetscBool :: print_kd
-    PetscBool :: print_total_sorb
-    PetscBool :: print_total_sorb_mobile
-    PetscBool :: print_h2o_act_coef
-    PetscBool :: print_act_coefs
-    PetscBool :: print_total_component
-    PetscBool :: print_free_ion
-    PetscBool :: print_total_bulk ! total in aq and sorbed phases
     PetscBool :: initialize_with_molality
-    PetscBool :: print_age
-    PetscBool :: print_ionic_strength
-    PetscBool :: print_auxiliary
-    PetscBool :: print_verbose_constraints
     PetscBool :: use_geothermal_hpt
-    PetscInt :: print_free_conc_type
-    PetscInt :: print_tot_conc_type
-    PetscInt :: print_secondary_conc_type
-    PetscBool :: print_total_mass_kg
     PetscInt :: num_dbase_temperatures
     PetscInt :: num_dbase_parameters
-
     PetscInt :: logging_verbosity
     PetscInt :: maximum_reaction_cuts
     PetscInt :: maximum_reaction_iterations
     PetscInt :: io_rank
     PetscBool :: stop_on_rreact_failure
     PetscBool :: use_total_as_guess
+
+    type(rt_print_type), pointer :: print
 
     PetscReal, pointer :: dbase_temperatures(:)
     type(species_idx_type), pointer :: species_idx
@@ -375,38 +380,41 @@ function ReactionAuxCreateAux()
   reaction%act_coef_update_frequency = ACT_COEF_FREQUENCY_OFF
   reaction%act_coef_update_algorithm = ACT_COEF_ALGORITHM_LAG
   reaction%checkpoint_activity_coefs = PETSC_TRUE
-  reaction%print_all_species = PETSC_FALSE
-  reaction%print_all_primary_species = PETSC_FALSE
-  reaction%print_all_secondary_species = PETSC_FALSE
-  reaction%print_pH = PETSC_FALSE
-  reaction%print_Eh = PETSC_FALSE
-  reaction%print_pe = PETSC_FALSE
-  reaction%print_O2 = PETSC_FALSE
-  reaction%print_kd = PETSC_FALSE
-  reaction%print_total_sorb = PETSC_FALSE
-  reaction%print_total_sorb_mobile = PETSC_FALSE
-  reaction%print_h2o_act_coef = PETSC_FALSE
-  reaction%print_act_coefs = PETSC_FALSE
   reaction%truncated_concentration = UNINITIALIZED_DOUBLE
   reaction%check_update = PETSC_TRUE
   reaction%read_reaction_database = PETSC_FALSE
   reaction%use_activity_h2o = PETSC_FALSE
   reaction%calculate_tracer_age = PETSC_FALSE
   reaction%calculate_water_age = PETSC_FALSE
-  reaction%print_age = PETSC_FALSE
-  reaction%print_ionic_strength = PETSC_FALSE
-  reaction%print_auxiliary = PETSC_FALSE
-  reaction%print_verbose_constraints = PETSC_FALSE
-  reaction%print_total_component = PETSC_FALSE
-  reaction%print_free_ion = PETSC_FALSE
-  reaction%print_total_bulk = PETSC_FALSE
   reaction%use_geothermal_hpt = PETSC_FALSE
-  reaction%print_total_mass_kg = PETSC_FALSE
 
   reaction%initialize_with_molality = PETSC_FALSE
-  reaction%print_free_conc_type = UNINITIALIZED_INTEGER
-  reaction%print_tot_conc_type = UNINITIALIZED_INTEGER
-  reaction%print_secondary_conc_type = UNINITIALIZED_INTEGER
+
+  allocate(reaction%print)
+  reaction%print%all_species = PETSC_FALSE
+  reaction%print%all_primary_species = PETSC_FALSE
+  reaction%print%all_secondary_species = PETSC_FALSE
+  reaction%print%pH = PETSC_FALSE
+  reaction%print%Eh = PETSC_FALSE
+  reaction%print%pe = PETSC_FALSE
+  reaction%print%O2 = PETSC_FALSE
+  reaction%print%kd = PETSC_FALSE
+  reaction%print%total_sorb = PETSC_FALSE
+  reaction%print%total_sorb_mobile = PETSC_FALSE
+  reaction%print%total_mass_kg = PETSC_FALSE
+  reaction%print%h2o_act_coef = PETSC_FALSE
+  reaction%print%act_coefs = PETSC_FALSE
+  reaction%print%age = PETSC_FALSE
+  reaction%print%ionic_strength = PETSC_FALSE
+  reaction%print%auxiliary = PETSC_FALSE
+  reaction%print%verbose_constraints = PETSC_FALSE
+  reaction%print%total_component = PETSC_FALSE
+  reaction%print%free_ion = PETSC_FALSE
+  reaction%print%total_bulk = PETSC_FALSE
+  reaction%print%free_conc_type = UNINITIALIZED_INTEGER
+  reaction%print%tot_conc_type = UNINITIALIZED_INTEGER
+  reaction%print%secondary_conc_type = UNINITIALIZED_INTEGER
+  reaction%print%electrical_conductivity_type = UNINITIALIZED_INTEGER
 
   reaction%logging_verbosity = 0
   reaction%maximum_reaction_cuts = 10
@@ -1875,6 +1883,8 @@ subroutine ReactionAuxDestroyAux(reaction,option)
   if (.not.associated(reaction)) return
 
   call ReactionBaseStrip(reaction)
+  if (associated(reaction%print)) deallocate(reaction%print)
+  nullify(reaction%print)
 
   !species index
   call ReactionAuxDestroyAqSpeciesIndex(reaction%species_idx)
