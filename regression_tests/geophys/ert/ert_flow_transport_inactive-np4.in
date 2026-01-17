@@ -13,10 +13,9 @@ SIMULATION
       MODE ERT
       OPTIONS
         COMPUTE_JACOBIAN
-        CALC_MAX_TRACER_CONCENTRATION
+        CALC_FLUID_COND_FROM_CHEMISTRY
         SURVEY_TIMES h 2.7778d-4 6.d0 12.d0 24.d0 # 2.778d-4 ~= 1 second
         OUTPUT_ALL_SURVEYS
-        MOBILITY_DATABASE ../../../database/mobilities.dat
       /
     /
   /
@@ -84,6 +83,7 @@ CHEMISTRY
   /
   FORCE_READ_OF_REACTION_DATABASE
   DATABASE ../../../database/hanford.dat
+  MOBILITY_DATABASE ../../../database/mobilities.dat
   OUTPUT
     TOTAL
     ALL
