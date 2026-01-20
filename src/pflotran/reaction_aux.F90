@@ -27,6 +27,11 @@ module Reaction_Aux_module
   PetscInt, parameter, public :: ACT_COEF_ALGORITHM_NEWTON = 4
   PetscInt, parameter, public :: NO_BDOT = 5
 
+  ! electrical conductivity algorithm
+  PetscInt, parameter, public :: ELEC_COND_LINEAR = 1
+  PetscInt, parameter, public :: ELEC_COND_PSEUDO_LINEAR = 2
+  PetscInt, parameter, public :: ELEC_COND_MOBILITY = 3
+
   type, public :: species_idx_type
     PetscInt :: h2o_aq_id
     PetscInt :: h_ion_id
@@ -146,6 +151,7 @@ module Reaction_Aux_module
 
   type, public, extends(reaction_base_type) :: reaction_rt_type
     character(len=MAXSTRINGLENGTH) :: database_filename
+    character(len=MAXSTRINGLENGTH) :: mobility_database_filename
     PetscBool :: read_reaction_database
     PetscReal :: truncated_concentration
     PetscBool :: check_update
@@ -176,6 +182,7 @@ module Reaction_Aux_module
     type(generic_parameter_type), pointer :: gas_diffusion_coefficients
     PetscInt :: act_coef_update_frequency
     PetscInt :: act_coef_update_algorithm
+    PetscInt :: elec_cond_algorithm
     PetscBool :: checkpoint_activity_coefs
     PetscBool :: act_coef_use_bdot
     PetscBool :: use_activity_h2o
@@ -208,6 +215,7 @@ module Reaction_Aux_module
     PetscBool, pointer :: primary_species_print(:)
     PetscReal, pointer :: primary_spec_a0(:)
     PetscReal, pointer :: primary_spec_Z(:)
+    PetscReal, pointer :: primary_spec_mobility(:)
     PetscReal, pointer :: primary_spec_molar_wt(:)
 
     ! aqueous complexes
@@ -222,6 +230,7 @@ module Reaction_Aux_module
     PetscReal, pointer :: eqcplxh2ostoich(:)  ! stoichiometry of water, if present
     PetscReal, pointer :: eqcplx_a0(:)  ! Debye-Huckel constant
     PetscReal, pointer :: eqcplx_Z(:)
+    PetscReal, pointer :: eqcplx_mobility(:)
     PetscReal, pointer :: eqcplx_molar_wt(:)
     PetscReal, pointer :: eqcplx_logK(:)
     PetscReal, pointer :: eqcplx_logKcoef(:,:)
@@ -350,6 +359,7 @@ module Reaction_Aux_module
             ReactionAuxCreateIonExchCation, &
             ReactionAuxInputRecord, &
             ReactionAuxNetworkToStoich, &
+            ReactionOutputRequiresDatabase, &
             ReactionAuxDestroyAux
 
 contains
@@ -373,12 +383,14 @@ function ReactionAuxCreateAux()
   call ReactionBaseInit(reaction)
 
   reaction%database_filename = ''
+  reaction%mobility_database_filename = ''
   reaction%num_dbase_temperatures = 0
   nullify(reaction%dbase_temperatures)
 
   reaction%act_coef_use_bdot = PETSC_TRUE
   reaction%act_coef_update_frequency = ACT_COEF_FREQUENCY_OFF
   reaction%act_coef_update_algorithm = ACT_COEF_ALGORITHM_LAG
+  reaction%elec_cond_algorithm = ELEC_COND_MOBILITY
   reaction%checkpoint_activity_coefs = PETSC_TRUE
   reaction%truncated_concentration = UNINITIALIZED_DOUBLE
   reaction%check_update = PETSC_TRUE
@@ -460,6 +472,7 @@ function ReactionAuxCreateAux()
   reaction%offset_immobile = UNINITIALIZED_INTEGER
   nullify(reaction%primary_spec_a0)
   nullify(reaction%primary_spec_Z)
+  nullify(reaction%primary_spec_mobility)
   nullify(reaction%primary_spec_molar_wt)
 
   reaction%neqcplx = 0
@@ -469,6 +482,7 @@ function ReactionAuxCreateAux()
   nullify(reaction%eqcplxh2ostoich)
   nullify(reaction%eqcplx_a0)
   nullify(reaction%eqcplx_Z)
+  nullify(reaction%eqcplx_mobility)
   nullify(reaction%eqcplx_molar_wt)
   nullify(reaction%eqcplx_logK)
   nullify(reaction%eqcplx_logKcoef)
@@ -1645,6 +1659,45 @@ subroutine ReactionAuxDestroyAqSpeciesIndex(species_idx)
   nullify(species_idx)
 
 end subroutine ReactionAuxDestroyAqSpeciesIndex
+
+! ************************************************************************** !
+
+function ReactionOutputRequiresDatabase(reaction)
+  !
+  ! Determines whether prescribed output requires the reading of the database
+  ! (i.e., full geochemistry).
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/16/26
+  !
+  implicit none
+
+  class(reaction_rt_type) :: reaction
+
+  PetscBool :: ReactionOutputRequiresDatabase
+
+  type(rt_print_type), pointer :: print
+
+  print => reaction%print
+
+  ReactionOutputRequiresDatabase = &
+    (print%all_secondary_species .or. &
+     print%pH .or. &
+     print%Eh .or. &
+     print%pe .or. &
+     print%O2 .or. &
+!     print%kd .or. &
+!     print%total_sorb .or. &
+!     print%total_sorb_mobile .or. &
+     print%h2o_act_coef .or. &
+     print%act_coefs .or. &
+!     print%total_bulk .or. &
+     print%total_mass_kg .or. &
+     print%ionic_strength .or. &
+     print%verbose_constraints .or. &
+     Initialized(print%electrical_conductivity_type))
+
+end function ReactionOutputRequiresDatabase
 
 ! ************************************************************************** !
 

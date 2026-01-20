@@ -44,14 +44,13 @@ module PM_ERT_class
     PetscReal :: temperature_coefficient
     ! For Brace's empirical model drho = slope * dstress
     PetscReal :: brace_stress_resistivity_slope
-    PetscReal, pointer :: species_conductivity_coef(:)
-    character(len=MAXSTRINGLENGTH) :: mobility_database
     character(len=MAXSTRINGLENGTH) :: survey_time_units
     ! Starting sulution/potential
     PetscBool :: analytical_potential
     PetscBool :: coupled_ert_flow_jacobian
     PetscBool :: invert_for_porosity
     PetscBool :: calc_max_tracer_concentration
+    PetscBool :: calc_fluid_cond_from_chemistry
   contains
     procedure, public :: Setup => PMERTSetup
     procedure, public :: ReadSimulationOptionsBlock => PMERTReadSimOptionsBlock
@@ -147,9 +146,8 @@ subroutine PMERTInit(pm_ert)
   pm_ert%coupled_ert_flow_jacobian = PETSC_FALSE
   pm_ert%invert_for_porosity = PETSC_FALSE
   pm_ert%calc_max_tracer_concentration = PETSC_FALSE
+  pm_ert%calc_fluid_cond_from_chemistry = PETSC_FALSE
 
-  nullify(pm_ert%species_conductivity_coef)
-  pm_ert%mobility_database = ''
   pm_ert%survey_time_units = ''
 
 end subroutine PMERTInit
@@ -294,9 +292,8 @@ subroutine PMERTReadSimOptionsBlock(this,input)
           call WaypointInsertInList(waypoint,this%waypoint_list,option)
         enddo
         call DeallocateArray(temp_real_array)
-      case('MOBILITY_DATABASE')
-        call InputReadFilename(input,option,this%mobility_database)
-        call InputErrorMsg(input,option,keyword,error_string)
+      case('CALC_FLUID_COND_FROM_CHEMISTRY')
+        this%calc_fluid_cond_from_chemistry = PETSC_TRUE
       case('OUTPUT_ALL_SURVEYS')
         output_all_surveys = PETSC_TRUE
       case('MAX_TRACER_CONCENTRATION')
@@ -364,16 +361,24 @@ subroutine PMERTSetup(this)
     call PrintErrMsg(option)
   endif
 
+  if (this%calc_max_tracer_concentration .and. &
+      Initialized(this%max_tracer_concentration)) then
+    option%io_buffer = 'CALC_MAX_TRACER_CONCENTRATION may not be used &
+      &when specifying a MAX_TRACER_CONCENTRATION for ERT.'
+    call PrintErrMsg(option)
+  endif
+
+  if (this%calc_fluid_cond_from_chemistry .and. &
+      (this%calc_max_tracer_concentration .or. &
+      Initialized(this%max_tracer_concentration))) then
+    option%io_buffer = 'MAX_TRACER_CONCENTRATION and &
+      &CALC_MAX_TRACER_CONCENTRATION may not be used with &
+      &CALC_FLUID_COND_FROM_CHEMISTRY.'
+    call PrintErrMsg(option)
+  endif
+
   if ((this%option%iflowmode == ZFLOW_MODE .and. &
-       zflow_sol_tran_eq > 0) .or. &
-      this%option%itranmode /= NULL_MODE) then
-    ! cannot specify and calculate max tracer concentration simultaneously
-    if (this%calc_max_tracer_concentration .and. &
-        Initialized(this%max_tracer_concentration)) then
-      option%io_buffer = 'CALC_MAX_TRACER_CONCENTRATION may not be used &
-        &when specifying a MAX_TRACER_CONCENTRATION for ERT.'
-      call PrintErrMsg(option)
-    endif
+       zflow_sol_tran_eq > 0)) then
     ! maximum tracer concentration must be set if using solute transport
     ! when calc_max_solute_conc is FALSE
     if (Uninitialized(this%max_tracer_concentration) .and. &
@@ -381,10 +386,17 @@ subroutine PMERTSetup(this)
       this%option%io_buffer = 'MAX_TRACER_CONCENTRATION must be specified &
         &as an ERT option when CALC_MAX_TRACER_CONCENTRATION is not &
         &specified as an ERT option and solute transport is included as a &
-        &PFLOTRAN process model.'
+        &PFLOTRAN process model (i.e., ZFLOW).'
       call PrintErrMsg(this%option)
     endif
+  else if (this%option%itranmode == RT_MODE) then
   else ! no transport
+    if (this%calc_fluid_cond_from_chemistry) then
+      this%option%io_buffer = 'Calculation of fluid conductivity from &
+        &water chemistry has be specified without a reactive transport &
+        &process model being employed.'
+      call PrintErrMsg(this%option)
+    endif
     if (Initialized(this%tracer_water_conductivity )) then
       option%io_buffer = 'TRACER_CONDUCTIVITY will not be factored into the &
         &bulk electrical conductivity calculation since solute is not being &
@@ -472,7 +484,6 @@ recursive subroutine PMERTInitializeRun(this)
   class(pm_ert_type) :: this
 
   type(option_type), pointer :: option
-  type(input_type), pointer :: input
   class(reaction_rt_type), pointer :: reaction
   type(reactive_transport_auxvar_type), pointer :: rt_auxvar
   type(reactive_transport_auxvar_type), pointer :: rt_auxvars(:)
@@ -486,7 +497,6 @@ recursive subroutine PMERTInitializeRun(this)
   type(coupler_type), pointer :: source_sink
   type(connection_set_type), pointer :: cur_connection_set
   type(patch_type), pointer :: patch
-  character(len=MAXWORDLENGTH) :: word
   PetscInt :: ispecies
   PetscBool :: flag
   PetscReal :: tempreal
@@ -588,64 +598,7 @@ recursive subroutine PMERTInitializeRun(this)
         enddo
         source_sink => source_sink%next
       enddo
-      call MPI_Allreduce(MPI_IN_PLACE,this%max_tracer_concentration, &
-                        ONE_INTEGER,MPI_DOUBLE_PRECISION,MPI_MAX, &
-                        option%mycomm,ierr);CHKERRQ(ierr)
-    endif
-  endif
-
-  if (option%itranmode == RT_MODE) then
-    ! calculate species conductivity coefficients if defined
-    if (len_trim(this%mobility_database) > 0) then
-      if (.not.associated(reaction%primary_spec_Z)) then
-        option%io_buffer = 'The CHEMISTRY block must be include a DATABASE to &
-          &calculate fluid conductivity as a function of species mobilities.'
-        call PrintErrMsg(option)
-      endif
-      input => InputCreate(IUNIT_TEMP,this%mobility_database,option)
-      allocate(this%species_conductivity_coef(reaction%naqcomp))
-      this%species_conductivity_coef = UNINITIALIZED_DOUBLE
-      do
-        call InputReadPflotranString(input,option)
-        if (InputError(input)) exit
-        if (InputCheckExit(input,option)) exit
-        if (len_trim(input%buf) == 0) cycle
-        call InputReadWord(input,option,word,PETSC_TRUE)
-        call InputErrorMsg(input,option,'MOBILITY SPECIES NAME', &
-                          'MOBILITY_DATABASE')
-        call InputReadDouble(input,option,tempreal)
-        call InputErrorMsg(input,option,'MOBILITY VALUE','MOBILITY_DATABASE')
-        ispecies = ReactionAuxGetPriSpecIDFromName(word,reaction,PETSC_FALSE, &
-                                                   this%option)
-        if (Initialized(ispecies)) then
-          this%species_conductivity_coef(ispecies) = & ! [m^2-charge-A/V-mol]
-            tempreal * &                               ! mobility [m^2/V-s]
-            abs(reaction%primary_spec_Z(ispecies)) * & ! [charge/atom]
-            AVOGADRO_NUMBER * &                        ! [atom/mol]
-            ELEMENTARY_CHARGE                          ! [A-s] or [C]
-        endif
-      enddo
-      flag = PETSC_FALSE
-      do ispecies = 1, reaction%naqcomp
-        if (Uninitialized(this%species_conductivity_coef(ispecies))) then
-          if (.not.flag) then
-            flag = PETSC_TRUE
-            option%io_buffer = ''
-            call PrintMsg(option)
-          endif
-          option%io_buffer = reaction%primary_species_names(ispecies)
-          call PrintMsg(option)
-        endif
-      enddo
-      if (flag) then
-        option%io_buffer = 'Electrical mobilities for the species above not &
-          &defined in mobility database: ' // trim(this%mobility_database)
-        call PrintErrMsg(option)
-      endif
-      call InputDestroy(input)
-    else if (associated(patch%aux%RT) .and. &
-             this%calc_max_tracer_concentration) then
-      this%max_tracer_concentration = 0.d0
+    else if (option%itranmode == RT_MODE) then
       rt_auxvars => patch%aux%RT%auxvars
       rt_auxvars_bc => patch%aux%RT%auxvars_bc
       ispecies = 1
@@ -679,10 +632,10 @@ recursive subroutine PMERTInitializeRun(this)
                                   rt_auxvar%total(ispecies,1))
         source_sink => source_sink%next
       enddo
-      call MPI_Allreduce(MPI_IN_PLACE,this%max_tracer_concentration, &
-                         ONE_INTEGER,MPI_DOUBLE_PRECISION,MPI_MAX, &
-                         option%mycomm,ierr);CHKERRQ(ierr)
     endif
+    call MPI_Allreduce(MPI_IN_PLACE,this%max_tracer_concentration, &
+                       ONE_INTEGER,MPI_DOUBLE_PRECISION,MPI_MAX, &
+                       option%mycomm,ierr);CHKERRQ(ierr)
   endif
 
   call DiscretizationCreateVector(this%realization%discretization,ONEDOF, &
@@ -874,6 +827,7 @@ subroutine PMERTPreSolve(this)
   use Option_module
   use Patch_module
   use Reaction_Aux_module
+  use Reaction_module
   use Reactive_Transport_Aux_module
   use Realization_Base_class
   use Variables_module
@@ -1001,19 +955,14 @@ subroutine PMERTPreSolve(this)
     endif
 
     sat = global_auxvars(ghosted_id)%sat(1)
-    if (associated(rt_auxvars)) then
-      if (associated(this%species_conductivity_coef)) then
-        ! assuming that we sum conductivity across species
-        cond_sp = 0.d0
-        do species_id = 1, reaction%naqcomp
-          cond_sp = cond_sp + &                          ! S/m
-            this%species_conductivity_coef(species_id)  * &![m^2-charge-A/V-mol]
-            rt_auxvars(ghosted_id)%pri_molal(species_id)* &![mol/kg water]
-            global_auxvars(ghosted_id)%den_kg(1)           ![kg water/m^3]
-        enddo
-        ! modify fluid conductivity for species contribution
+    if (option%itranmode == RT_MODE) then
+      if (this%calc_fluid_cond_from_chemistry) then
+        cond_sp = RElectricalConductivity(rt_auxvars(ghosted_id), &
+                                          global_auxvars(ghosted_id), &
+                                          material_auxvars(ghosted_id), &
+                                          reaction)
         cond_w = cond_w_no_tracer + cond_sp
-      else
+      else if (Initialized(this%max_tracer_concentration)) then
         species_id = 1
         cond_sp = tracer_scale * diff_water_cond * &
                   rt_auxvars(ghosted_id)%total(species_id,1)
@@ -1870,7 +1819,6 @@ subroutine PMERTStrip(this)
   nullify(this%survey)
   call WaypointListDestroy(this%waypoint_list)
 
-  call DeallocateArray(this%species_conductivity_coef)
   if (.not.PetscObjectIsNull(this%rhs)) then
     call VecDestroy(this%rhs,ierr);CHKERRQ(ierr)
   endif

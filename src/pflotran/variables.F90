@@ -230,5 +230,6 @@ module Variables_module
   PetscInt, parameter, public :: WELL_CELLS                 = 175
   PetscInt, parameter, public :: SUM_MINERAL_VOLUME_FRACTION = 176
   PetscInt, parameter, public :: IONIC_STRENGTH              = 177
+  PetscInt, parameter, public :: AQUEOUS_ELECTRICAL_CONDUCTIVITY = 178
 
 end module Variables_module

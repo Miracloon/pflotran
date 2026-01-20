@@ -58,7 +58,9 @@ module Reaction_module
             RUpdateKineticState, &
             RUpdateTempDependentCoefs, &
             RTotalSorb, &
-            RIonicStrength
+            RIonicStrength, &
+            RElectricalConductivity, &
+            ReactionReadMobilityDatabase
 
 contains
 
@@ -763,6 +765,10 @@ subroutine ReactionReadPass1(reaction,input,option)
         call InputReadFilename(input,option,reaction%database_filename)
         call InputErrorMsg(input,option,'keyword', &
                            'CHEMISTRY,DATABASE FILENAME')
+      case('MOBILITY_DATABASE')
+        call InputReadFilename(input,option,reaction%mobility_database_filename)
+        call InputErrorMsg(input,option,'keyword', &
+                           'CHEMISTRY,MOBILITY DATABASE FILENAME')
       case('LOG_FORMULATION')
         reaction%use_log_formulation = PETSC_TRUE
       case('TRUNCATE_CONCENTRATION')
@@ -1116,6 +1122,90 @@ subroutine ReactionReadPass2(reaction,input,option)
   call InputPopBlock(input,option)
 
 end subroutine ReactionReadPass2
+
+! ************************************************************************** !
+
+subroutine ReactionReadMobilityDatabase(reaction,option)
+  !
+  ! Reads mobilities from database and calculates electrical conductivity
+  ! coefficients
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/15/26
+  !
+  use Option_module
+  use Input_Aux_module
+
+  implicit none
+
+  class(reaction_rt_type) :: reaction
+  type(option_type) :: option
+
+  type(input_type), pointer :: input
+  character(len=MAXWORDLENGTH) :: word
+  PetscInt :: ispecies
+  PetscReal :: tempreal
+  PetscBool :: flag
+
+  input => InputCreate(IUNIT_TEMP,reaction%mobility_database_filename,option)
+  allocate(reaction%primary_spec_mobility(reaction%naqcomp))
+  reaction%primary_spec_mobility = UNINITIALIZED_DOUBLE
+  allocate(reaction%eqcplx_mobility(reaction%neqcplx))
+  reaction%eqcplx_mobility = UNINITIALIZED_DOUBLE
+  do
+    call InputReadPflotranString(input,option)
+    if (InputError(input)) exit
+    if (InputCheckExit(input,option)) exit
+    if (len_trim(input%buf) == 0) cycle
+    call InputReadWord(input,option,word,PETSC_TRUE)
+    call InputErrorMsg(input,option,'MOBILITY SPECIES NAME', &
+                      'MOBILITY_DATABASE')
+    call InputReadDouble(input,option,tempreal)
+    call InputErrorMsg(input,option,'MOBILITY VALUE','MOBILITY_DATABASE')
+    ispecies = ReactionAuxGetPriSpecIDFromName(word,reaction,PETSC_FALSE, &
+                                               option)
+    if (Initialized(ispecies)) then
+      reaction%primary_spec_mobility(ispecies) = tempreal
+    else
+      ispecies = ReactionAuxGetSecSpecIDFromName(word,reaction,PETSC_FALSE, &
+                                                 option)
+      if (Initialized(ispecies)) then
+        reaction%eqcplx_mobility(ispecies) = tempreal
+      endif
+    endif
+  enddo
+  flag = PETSC_FALSE
+    do ispecies = 1, reaction%naqcomp
+    if (Uninitialized(reaction%primary_spec_mobility(ispecies))) then
+      if (.not.flag) then
+        flag = PETSC_TRUE
+        option%io_buffer = ''
+        call PrintMsg(option)
+      endif
+      option%io_buffer = reaction%primary_species_names(ispecies)
+      call PrintMsg(option)
+    endif
+  enddo
+  do ispecies = 1, reaction%neqcplx
+    if (Uninitialized(reaction%eqcplx_mobility(ispecies))) then
+      if (.not.flag) then
+        flag = PETSC_TRUE
+        option%io_buffer = ''
+        call PrintMsg(option)
+      endif
+      option%io_buffer = reaction%secondary_species_names(ispecies)
+      call PrintMsg(option)
+    endif
+  enddo
+  if (flag) then
+    option%io_buffer = 'Electrical mobilities for the species above not &
+      &defined in mobility database: ' // &
+      trim(reaction%mobility_database_filename)
+    call PrintErrMsg(option)
+  endif
+  call InputDestroy(input)
+
+end subroutine ReactionReadMobilityDatabase
 
 ! ************************************************************************** !
 
@@ -3277,6 +3367,23 @@ subroutine ReactionReadOutput(reaction,input,option)
       case('IONIC_STRENGTH')
         print_something = PETSC_TRUE
         reaction%print%ionic_strength = PETSC_TRUE
+      case('ELECTRICAL_CONDUCTIVITY')
+        print_something = PETSC_TRUE
+        call InputReadWord(input,option,word,PETSC_TRUE)
+        call PrintErrMsg(option)
+        call StringToUpper(word)
+        select case(word)
+          case('LINEAR')
+            reaction%print%electrical_conductivity_type = ELEC_COND_LINEAR
+          case('PSEUDO_LINEAR')
+            reaction%print%electrical_conductivity_type = &
+              ELEC_COND_PSEUDO_LINEAR
+          case('MOBILITY')
+            reaction%print%electrical_conductivity_type = ELEC_COND_MOBILITY
+          case default
+            error_string = trim(error_string) // keyword
+            call InputKeywordUnrecognized(input,word,error_string,option)
+        end select
       case('EH')
         print_something = PETSC_TRUE
         reaction%print%Eh = PETSC_TRUE
@@ -3358,12 +3465,7 @@ subroutine ReactionReadOutput(reaction,input,option)
       case('PRINT_VERBOSE_CONSTRAINTS')
         reaction%print%verbose_constraints = PETSC_TRUE
       case('PRINT_TOTAL_MASS_KG')
-        if (.not.reaction%read_reaction_database) then
-          option%io_buffer = 'FORCE_READ_REACTION_DATABASE must be specified &
-                              &when using PRINT_TOTAL_MASS_KG'
-          call PrintErrMsg(option)
-        endif
-          reaction%print%total_mass_kg = PETSC_TRUE
+        reaction%print%total_mass_kg = PETSC_TRUE
       case ('SITE_DENSITY')
         call InputReadWord(input,option,name,PETSC_TRUE)
         call InputErrorMsg(input,option,'Site Name', &
@@ -4640,6 +4742,78 @@ function RIonicStrength(rt_auxvar,reaction)
   RIonicStrength = 0.5d0*I
 
 end function RIonicStrength
+
+! ************************************************************************** !
+
+function RElectricalConductivity(rt_auxvar,global_auxvar,material_auxvar, &
+                                 reaction)
+  !
+  ! Computes the electrical conductivity of a solution
+  !
+  ! Author: Glenn Hammond
+  ! Date: 1/14/26
+  !
+  implicit none
+
+  type(reactive_transport_auxvar_type) :: rt_auxvar
+  type(global_auxvar_type) :: global_auxvar
+  type(material_auxvar_type) :: material_auxvar
+  class(reaction_rt_type) :: reaction
+
+  PetscReal :: RElectricalConductivity
+
+  PetscInt :: i
+  PetscReal :: kg_water_per_m3
+  PetscReal :: mol_per_m3
+  PetscReal :: ec
+  PetscReal :: tempreal
+  PetscReal, parameter :: FARADAY_CONSTANT = 96485.3321 ! [C/mol]
+
+  select case(reaction%elec_cond_algorithm)
+    case(ELEC_COND_LINEAR)
+      ec = 6.2d4 * RIonicStrength(rt_auxvar,reaction)
+    case(ELEC_COND_PSEUDO_LINEAR)
+      ec = 6.67d4 * (RIonicStrength(rt_auxvar,reaction)**0.991d0)
+    case(ELEC_COND_MOBILITY)
+      ! \kappa = sum_i c_i z_i F u_i               [S/m] or [C/V-s-m]
+      !   where
+      !     c_i = molar concentration of species i [mol/m^3]
+      !     z_i = charge of species i              [-]
+      !     F   = Faraday constant                 [C/mol]
+      !     u_i = mobility for species i           [m^2/V/s]
+      kg_water_per_m3 = &
+          global_auxvar%den_kg(1)! * &            ! [kg water/m^3 water]
+!          global_auxvar%sat(1) * &               ! [m^3 water/m^3 pore]
+!          material_auxvar%porosity               ! [m^3 pore/m^3]
+      ec = 0.d0
+      do i = 1, reaction%naqcomp
+        mol_per_m3 = &
+          rt_auxvar%pri_molal(i) * &             ! [mol/kg water]
+          kg_water_per_m3
+        tempreal = &                             ! [S/m] or [C/V-s-m]
+             mol_per_m3 * &                      ! [mol/m^3]
+             abs(reaction%primary_spec_Z(i)) * & ! [-]
+             FARADAY_CONSTANT * &                ! [C/mol]
+             reaction%primary_spec_mobility(i)   ! [m^2/V-s]
+        ec = ec + tempreal
+      enddo
+      do i = 1, reaction%neqcplx
+        mol_per_m3 = &
+          rt_auxvar%sec_molal(i) * &             ! [mol/kg water]
+          kg_water_per_m3
+        ec = ec + &                              ! [S/m] or [C/V-s-m]
+             mol_per_m3 * &                      ! [mol/m^3]
+             abs(reaction%eqcplx_Z(i)) * &       ! [-]
+             FARADAY_CONSTANT * &                ! [C/mol]
+             reaction%eqcplx_mobility(i)         ! [m^2/V-s]
+      enddo
+    case default
+      stop 'Unsupported algorithm in RElectricalConductivity'
+  end select
+
+  RElectricalConductivity = ec
+
+end function RElectricalConductivity
 
 ! ************************************************************************** !
 
@@ -6107,6 +6281,13 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
   character(len=2) :: free_mol_char, tot_mol_char, sec_mol_char
   PetscInt :: i
 
+  if (ReactionOutputRequiresDatabase(reaction) .and. &
+      .not.reaction%read_reaction_database) then
+    option%io_buffer = 'The requested output variables necessitate the &
+      &reading of a reaction database to simulate full geochemistry.'
+    call PrintErrMsg(option)
+  endif
+
   if (reaction%print%free_conc_type == PRIMARY_MOLALITY) then
     free_mol_char = 'm'
   else
@@ -6423,6 +6604,13 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
     units = ''
     call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                  IONIC_STRENGTH)
+  endif
+
+  if (Initialized(reaction%print%electrical_conductivity_type)) then
+    name = 'Electrical Conductivity'
+    units = 'S/m'
+    call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
+                                 AQUEOUS_ELECTRICAL_CONDUCTIVITY)
   endif
 
   if (reaction%print%auxiliary) then

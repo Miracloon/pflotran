@@ -492,6 +492,18 @@ subroutine RTSetup(realization)
     endif
   endif
 
+  ! read mobilities if database is specified
+  if (len_trim(reaction%mobility_database_filename) > 0) then
+    call ReactionReadMobilityDatabase(reaction,option)
+  endif
+  if (Initialized(reaction%print%electrical_conductivity_type) .and. &
+      .not.associated(reaction%primary_spec_mobility)) then
+    option%io_buffer = 'A database must be read prescribing the mobility &
+      &of all primary and secondary aqueous species (using the &
+      &MOBILITY_DATABASE card) to calculate fluid electrical conductivity.'
+    call PrintErrMsg(option)
+  endif
+
   list => realization%output_option%output_snap_variable_list
   call RTSetPlotVariables(list,reaction,option, &
                           realization%output_option%tunit)
