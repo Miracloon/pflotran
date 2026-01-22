@@ -333,6 +333,7 @@ geomech_obj = \
 	${common_src}geomechanics_force.o \
 	${common_src}geomechanics_global.o \
 	${common_src}geomechanics_global_aux.o\
+	${common_src}geomechanics_linear_aux.o\
 	${common_src}geomechanics_material.o \
 	${common_src}geomechanics_patch.o \
 	${common_src}geomechanics_region.o \

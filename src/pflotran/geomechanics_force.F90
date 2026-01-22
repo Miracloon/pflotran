@@ -2,7 +2,9 @@ module Geomechanics_Force_module
 
 #include "petsc/finclude/petscsnes.h"
   use petscsnes
+  use Geomechanics_Auxiliary_module
   use Geomechanics_Global_Aux_module
+  use Geomechanics_Linear_Aux_module
   use PFLOTRAN_Constants_module
 
   implicit none
@@ -63,105 +65,132 @@ subroutine GeomechForceSetupPatch(geomech_realization)
   ! Author: Satish Karra, LANL
   ! Date: 09/11/13
   !
-
   use Geomechanics_Realization_class
   use Geomechanics_Patch_module
   use Option_module
+  use Parameter_module
 
   implicit none
 
   class(realization_geomech_type) :: geomech_realization
+
   type(option_type), pointer :: option
   type(geomech_patch_type), pointer :: patch
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt :: i
 
   option => geomech_realization%option
   patch => geomech_realization%geomech_patch
 
-  patch%geomech_aux%GeomechParam%youngs_modulus_spatially_varying = .false.
-  patch%geomech_aux%GeomechParam%poissons_ratio_spatially_varying = .false.
-  patch%geomech_aux%GeomechParam%density_spatially_varying = .false.
-  patch%geomech_aux%GeomechParam%biot_coeff_spatially_varying = .false.
-  patch%geomech_aux%GeomechParam%thermal_exp_coeff_spatially_varying = .false.
+  patch%geomech_aux%Linear => GeomechLinearAuxCreate()
+
+  geomech_parameter => patch%geomech_aux%Linear%linear_parameter
+
+  geomech_parameter%youngs_modulus_spatially_varying = PETSC_FALSE
+  geomech_parameter%poissons_ratio_spatially_varying = PETSC_FALSE
+  geomech_parameter%density_spatially_varying = PETSC_FALSE
+  geomech_parameter%biot_coeff_spatially_varying = PETSC_FALSE
+  geomech_parameter%thermal_exp_coeff_spatially_varying = PETSC_FALSE
   do i = 1, size(geomech_realization%geomech_material_property_array)
-    if (associated(geomech_realization%geomech_material_property_array(i)%ptr%youngs_modulus_dataset)) then
-      patch%geomech_aux%GeomechParam%youngs_modulus_spatially_varying = .true.
-    endif
-    if (associated(geomech_realization%geomech_material_property_array(i)%ptr%poissons_ratio_dataset)) then
-      patch%geomech_aux%GeomechParam%poissons_ratio_spatially_varying = .true.
-    endif
-    if (associated(geomech_realization%geomech_material_property_array(i)%ptr%density_dataset)) then
-      patch%geomech_aux%GeomechParam%density_spatially_varying = .true.
-    endif
-    if (associated(geomech_realization%geomech_material_property_array(i)%ptr%biot_coeff_dataset)) then
-      patch%geomech_aux%GeomechParam%biot_coeff_spatially_varying = .true.
-    endif
-    if (associated(geomech_realization%geomech_material_property_array(i)%ptr%thermal_exp_coeff_dataset)) then
-      patch%geomech_aux%GeomechParam%thermal_exp_coeff_spatially_varying = .true.
-    endif
+    geomech_parameter%youngs_modulus_spatially_varying = &
+      geomech_parameter%youngs_modulus_spatially_varying .or. &
+      associated(geomech_realization%geomech_material_property_array(i)%ptr%youngs_modulus_dataset)
+    geomech_parameter%poissons_ratio_spatially_varying = &
+      geomech_parameter%poissons_ratio_spatially_varying .or. &
+      associated(geomech_realization%geomech_material_property_array(i)%ptr%poissons_ratio_dataset)
+    geomech_parameter%density_spatially_varying = &
+      geomech_parameter%density_spatially_varying .or. &
+      associated(geomech_realization%geomech_material_property_array(i)%ptr%density_dataset)
+    geomech_parameter%biot_coeff_spatially_varying = &
+      geomech_parameter%biot_coeff_spatially_varying .or. &
+      associated(geomech_realization%geomech_material_property_array(i)%ptr%biot_coeff_dataset)
+    geomech_parameter%thermal_exp_coeff_spatially_varying = &
+      geomech_parameter%thermal_exp_coeff_spatially_varying .or. &
+      associated(geomech_realization%geomech_material_property_array(i)%ptr%thermal_exp_coeff_dataset)
   enddo
 
   ! Young's modulus
-  if (patch%geomech_aux%GeomechParam%youngs_modulus_spatially_varying) then
-    patch%geomech_aux%GeomechParam%youngs_modulus_vec = patch%geomech_field%youngs_modulus
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
+!    geomech_parameter%youngs_modulus_vec = patch%geomech_field%youngs_modulus
   else
-    allocate(patch%geomech_aux%GeomechParam%youngs_modulus &
+    allocate(geomech_parameter%youngs_modulus &
       (size(geomech_realization%geomech_material_property_array)))
     do i = 1, size(geomech_realization%geomech_material_property_array)
-      patch%geomech_aux%GeomechParam%youngs_modulus(geomech_realization% &
+      geomech_parameter%youngs_modulus(geomech_realization% &
         geomech_material_property_array(i)%ptr%id) = geomech_realization% &
         geomech_material_property_array(i)%ptr%youngs_modulus
     enddo
   endif
   ! Poisson's ratio
-  if (patch%geomech_aux%GeomechParam%poissons_ratio_spatially_varying) then
-    patch%geomech_aux%GeomechParam%poissons_ratio_vec = patch%geomech_field%poissons_ratio
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
+!    geomech_parameter%poissons_ratio_vec = patch%geomech_field%poissons_ratio
   else
-    allocate(patch%geomech_aux%GeomechParam%poissons_ratio &
+    allocate(geomech_parameter%poissons_ratio &
       (size(geomech_realization%geomech_material_property_array)))
     do i = 1, size(geomech_realization%geomech_material_property_array)
-      patch%geomech_aux%GeomechParam%poissons_ratio(geomech_realization% &
+      geomech_parameter%poissons_ratio(geomech_realization% &
         geomech_material_property_array(i)%ptr%id) = geomech_realization% &
         geomech_material_property_array(i)%ptr%poissons_ratio
     enddo
   endif
   ! Density
-  if (patch%geomech_aux%GeomechParam%density_spatially_varying) then
-    patch%geomech_aux%GeomechParam%density_vec = patch%geomech_field%density
+  if (geomech_parameter%density_spatially_varying) then
+!    geomech_parameter%density_vec = patch%geomech_field%density
   else
-    allocate(patch%geomech_aux%GeomechParam%density &
+    allocate(geomech_parameter%density &
       (size(geomech_realization%geomech_material_property_array)))
     do i = 1, size(geomech_realization%geomech_material_property_array)
-      patch%geomech_aux%GeomechParam%density(geomech_realization% &
+      geomech_parameter%density(geomech_realization% &
         geomech_material_property_array(i)%ptr%id) = geomech_realization% &
         geomech_material_property_array(i)%ptr%density
     enddo
   endif
   ! Biot's coefficient
-  if (patch%geomech_aux%GeomechParam%biot_coeff_spatially_varying) then
-    patch%geomech_aux%GeomechParam%biot_coeff_vec = patch%geomech_field%biot_coeff
+  if (geomech_parameter%biot_coeff_spatially_varying) then
+!    geomech_parameter%biot_coeff_vec = patch%geomech_field%biot_coeff
   else
-    allocate(patch%geomech_aux%GeomechParam%biot_coeff &
+    allocate(geomech_parameter%biot_coeff &
       (size(geomech_realization%geomech_material_property_array)))
     do i = 1, size(geomech_realization%geomech_material_property_array)
-      patch%geomech_aux%GeomechParam%biot_coeff(geomech_realization% &
+      geomech_parameter%biot_coeff(geomech_realization% &
         geomech_material_property_array(i)%ptr%id) = geomech_realization% &
         geomech_material_property_array(i)%ptr%biot_coeff
     enddo
   endif
   ! Thermal expansion coefficient
-  if (patch%geomech_aux%GeomechParam%thermal_exp_coeff_spatially_varying) then
-    patch%geomech_aux%GeomechParam%thermal_exp_coeff_vec = patch%geomech_field%thermal_exp_coeff
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
+!    geomech_parameter%thermal_exp_coeff_vec = patch%geomech_field%thermal_exp_coeff
   else
-    allocate(patch%geomech_aux%GeomechParam%thermal_exp_coeff &
+    allocate(geomech_parameter%thermal_exp_coeff &
       (size(geomech_realization%geomech_material_property_array)))
     do i = 1, size(geomech_realization%geomech_material_property_array)
-      patch%geomech_aux%GeomechParam%thermal_exp_coeff(geomech_realization% &
+      geomech_parameter%thermal_exp_coeff(geomech_realization% &
         geomech_material_property_array(i)%ptr%id) = geomech_realization% &
         geomech_material_property_array(i)%ptr%thermal_exp_coeff
     enddo
   endif
+
+  select case(option%geomechanics%flow_coupling)
+    case(GEOMECH_TWO_WAY_COUPLED)
+      select case(option%geomechanics%split_scheme)
+        case(GEOMECH_FIXED_STRESS_SPLIT)
+          geomech_parameter%press_0_id = &
+            ParameterGetIDFromName('press_0',option)
+          geomech_parameter%temp_0_id = &
+            ParameterGetIDFromName('temp_0',option)
+          geomech_parameter%vol_strain_0_id = &
+            ParameterGetIDFromName('vol_strain_0',option)
+          geomech_parameter%vol_strain_id = &
+            ParameterGetIDFromName('vol_strain',option)
+          geomech_parameter%stored_pressure_id = &
+            ParameterGetIDFromName('stored_pressure',option)
+          geomech_parameter%stored_porosity_id = &
+            ParameterGetIDFromName('stored_porosity',option)
+          geomech_parameter%flow_porosity_id = &
+            ParameterGetIDFromName('flow_porosity',option)
+      end select
+  end select
 
 end subroutine GeomechForceSetupPatch
 
@@ -461,7 +490,7 @@ subroutine GeomechForceUpdateAuxVars(geomech_realization)
   grid => patch%geomech_grid
   geomech_field => geomech_realization%geomech_field
 
-  geomech_global_aux_vars => patch%geomech_aux%GeomechGlobal%aux_vars
+  geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
 
   ! Communication -----------------------------------------
   call GeomechDiscretizationGlobalToLocal(geomech_realization% &
@@ -599,7 +628,7 @@ subroutine GeomechForceResidualPatch(snes,xx,r,geomech_realization,ierr)
   type(option_type), pointer :: option
   type(gm_region_type), pointer :: region
   type(geomech_coupler_type), pointer :: boundary_condition
-  type(geomech_parameter_type), pointer :: GeomechParam
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt, allocatable :: elenodes(:)
   PetscReal, allocatable :: local_coordinates(:,:)
@@ -640,8 +669,8 @@ subroutine GeomechForceResidualPatch(snes,xx,r,geomech_realization,ierr)
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
   option => geomech_realization%option
-  geomech_global_aux_vars => patch%geomech_aux%GeomechGlobal%aux_vars
-  GeomechParam => patch%geomech_aux%GeomechParam
+  geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
+  geomech_parameter => patch%geomech_aux%Linear%linear_parameter
 
   call GeomechForceUpdateAuxVars(geomech_realization)
   ! Add flag for the update
@@ -666,19 +695,19 @@ subroutine GeomechForceResidualPatch(snes,xx,r,geomech_realization,ierr)
   call VecGetArray(field%fluid_density_init_loc,fluid_density_init, &
                       ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecGetArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecGetArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%density_spatially_varying) then
+  if (geomech_parameter%density_spatially_varying) then
     call VecGetArray(field%density,temp_density_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecGetArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecGetArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -719,35 +748,35 @@ subroutine GeomechForceResidualPatch(snes,xx,r,geomech_realization,ierr)
       enddo
       local_press(ivertex) = press(ghosted_id) - press_init(ghosted_id)  ! p - p_0
       local_temp(ivertex) = temp(ghosted_id) - temp_init(ghosted_id)     ! T - T_0
-      if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+      if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
         alpha_vec(ivertex) = temp_thermal_exp_coeff_p(grid%nG2L(ghosted_id))
       else
         alpha_vec(ivertex) = &
-          GeomechParam%thermal_exp_coeff(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%thermal_exp_coeff(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%biot_coeff_spatially_varying) then
+      if (geomech_parameter%biot_coeff_spatially_varying) then
         beta_vec(ivertex) = temp_biot_coeff_p(grid%nG2L(ghosted_id))
       else
         beta_vec(ivertex) = &
-          GeomechParam%biot_coeff(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%biot_coeff(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%density_spatially_varying) then
+      if (geomech_parameter%density_spatially_varying) then
         density_rock_vec(ivertex) = temp_density_p(grid%nG2L(ghosted_id))
       else
         density_rock_vec(ivertex) = &
-          GeomechParam%density(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%density(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%youngs_modulus_spatially_varying) then
+      if (geomech_parameter%youngs_modulus_spatially_varying) then
         youngs_vec(ivertex) = temp_youngs_modulus_p(grid%nG2L(ghosted_id))
       else
         youngs_vec(ivertex) = &
-          GeomechParam%youngs_modulus(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%youngs_modulus(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%poissons_ratio_spatially_varying) then
+      if (geomech_parameter%poissons_ratio_spatially_varying) then
         poissons_vec(ivertex) = temp_poissons_ratio_p(grid%nG2L(ghosted_id))
       else
         poissons_vec(ivertex) = &
-          GeomechParam%poissons_ratio(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%poissons_ratio(nint(imech_loc_p(ghosted_id)))
       endif
       density_fluid_vec(ivertex) = fluid_density(ghosted_id)
       porosity_vec(ivertex) = porosity(ghosted_id)
@@ -803,19 +832,19 @@ subroutine GeomechForceResidualPatch(snes,xx,r,geomech_realization,ierr)
   call VecRestoreArray(field%fluid_density_init_loc,fluid_density_init, &
                           ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecRestoreArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecRestoreArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%density_spatially_varying) then
+  if (geomech_parameter%density_spatially_varying) then
     call VecRestoreArray(field%density,temp_density_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecRestoreArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecRestoreArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -1727,7 +1756,7 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
   type(option_type), pointer :: option
   type(gm_region_type), pointer :: region
   type(geomech_coupler_type), pointer :: boundary_condition
-  type(geomech_parameter_type), pointer :: GeomechParam
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt, allocatable :: elenodes(:)
   PetscReal, allocatable :: local_coordinates(:,:)
@@ -1767,8 +1796,8 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
   option => geomech_realization%option
-  geomech_global_aux_vars => patch%geomech_aux%GeomechGlobal%aux_vars
-  GeomechParam => patch%geomech_aux%GeomechParam
+  geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
+  geomech_parameter => patch%geomech_aux%Linear%linear_parameter
 
 
   solution = field%disp_xx
@@ -1787,19 +1816,19 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
   call VecGetArray(field%fluid_density_loc,fluid_density,ierr);CHKERRQ(ierr)
 
   ! Get geomech properties
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecGetArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecGetArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%density_spatially_varying) then
+  if (geomech_parameter%density_spatially_varying) then
     call VecGetArray(field%density,temp_density_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecGetArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecGetArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -1843,35 +1872,35 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
       enddo
       local_press(ivertex) = press(ghosted_id) - press_init(ghosted_id)  ! p - p_0
       local_temp(ivertex) = temp(ghosted_id) - temp_init(ghosted_id)     ! T - T_0
-      if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+      if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
         alpha_vec(ivertex) = temp_thermal_exp_coeff_p(grid%nG2L(ghosted_id))
       else
         alpha_vec(ivertex) = &
-          GeomechParam%thermal_exp_coeff(int(imech_loc_p(ghosted_id)))
+          geomech_parameter%thermal_exp_coeff(int(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%biot_coeff_spatially_varying) then
+      if (geomech_parameter%biot_coeff_spatially_varying) then
         beta_vec(ivertex) = temp_biot_coeff_p(grid%nG2L(ghosted_id))
       else
         beta_vec(ivertex) = &
-          GeomechParam%biot_coeff(int(imech_loc_p(ghosted_id)))
+          geomech_parameter%biot_coeff(int(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%density_spatially_varying) then
+      if (geomech_parameter%density_spatially_varying) then
         density_rock_vec(ivertex) = temp_density_p(grid%nG2L(ghosted_id))
       else
         density_rock_vec(ivertex) = &
-          GeomechParam%density(int(imech_loc_p(ghosted_id)))
+          geomech_parameter%density(int(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%youngs_modulus_spatially_varying) then
+      if (geomech_parameter%youngs_modulus_spatially_varying) then
         youngs_vec(ivertex) = temp_youngs_modulus_p(grid%nG2L(ghosted_id))
       else
         youngs_vec(ivertex) = &
-          GeomechParam%youngs_modulus(int(imech_loc_p(ghosted_id)))
+          geomech_parameter%youngs_modulus(int(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%poissons_ratio_spatially_varying) then
+      if (geomech_parameter%poissons_ratio_spatially_varying) then
         poissons_vec(ivertex) = temp_poissons_ratio_p(grid%nG2L(ghosted_id))
       else
         poissons_vec(ivertex) = &
-          GeomechParam%poissons_ratio(int(imech_loc_p(ghosted_id)))
+          geomech_parameter%poissons_ratio(int(imech_loc_p(ghosted_id)))
       endif
       density_fluid_vec(ivertex) = fluid_density(ghosted_id)
       porosity_vec(ivertex) = porosity(ghosted_id)
@@ -1913,19 +1942,19 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
   call VecRestoreArray(field%fluid_density_loc,fluid_density, &
                           ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecRestoreArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecRestoreArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%density_spatially_varying) then
+  if (geomech_parameter%density_spatially_varying) then
     call VecRestoreArray(field%density,temp_density_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecRestoreArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecRestoreArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -2476,7 +2505,7 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
   type(option_type), pointer :: option
   type(gm_region_type), pointer :: region
   type(geomech_coupler_type), pointer :: boundary_condition
-  type(geomech_parameter_type), pointer :: GeomechParam
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt, allocatable :: elenodes(:)
   PetscReal, allocatable :: local_coordinates(:,:)
@@ -2506,16 +2535,16 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
   option => geomech_realization%option
-  geomech_global_aux_vars => patch%geomech_aux%GeomechGlobal%aux_vars
-  GeomechParam => patch%geomech_aux%GeomechParam
+  geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
+  geomech_parameter => patch%geomech_aux%Linear%linear_parameter
 
   call MatZeroEntries(A,ierr);CHKERRQ(ierr)
   call VecGetArray(field%imech_loc,imech_loc_p,ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecGetArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecGetArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -2545,17 +2574,17 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
         local_disp(idof + (ivertex-1)*option%ngeomechdof) = &
           geomech_global_aux_vars(ghosted_id)%disp_vector(idof)
       enddo
-      if (GeomechParam%youngs_modulus_spatially_varying) then
+      if (geomech_parameter%youngs_modulus_spatially_varying) then
         youngs_vec(ivertex) = temp_youngs_modulus_p(grid%nG2L(ghosted_id))
       else
         youngs_vec(ivertex) = &
-          GeomechParam%youngs_modulus(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%youngs_modulus(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%poissons_ratio_spatially_varying) then
+      if (geomech_parameter%poissons_ratio_spatially_varying) then
         poissons_vec(ivertex) = temp_poissons_ratio_p(grid%nG2L(ghosted_id))
       else
         poissons_vec(ivertex) = &
-          GeomechParam%poissons_ratio(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%poissons_ratio(nint(imech_loc_p(ghosted_id)))
       endif
     enddo
     size_elenodes = size(elenodes)
@@ -2593,10 +2622,10 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
 
   call VecRestoreArray(field%imech_loc,imech_loc_p,ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecRestoreArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecRestoreArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -3005,7 +3034,7 @@ subroutine GeomechForceStressStrain(geomech_realization)
   type(geomech_grid_type), pointer :: grid
   type(geomech_global_auxvar_type), pointer :: geomech_global_aux_vars(:)
   type(option_type), pointer :: option
-  type(geomech_parameter_type), pointer :: GeomechParam
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt, allocatable :: elenodes(:)
   PetscReal, allocatable :: local_coordinates(:,:)
@@ -3044,8 +3073,8 @@ subroutine GeomechForceStressStrain(geomech_realization)
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
   option => geomech_realization%option
-  geomech_global_aux_vars => patch%geomech_aux%GeomechGlobal%aux_vars
-  GeomechParam => patch%geomech_aux%GeomechParam
+  geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
+  geomech_parameter => patch%geomech_aux%Linear%linear_parameter
 
   call VecSet(field%strain,0.d0,ierr);CHKERRQ(ierr)
   call VecSet(field%stress,0.d0,ierr);CHKERRQ(ierr)
@@ -3060,16 +3089,16 @@ subroutine GeomechForceStressStrain(geomech_realization)
   call VecGetArray(field%press_loc,press_loc_p,ierr);CHKERRQ(ierr)
   call VecGetArray(field%press_init_loc,press_init_loc_p,ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecGetArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecGetArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecGetArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecGetArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 
@@ -3114,29 +3143,29 @@ subroutine GeomechForceStressStrain(geomech_realization)
         temp_loc_p(ghosted_id) - temp_init_loc_p(ghosted_id)
       local_press(ivertex) = &
         press_loc_p(ghosted_id) - press_init_loc_p(ghosted_id)
-      if (GeomechParam%youngs_modulus_spatially_varying) then
+      if (geomech_parameter%youngs_modulus_spatially_varying) then
         youngs_vec(ivertex) = temp_youngs_modulus_p(grid%nG2L(ghosted_id))
       else
         youngs_vec(ivertex) = &
-          GeomechParam%youngs_modulus(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%youngs_modulus(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%poissons_ratio_spatially_varying) then
+      if (geomech_parameter%poissons_ratio_spatially_varying) then
         poissons_vec(ivertex) = temp_poissons_ratio_p(grid%nG2L(ghosted_id))
       else
         poissons_vec(ivertex) = &
-          GeomechParam%poissons_ratio(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%poissons_ratio(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%biot_coeff_spatially_varying) then
+      if (geomech_parameter%biot_coeff_spatially_varying) then
         beta_vec(ivertex) = temp_biot_coeff_p(grid%nG2L(ghosted_id))
       else
         beta_vec(ivertex) = &
-          GeomechParam%biot_coeff(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%biot_coeff(nint(imech_loc_p(ghosted_id)))
       endif
-      if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+      if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
         alpha_vec(ivertex) = temp_thermal_exp_coeff_p(grid%nG2L(ghosted_id))
       else
         alpha_vec(ivertex) = &
-          GeomechParam%thermal_exp_coeff(nint(imech_loc_p(ghosted_id)))
+          geomech_parameter%thermal_exp_coeff(nint(imech_loc_p(ghosted_id)))
       endif
     enddo
     size_elenodes = size(elenodes)
@@ -3185,16 +3214,16 @@ subroutine GeomechForceStressStrain(geomech_realization)
   call VecRestoreArray(field%stress_loc,stress_loc_p,ierr);CHKERRQ(ierr)
   call VecRestoreArray(field%stress_total_loc,stress_total_loc_p,ierr);CHKERRQ(ierr)
 
-  if (GeomechParam%youngs_modulus_spatially_varying) then
+  if (geomech_parameter%youngs_modulus_spatially_varying) then
     call VecRestoreArray(field%youngs_modulus,temp_youngs_modulus_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%poissons_ratio_spatially_varying) then
+  if (geomech_parameter%poissons_ratio_spatially_varying) then
     call VecRestoreArray(field%poissons_ratio,temp_poissons_ratio_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%biot_coeff_spatially_varying) then
+  if (geomech_parameter%biot_coeff_spatially_varying) then
     call VecRestoreArray(field%biot_coeff,temp_biot_coeff_p,ierr);CHKERRQ(ierr)
   endif
-  if (GeomechParam%thermal_exp_coeff_spatially_varying) then
+  if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
     call VecRestoreArray(field%thermal_exp_coeff,temp_thermal_exp_coeff_p,ierr);CHKERRQ(ierr)
   endif
 

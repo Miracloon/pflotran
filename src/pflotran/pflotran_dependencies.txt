@@ -859,6 +859,7 @@ geomechanics_attributes.o : \
   waypoint.o
 geomechanics_auxiliary.o : \
   geomechanics_global_aux.o \
+  geomechanics_linear_aux.o \
   pflotran_constants.o
 geomechanics_condition.o : \
   condition.o \
@@ -899,6 +900,7 @@ geomechanics_force.o : \
   geomechanics_discretization.o \
   geomechanics_field.o \
   geomechanics_global_aux.o \
+  geomechanics_linear_aux.o \
   geomechanics_material.o \
   geomechanics_patch.o \
   geomechanics_realization.o \
@@ -907,6 +909,7 @@ geomechanics_force.o : \
   grid_unstructured_cell.o \
   option.o \
   output_aux.o \
+  parameter.o \
   petsc_utility.o \
   pflotran_constants.o \
   realization_subsurface.o \
@@ -928,6 +931,10 @@ geomechanics_global.o : \
   variables.o
 geomechanics_global_aux.o : \
   option.o \
+  pflotran_constants.o \
+  utility.o
+geomechanics_linear_aux.o : \
+  petsc_utility.o \
   pflotran_constants.o \
   utility.o
 geomechanics_material.o : \
@@ -1542,7 +1549,7 @@ material.o : \
   variables.o \
   wipp.o
 material_aux.o : \
-  geomechanics_auxiliary.o \
+  geomechanics_linear_aux.o \
   option.o \
   pflotran_constants.o \
   string.o \
@@ -2087,6 +2094,7 @@ pm_ert.o : \
   petsc_utility.o \
   pflotran_constants.o \
   pm_base.o \
+  reaction.o \
   reaction_aux.o \
   reactive_transport_aux.o \
   realization_base.o \
@@ -3532,6 +3540,7 @@ richards.o : \
   debug.o \
   discretization.o \
   field.o \
+  geomechanics_linear_aux.o \
   global_aux.o \
   grid.o \
   inlinesurface.o \
@@ -3574,7 +3583,7 @@ richards_common.o : \
   characteristic_curves.o \
   connection.o \
   eos_water.o \
-  geomechanics_auxiliary.o \
+  geomechanics_linear_aux.o \
   global_aux.o \
   material_aux.o \
   option.o \
@@ -3931,7 +3940,7 @@ th.o : \
   eos_water.o \
   field.o \
   fluid.o \
-  geomechanics_auxiliary.o \
+  geomechanics_linear_aux.o \
   global_aux.o \
   grid.o \
   logging.o \
@@ -3940,7 +3949,6 @@ th.o : \
   matrix_zeroing.o \
   option.o \
   output_aux.o \
-  parameter.o \
   patch.o \
   petsc_utility.o \
   pflotran_constants.o \

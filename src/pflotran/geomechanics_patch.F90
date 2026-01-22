@@ -577,7 +577,7 @@ subroutine GeomechPatchGetDataset(patch,geomech_field,option,output_option, &
   PetscErrorCode :: ierr
 
   grid => patch%geomech_grid
-  geom_gl_auxvars => patch%geomech_aux%GeomechGlobal%aux_vars
+  geom_gl_auxvars => patch%geomech_aux%Global%aux_vars
 
   call VecGetArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
 
@@ -670,37 +670,37 @@ subroutine GeomechPatchGetDataset(patch,geomech_field,option,output_option, &
     case(STRESS_TOTAL_XX)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(1)
       enddo
     case(STRESS_TOTAL_YY)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(2)
       enddo
     case(STRESS_TOTAL_ZZ)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(3)
       enddo
     case(STRESS_TOTAL_XY)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(4)
       enddo
     case(STRESS_TOTAL_YZ)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(5)
       enddo
     case(STRESS_TOTAL_ZX)
       do local_id=1,grid%nlmax_node
         vec_ptr(local_id) = &
-          patch%geomech_aux%GeomechGlobal%aux_vars(&
+          patch%geomech_aux%Global%aux_vars(&
             grid%nL2G(local_id))%stress_total(6)
       enddo
     case(GEOMECH_MATERIAL_ID)

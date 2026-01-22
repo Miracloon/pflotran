@@ -67,7 +67,9 @@ module Petsc_Utility_module
 
   public :: PUCreateViewer, &
             PUVecView, &
-            PUMatView, &
+            PUMatView
+
+  public :: PUVecDestroy, &
             PUViewerDestroy
 
   public :: PUTestFile, &
@@ -739,5 +741,25 @@ subroutine PUViewerDestroy(viewer,iformat)
   call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
 
 end subroutine PUViewerDestroy
+
+! ************************************************************************** !
+
+subroutine PUVecDestroy(vec)
+  !
+  ! Destroys PETSc Vec
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/22/26
+  !
+  implicit none
+
+  Vec :: vec
+  PetscErrorCode :: ierr
+
+  if (.not.PetscObjectIsNull(vec)) then
+    call VecDestroy(vec,ierr);CHKERRQ(ierr)
+  endif
+
+end subroutine PUVecDestroy
 
 end module Petsc_Utility_module

@@ -1129,6 +1129,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   use Grid_module
   use Connection_module
   use Region_module
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -1142,6 +1143,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt :: ghosted_id, local_id, istart
   PetscInt :: region_id
@@ -1158,6 +1160,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  geomech_parameter => patch%aux%Material%geomech_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
 
@@ -1186,6 +1189,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
     call RichardsAccumulation(rich_auxvars(ghosted_id), &
                               global_auxvars(ghosted_id), &
                               material_auxvars(ghosted_id), &
+                              geomech_parameter, &
                               option,accum_p(istart:istart))
   enddo
 
@@ -2128,6 +2132,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
   use Debug_module
   use Region_module
   use PM_Well_class
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -2145,6 +2150,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(inlinesurface_auxvar_type), pointer :: inlinesurface_auxvars(:)
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   PetscInt :: local_id, ghosted_id, region_id, ghosted_end
   PetscInt :: istart
@@ -2161,6 +2167,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  geomech_parameter => patch%aux%Material%geomech_parameter
 
   if (option%flow%inline_surface_flow) then
     region => RegionGetPtrFromList(option%flow%inline_surface_region_name, &
@@ -2185,6 +2192,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
       call RichardsAccumulation(rich_auxvars(ghosted_id), &
            global_auxvars(ghosted_id), &
            material_auxvars(ghosted_id), &
+           geomech_parameter, &
            option,Res)
       istart = (local_id-1)*option%nflowdof + 1
       r_p(istart) = r_p(istart) + Res(1)
@@ -2819,6 +2827,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   use Region_module
   use Petsc_Utility_module
   use Debug_module
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -2841,6 +2850,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(inlinesurface_auxvar_type), pointer :: inlinesurface_auxvars(:)
+  type(geomech_linear_parameter_type), pointer :: geomech_parameter
 
   patch => realization%patch
   grid => patch%grid
@@ -2848,6 +2858,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  geomech_parameter => patch%aux%Material%geomech_parameter
 
   if (option%flow%inline_surface_flow) then
     region => &
@@ -2866,6 +2877,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
       call RichardsAccumDerivative(rich_auxvars(ghosted_id), &
            global_auxvars(ghosted_id), &
            material_auxvars(ghosted_id), &
+           geomech_parameter, &
            option, &
            patch%characteristic_curves_array( &
            patch%cc_id(ghosted_id))%ptr, &

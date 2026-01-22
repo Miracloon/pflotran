@@ -70,14 +70,14 @@ subroutine GeomechGlobalSetupPatch(geomech_realization)
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
 
-  patch%geomech_aux%GeomechGlobal => GeomechGlobalAuxCreate()
+  patch%geomech_aux%Global => GeomechGlobalAuxCreate()
 
   allocate(aux_vars(grid%ngmax_node))
   do ghosted_id = 1, grid%ngmax_node
     call GeomechGlobalAuxVarInit(aux_vars(ghosted_id),option)
   enddo
-  patch%geomech_aux%GeomechGlobal%aux_vars => aux_vars
-  patch%geomech_aux%GeomechGlobal%num_aux = grid%ngmax_node
+  patch%geomech_aux%Global%aux_vars => aux_vars
+  patch%geomech_aux%Global%num_aux = grid%ngmax_node
 
 end subroutine GeomechGlobalSetupPatch
 
@@ -140,18 +140,18 @@ subroutine GeomechGlobalSetAuxVarScalarPatch(geomech_realization,value,ivar)
 
   select case(ivar)
     case(GEOMECH_DISP_X)
-      do i=1, patch%geomech_aux%GeomechGlobal%num_aux
-        patch%geomech_aux%GeomechGlobal%aux_vars(i)%disp_vector(&
+      do i=1, patch%geomech_aux%Global%num_aux
+        patch%geomech_aux%Global%aux_vars(i)%disp_vector(&
           GEOMECH_DISP_X_DOF) = value
       enddo
     case(GEOMECH_DISP_Y)
-      do i=1, patch%geomech_aux%GeomechGlobal%num_aux
-        patch%geomech_aux%GeomechGlobal%aux_vars(i)%disp_vector(&
+      do i=1, patch%geomech_aux%Global%num_aux
+        patch%geomech_aux%Global%aux_vars(i)%disp_vector(&
           GEOMECH_DISP_Y_DOF) = value
       enddo
     case(GEOMECH_DISP_Z)
-      do i=1, patch%geomech_aux%GeomechGlobal%num_aux
-        patch%geomech_aux%GeomechGlobal%aux_vars(i)%disp_vector(&
+      do i=1, patch%geomech_aux%Global%num_aux
+        patch%geomech_aux%Global%aux_vars(i)%disp_vector(&
           GEOMECH_DISP_Z_DOF) = value
       enddo
   end select
@@ -230,7 +230,7 @@ subroutine GeomechGlobalSetAuxVarVecLocPatch(geomech_realization,vec_loc,ivar,&
       select case(isubvar)
         case default
           do ghosted_id=1, grid%ngmax_node
-            patch%geomech_aux%GeomechGlobal%aux_vars(&
+            patch%geomech_aux%Global%aux_vars(&
               ghosted_id)%disp_vector(GEOMECH_DISP_X_DOF) &
               = vec_loc_p(ghosted_id)
           enddo
@@ -239,7 +239,7 @@ subroutine GeomechGlobalSetAuxVarVecLocPatch(geomech_realization,vec_loc,ivar,&
       select case(isubvar)
         case default
           do ghosted_id=1, grid%ngmax_node
-            patch%geomech_aux%GeomechGlobal%aux_vars(&
+            patch%geomech_aux%Global%aux_vars(&
               ghosted_id)%disp_vector(GEOMECH_DISP_Y_DOF) &
               = vec_loc_p(ghosted_id)
           enddo
@@ -248,7 +248,7 @@ subroutine GeomechGlobalSetAuxVarVecLocPatch(geomech_realization,vec_loc,ivar,&
       select case(isubvar)
         case default
           do ghosted_id=1, grid%ngmax_node
-            patch%geomech_aux%GeomechGlobal%aux_vars(&
+            patch%geomech_aux%Global%aux_vars(&
               ghosted_id)%disp_vector(GEOMECH_DISP_Z_DOF) &
               = vec_loc_p(ghosted_id)
           enddo

@@ -970,8 +970,9 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
 
   ! used for fixed-stress coupling flow (TH and RICHARDS) routines
   do ghosted_id = 1, subsurf_realization%patch%grid%ngmax
-    pm_geomech%subsurf_realization%patch%aux%Material%auxvars(ghosted_id)% &
-      geomech => pm_geomech%geomech_realization%geomech_patch%geomech_aux
+    pm_geomech%subsurf_realization%patch%aux%Material%geomech_parameter => &
+      pm_geomech%geomech_realization%geomech_patch%geomech_aux% &
+        Linear%linear_parameter
   enddo
 
   ! this is solely for casting to pmc geomech
