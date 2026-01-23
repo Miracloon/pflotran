@@ -202,6 +202,11 @@ recursive subroutine PMCGeomechanicsInitializeRun(this)
   if (this%option%geomechanics%split_scheme == GEOMECH_DRAINED_SPLIT) &
     return
 
+  ! continue to initialize geomechanics
+  ! used for GEOMECH_FIXED_STRESS_SPLIT and
+  ! GEOMECH_FIXED_STRAIN_SPLIT
+  this%timestepper%steps = -1
+
   call this%RunToTime(target_time,local_stop_flag)
 
 end subroutine PMCGeomechanicsInitializeRun

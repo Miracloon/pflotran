@@ -412,13 +412,7 @@ subroutine InitSubsurfGeomechJumpStart(geomech)
   geomech_read = PETSC_FALSE
   failure = PETSC_FALSE
 
-
-  ! initialization of geomech
-  if (option%geomechanics%split_scheme == GEOMECH_FIXED_STRESS_SPLIT .or. &
-      option%geomechanics%split_scheme == GEOMECH_FIXED_STRAIN_SPLIT) &
-    geomech_timestepper%steps = -1
-
-  call OutputGeomechInit(geomech_timestepper%steps, option)
+  call OutputGeomechInit(geomech_timestepper%steps)
 
   ! pushed in INIT_STAGE()
   call PetscLogStagePop(ierr);CHKERRQ(ierr)
