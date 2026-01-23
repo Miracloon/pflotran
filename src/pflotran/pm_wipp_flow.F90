@@ -2625,13 +2625,6 @@ subroutine PMWIPPFloRestartBinary(this,viewer)
     endif
   endif
 
-  !MAN: not sure if this is needed
-  !if (associated(this%pmwell_ptr)) then
-  !  if (.not.this%pmwell_ptr%skip_restart) then
-  !    call PMWellRestartBinary(this%pmwell_ptr,viewer)
-  !  endif
-  !endif
-
 end subroutine PMWIPPFloRestartBinary
 
 ! ************************************************************************** !
@@ -2666,13 +2659,6 @@ subroutine PMWIPPFloRestartHDF5(this,pm_grp_id)
       !call PMWSSRestartHDF5(this%pmwss_ptr,pm_grp_id)
     endif
   endif
-
-  !MAN: not sure if this is needed
-  !if (associated(this%pmwell_ptr)) then
-  !  if (.not.this%pmwell_ptr%skip_restart) then
-  !    call PMWellRestartHDF5(this%pmwell_ptr,pm_grp_id)
-  !  endif
-  !endif
 
 end subroutine PMWIPPFloRestartHDF5
 

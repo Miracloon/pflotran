@@ -1406,8 +1406,8 @@ recursive subroutine PMCBaseRestartHDF5(this,h5_chk_grp_id)
 
   ! if the top PMC
   if (this%is_master) then
-    this%option%io_buffer = 'Restarting with checkpoint file "' // &
-      trim(this%option%restart_filename) // '".'
+    this%option%io_buffer = 'Restarting with checkpoint file: ' // &
+      trim(this%option%restart_filename)
     call PrintMsg(this%option)
     call PetscLogEventBegin(logging%event_restart,ierr);CHKERRQ(ierr)
     call PetscTime(tstart,ierr);CHKERRQ(ierr)
@@ -1475,6 +1475,12 @@ recursive subroutine PMCBaseRestartHDF5(this,h5_chk_grp_id)
       call PrintErrMsg(this%option)
     endif
     this%option%time = this%timestepper%target_time
+  endif
+
+  if (skip_restart) then
+    this%option%io_buffer = ' Skipping restart for process model: ' // &
+      trim(this%pm_list%name)
+    call PrintMsg(this%option)
   endif
 
   if (.not.skip_restart) then

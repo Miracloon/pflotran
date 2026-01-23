@@ -632,15 +632,6 @@ recursive subroutine PMRTInitializeRun(this)
                  this%realization%field%porosity_tpdt,ierr);CHKERRQ(ierr)
   endif
 
-  ! restart
-  !geh: the below equilibrates the original (non-restarted) chemistry
-  !     with restarted flow state variables. but we should not need it
-  !     with the skip restart refactor - 12/13/18
-!  if (this%option%restart_flag .and. this%skip_restart) then
-!    call RTClearActivityCoefficients(this%realization)
-!    call CondControlAssignTranInitCond(this%realization)
-!  endif
-
   if (this%option%iflowmode /= NULL_MODE) then
     ! at this point, global_auxvars%xxx_store(:,1) holds the correct values
     ! and weighting by 0. obtains that value
