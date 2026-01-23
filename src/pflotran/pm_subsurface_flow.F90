@@ -557,6 +557,7 @@ subroutine PMSubsurfaceFlowSetSoilRefPres(realization)
   use Realization_Subsurface_class
   use Realization_Base_class
   use Patch_module
+  use Petsc_Utility_module
   use Discretization_module
   use Grid_module
   use Material_Aux_module
@@ -676,9 +677,7 @@ subroutine PMSubsurfaceFlowSetSoilRefPres(realization)
     call PrintErrMsg(option)
   endif
 
-  if (.not.PetscObjectIsNull(dataset_vec)) then
-    call VecDestroy(dataset_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(dataset_vec)
 
 end subroutine PMSubsurfaceFlowSetSoilRefPres
 

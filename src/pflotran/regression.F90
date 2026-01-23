@@ -907,14 +907,12 @@ subroutine RegressionDestroy(regression)
   ! Author: Glenn Hammond
   ! Date: 10/11/12
   !
-
+  use Petsc_Utility_module
   use Utility_module
 
   implicit none
 
   type(regression_type), pointer :: regression
-
-  PetscErrorCode :: ierr
 
   if (.not.associated(regression)) return
 
@@ -922,20 +920,11 @@ subroutine RegressionDestroy(regression)
   call DeallocateArray(regression%natural_cell_ids)
   regression%num_cells_per_process = 0
   call DeallocateArray(regression%cells_per_process_natural_ids)
-  if (.not.PetscObjectIsNull(regression%natural_cell_id_vec)) then
-    call VecDestroy(regression%natural_cell_id_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(regression%cells_per_process_vec)) then
-    call VecDestroy(regression%cells_per_process_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(regression%scatter_natural_cell_id_gtos)) then
-    call VecScatterDestroy(regression%scatter_natural_cell_id_gtos, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(regression%scatter_cells_per_process_gtos)) then
-    call VecScatterDestroy(regression%scatter_cells_per_process_gtos, &
-                           ierr);CHKERRQ(ierr)
-  endif
+
+  call PUVecDestroy(regression%natural_cell_id_vec)
+  call PUVecDestroy(regression%cells_per_process_vec)
+  call PUVecScatterDestroy(regression%scatter_natural_cell_id_gtos)
+  call PUVecScatterDestroy(regression%scatter_cells_per_process_gtos)
 
   deallocate(regression)
   nullify(regression)

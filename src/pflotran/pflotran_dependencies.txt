@@ -131,6 +131,7 @@ checkpoint.o : \
   material_aux.o \
   option.o \
   option_checkpoint.o \
+  petsc_utility.o \
   pflotran_constants.o \
   realization_subsurface.o \
   sco2.o \
@@ -286,7 +287,8 @@ data_mediator_dataset.o : \
   string.o
 data_mediator_vec.o : \
   data_mediator_base.o \
-  option.o
+  option.o \
+  petsc_utility.o
 dataset.o : \
   dataset_ascii.o \
   dataset_base.o \
@@ -376,6 +378,7 @@ discretization.o : \
   input_aux.o \
   material_aux.o \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o \
   string.o
 dm_custom.o : \
@@ -745,6 +748,7 @@ factory_subsurface_read.o : \
   wipp.o \
   wipp_well.o
 field.o : \
+  petsc_utility.o \
   pflotran_constants.o
 fluid.o : \
   input_aux.o \
@@ -850,6 +854,7 @@ geomech_grid_aux.o : \
   geometry.o \
   grid_unstructured_cell.o \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o \
   utility.o
 geomechanics_attributes.o : \
@@ -888,6 +893,7 @@ geomechanics_discretization.o : \
   option.o \
   pflotran_constants.o
 geomechanics_field.o : \
+  petsc_utility.o \
   pflotran_constants.o
 geomechanics_force.o : \
   discretization.o \
@@ -1003,6 +1009,7 @@ geomechanics_regression.o : \
   option.o \
   output_aux.o \
   output_geomechanics.o \
+  petsc_utility.o \
   pflotran_constants.o \
   string.o \
   timestepper_KSP.o \
@@ -1391,6 +1398,7 @@ inversion_aux.o : \
   material.o \
   material_aux.o \
   option_inversion.o \
+  petsc_utility.o \
   pflotran_constants.o \
   string.o \
   utility.o \
@@ -1425,6 +1433,7 @@ inversion_ert.o : \
   material_aux.o \
   option.o \
   patch.o \
+  petsc_utility.o \
   pflotran_constants.o \
   string.o \
   survey.o \
@@ -1495,6 +1504,7 @@ inversion_ts_aux.o : \
   inversion_coupled_aux.o \
   inversion_measurement_aux.o \
   inversion_parameter.o \
+  petsc_utility.o \
   pflotran_constants.o \
   utility.o
 inversion_zflow.o : \
@@ -2064,6 +2074,7 @@ pm_base.o : \
   input_aux.o \
   option.o \
   output_aux.o \
+  petsc_utility.o \
   pflotran_constants.o \
   realization_base.o \
   solver.o \
@@ -2277,6 +2288,7 @@ pm_nwt.o : \
   option.o \
   output_ekg.o \
   patch.o \
+  petsc_utility.o \
   pflotran_constants.o \
   pm_base.o \
   pm_well.o \
@@ -2292,6 +2304,7 @@ pm_osrt.o : \
   global.o \
   material.o \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o \
   pm_base.o \
   pm_rt.o \
@@ -2476,6 +2489,7 @@ pm_subsurface_flow.o : \
   matrix_zeroing.o \
   option.o \
   patch.o \
+  petsc_utility.o \
   pflotran_constants.o \
   pm_base.o \
   pm_well.o \
@@ -3525,6 +3539,7 @@ regression.o : \
   output.o \
   output_aux.o \
   output_common.o \
+  petsc_utility.o \
   pflotran_constants.o \
   realization_subsurface.o \
   string.o \
@@ -3697,6 +3712,7 @@ shape_function.o : \
   pflotran_constants.o
 simulation_aux.o : \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o
 simulation_base.o : \
   driver.o \
@@ -3802,6 +3818,7 @@ slatec_pchip.o :
 solver.o : \
   input_aux.o \
   option.o \
+  petsc_utility.o \
   pflotran_constants.o \
   preconditioner_cpr.o \
   solver_cpr.o \

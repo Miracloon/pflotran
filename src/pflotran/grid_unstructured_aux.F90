@@ -2019,13 +2019,12 @@ subroutine UGridDestroy(unstructured_grid)
   ! Date: 11/01/09
   !
 
+  use Petsc_Utility_module
   use Utility_module, only : DeallocateArray
 
   implicit none
 
   type(grid_unstructured_type), pointer :: unstructured_grid
-
-  PetscErrorCode :: ierr
 
   if (.not.associated(unstructured_grid)) return
 
@@ -2035,9 +2034,7 @@ subroutine UGridDestroy(unstructured_grid)
   call DeallocateArray(unstructured_grid%ghost_cell_ids_petsc)
   call UGridExplicitDestroy(unstructured_grid%explicit_grid)
   call UGridPolyhedraDestroy(unstructured_grid%polyhedra_grid)
-  if (.not.PetscObjectIsNull(unstructured_grid%ao_natural_to_petsc)) then
-    call AODestroy(unstructured_grid%ao_natural_to_petsc,ierr);CHKERRQ(ierr)
-  endif
+  call PUAODestroy(unstructured_grid%ao_natural_to_petsc)
 
   ! variables for implicit unstructured grids
   call DeallocateArray(unstructured_grid%cell_type)
@@ -2071,64 +2068,31 @@ subroutine UGridDMDestroy(ugdm)
   ! Author: Glenn Hammond
   ! Date: 11/01/09
   !
+  use Petsc_Utility_module
 
   implicit none
 
   type(ugdm_type), pointer :: ugdm
 
-  PetscErrorCode :: ierr
-
   if (.not.associated(ugdm)) return
 
-  if (.not.PetscObjectIsNull(ugdm%is_ghosted_local)) then
-    call ISDestroy(ugdm%is_ghosted_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_local_local)) then
-    call ISDestroy(ugdm%is_local_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_ghosted_petsc)) then
-    call ISDestroy(ugdm%is_ghosted_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_local_petsc)) then
-    call ISDestroy(ugdm%is_local_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_ghosts_local)) then
-    call ISDestroy(ugdm%is_ghosts_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_ghosts_petsc)) then
-    call ISDestroy(ugdm%is_ghosts_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%is_local_natural)) then
-    call ISDestroy(ugdm%is_local_natural,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_ltog)) then
-    call VecScatterDestroy(ugdm%scatter_ltog,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_gtol)) then
-    call VecScatterDestroy(ugdm%scatter_gtol,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_ltol)) then
-    call VecScatterDestroy(ugdm%scatter_ltol,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_gton)) then
-    call VecScatterDestroy(ugdm%scatter_gton,ierr);CHKERRQ(ierr)
-  endif
-  call ISLocalToGlobalMappingDestroy(ugdm%mapping_ltog,ierr);CHKERRQ(ierr)
-  if (.not.PetscObjectIsNull(ugdm%global_vec)) then
-    call VecDestroy(ugdm%global_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%local_vec)) then
-    call VecDestroy(ugdm%local_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_bet_grids)) then
-    call VecScatterDestroy(ugdm%scatter_bet_grids,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_bet_grids_1dof)) then
-    call VecScatterDestroy(ugdm%scatter_bet_grids_1dof,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ugdm%scatter_bet_grids_ndof)) then
-    call VecScatterDestroy(ugdm%scatter_bet_grids_ndof,ierr);CHKERRQ(ierr)
-  endif
+  call PUISDestroy(ugdm%is_ghosted_local)
+  call PUISDestroy(ugdm%is_local_local)
+  call PUISDestroy(ugdm%is_ghosted_petsc)
+  call PUISDestroy(ugdm%is_local_petsc)
+  call PUISDestroy(ugdm%is_ghosts_local)
+  call PUISDestroy(ugdm%is_ghosts_petsc)
+  call PUISDestroy(ugdm%is_local_natural)
+  call PUVecScatterDestroy(ugdm%scatter_ltog)
+  call PUVecScatterDestroy(ugdm%scatter_gtol)
+  call PUVecScatterDestroy(ugdm%scatter_ltol)
+  call PUVecScatterDestroy(ugdm%scatter_gton)
+  call PUISLocalToGlobalMappingDestroy(ugdm%mapping_ltog)
+  call PUVecDestroy(ugdm%global_vec)
+  call PUVecDestroy(ugdm%local_vec)
+  call PUVecScatterDestroy(ugdm%scatter_bet_grids)
+  call PUVecScatterDestroy(ugdm%scatter_bet_grids_1dof)
+  call PUVecScatterDestroy(ugdm%scatter_bet_grids_ndof)
   ! ugdm%ao_natural_to_petsc is a pointer to ugrid%ao_natural_to_petsc.  Do
   ! not destroy here.
   PetscObjectNullify(ugdm%ao_natural_to_petsc)

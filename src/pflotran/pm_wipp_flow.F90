@@ -2674,12 +2674,11 @@ subroutine PMWIPPFloDestroy(this)
 
   use WIPP_Flow_module, only : WIPPFloDestroy
   use Utility_module, only : DeallocateArray
+  use Petsc_Utility_module, only : PUVecDestroy
 
   implicit none
 
   class(pm_wippflo_type) :: this
-
-  PetscErrorCode :: ierr
 
   if (associated(this%next)) then
     call this%next%Destroy()
@@ -2688,12 +2687,8 @@ subroutine PMWIPPFloDestroy(this)
   call DeallocateArray(this%max_change_ivar)
   call DeallocateArray(this%rotation_region_names)
   call DeallocateArray(this%auto_pressure_material_ids)
-  if (.not.PetscObjectIsNull(this%stored_residual_vec)) then
-    call VecDestroy(this%stored_residual_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%scaling_vec)) then
-    call VecDestroy(this%scaling_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%stored_residual_vec)
+  call PUVecDestroy(this%scaling_vec)
   if (associated(this%dirichlet_dofs_ghosted)) then
     deallocate(this%dirichlet_dofs_ghosted)
     nullify(this%dirichlet_dofs_ghosted)

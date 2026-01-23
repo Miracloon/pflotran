@@ -744,14 +744,12 @@ subroutine GeomechanicsRegressionDestroy(geomechanics_regression)
   ! Author: Satish Karra
   ! Date: 06/22/2016
   !
-
+  use Petsc_Utility_module
   use Utility_module
 
   implicit none
 
   type(geomechanics_regression_type), pointer :: geomechanics_regression
-
-  PetscErrorCode :: ierr
 
   if (.not.associated(geomechanics_regression)) return
 
@@ -761,24 +759,12 @@ subroutine GeomechanicsRegressionDestroy(geomechanics_regression)
   geomechanics_regression%num_vertices_per_process = 0
   call DeallocateArray( &
                 geomechanics_regression%vertices_per_process_natural_ids)
-  if (.not.PetscObjectIsNull(geomechanics_regression%natural_vertex_id_vec)) then
-    call VecDestroy(geomechanics_regression%natural_vertex_id_vec, &
-                    ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomechanics_regression%vertices_per_process_vec)) then
-    call VecDestroy(geomechanics_regression%vertices_per_process_vec, &
-                    ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomechanics_regression%scatter_natural_vertex_id_gtos)) then
-    call VecScatterDestroy(geomechanics_regression% &
-                             scatter_natural_vertex_id_gtos, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomechanics_regression%scatter_vertices_per_process_gtos)) then
-    call VecScatterDestroy(geomechanics_regression% &
-                             scatter_vertices_per_process_gtos, &
-                           ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(geomechanics_regression%natural_vertex_id_vec)
+  call PUVecDestroy(geomechanics_regression%vertices_per_process_vec)
+  call PUVecScatterDestroy(geomechanics_regression% &
+                             scatter_natural_vertex_id_gtos)
+  call PUVecScatterDestroy(geomechanics_regression% &
+                              scatter_vertices_per_process_gtos)
 
   deallocate(geomechanics_regression)
   nullify(geomechanics_regression)

@@ -379,20 +379,16 @@ subroutine PMOSRTStrip(this)
   ! Author: Glenn Hammond
   ! Date: 12/09/19
   !
+  use Petsc_Utility_module
+
   implicit none
 
   class(pm_osrt_type) :: this
 
-  PetscErrorCode :: ierr
-
   call PMRTStrip(this)
 
-  if (.not.PetscObjectIsNull(this%fixed_accum)) then
-    call VecDestroy(this%fixed_accum,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%rhs)) then
-    call VecDestroy(this%rhs,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%fixed_accum)
+  call PUVecDestroy(this%rhs)
 
 end subroutine PMOSRTStrip
 

@@ -1832,6 +1832,7 @@ subroutine PMRTCheckpointBinary(this,viewer)
   use Discretization_module
   use Grid_module
   use Patch_module
+  use Petsc_Utility_module
   use Secondary_Continuum_module
   use Reactive_Transport_module, only : RTCheckpointKineticSorptionBinary
   use Reaction_Aux_module, only : ACT_COEF_FREQUENCY_OFF
@@ -1994,9 +1995,7 @@ subroutine PMRTCheckpointBinary(this,viewer)
     endif
   endif
 
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
 
 end subroutine PMRTCheckpointBinary
 
@@ -2019,6 +2018,7 @@ subroutine PMRTRestartBinary(this,viewer)
   use Discretization_module
   use Grid_module
   use Patch_module
+  use Petsc_Utility_module
   use Reactive_Transport_module, only : RTCheckpointKineticSorptionBinary, &
                                         RTUpdateAuxVars
   use Reaction_Aux_module, only : ACT_COEF_FREQUENCY_OFF
@@ -2180,12 +2180,8 @@ subroutine PMRTRestartBinary(this,viewer)
   endif
 
   ! We are finished, so clean up.
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(local_vec)) then
-    call VecDestroy(local_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
+  call PUVecDestroy(local_vec)
 
   call PetscBagDestroy(bag,ierr);CHKERRQ(ierr)
 

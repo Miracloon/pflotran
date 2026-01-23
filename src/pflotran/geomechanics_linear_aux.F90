@@ -31,12 +31,6 @@ module Geomechanics_Linear_Aux_module
     PetscReal, pointer :: thermal_exp_coeff(:)
     PetscReal, pointer :: density(:)
 
-!    Vec :: youngs_modulus_vec
-!    Vec :: poissons_ratio_vec
-!    Vec :: density_vec
-!    Vec :: biot_coeff_vec
-!    Vec :: thermal_exp_coeff_vec
-
   end type geomech_linear_parameter_type
 
   type, public :: geomech_linear_type
@@ -83,11 +77,6 @@ function GeomechLinearAuxCreate()
   nullify(linear_parameter%biot_coeff)
   nullify(linear_parameter%thermal_exp_coeff)
   nullify(linear_parameter%density)
-!  PetscObjectNullify(linear_parameter%youngs_modulus_vec)
-!  PetscObjectNullify(linear_parameter%poissons_ratio_vec)
-!  PetscObjectNullify(linear_parameter%density_vec)
-!  PetscObjectNullify(linear_parameter%biot_coeff_vec)
-!  PetscObjectNullify(linear_parameter%thermal_exp_coeff_vec)
 
   aux%linear_parameter => linear_parameter
 
@@ -122,11 +111,6 @@ subroutine GeomechLinearAuxDestroy(aux)
   call DeallocateArray(linear_parameter%biot_coeff)
   call DeallocateArray(linear_parameter%thermal_exp_coeff)
   call DeallocateArray(linear_parameter%density)
-!  call PUVecDestroy(linear_parameter%youngs_modulus_vec)
-!  call PUVecDestroy(linear_parameter%poissons_ratio_vec)
-!  call PUVecDestroy(linear_parameter%density_vec)
-!  call PUVecDestroy(linear_parameter%biot_coeff_vec)
-!  call PUVecDestroy(linear_parameter%thermal_exp_coeff_vec)
 
   deallocate(aux%linear_parameter)
   nullify(aux%linear_parameter)

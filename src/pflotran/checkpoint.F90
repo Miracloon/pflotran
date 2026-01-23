@@ -339,9 +339,11 @@ subroutine CheckpointFlowProcessModelBinary(viewer,realization)
   use Global_module
   use Material_module
   use Material_Aux_module, only : POROSITY_BASE
+  use Petsc_Utility_module
   use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2GetSlminVecLoc
+
   implicit none
 
   PetscViewer :: viewer
@@ -420,9 +422,7 @@ subroutine CheckpointFlowProcessModelBinary(viewer,realization)
 
   endif
 
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
 
 end subroutine CheckpointFlowProcessModelBinary
 
@@ -444,6 +444,7 @@ subroutine RestartFlowProcessModelBinary(viewer,realization)
   use Global_module
   use Material_module
   use Material_Aux_module, only : POROSITY_BASE
+  use Petsc_Utility_module
   use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2SetSlminVecLoc
@@ -518,9 +519,7 @@ subroutine RestartFlowProcessModelBinary(viewer,realization)
                                   field%work_loc,PERMEABILITY_Z,ZERO_INTEGER)
   endif
 
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
 
 end subroutine RestartFlowProcessModelBinary
 

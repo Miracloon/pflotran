@@ -1804,13 +1804,12 @@ subroutine PMERTStrip(this)
   ! Author: Piyoosh Jaysaval
   ! Date: 01/22/21
   !
+  use Petsc_Utility_module
   use Utility_module
 
   implicit none
 
   class(pm_ert_type) :: this
-
-  PetscErrorCode :: ierr
 
   call PMBaseDestroy(this)
   ! destroyed in realization
@@ -1819,18 +1818,10 @@ subroutine PMERTStrip(this)
   nullify(this%survey)
   call WaypointListDestroy(this%waypoint_list)
 
-  if (.not.PetscObjectIsNull(this%rhs)) then
-    call VecDestroy(this%rhs,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%dconductivity_dsaturation)) then
-    call VecDestroy(this%dconductivity_dsaturation,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%dconductivity_dconcentration)) then
-    call VecDestroy(this%dconductivity_dconcentration,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%dconductivity_dporosity)) then
-    call VecDestroy(this%dconductivity_dporosity,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%rhs)
+  call PUVecDestroy(this%dconductivity_dsaturation)
+  call PUVecDestroy(this%dconductivity_dconcentration)
+  call PUVecDestroy(this%dconductivity_dporosity)
 
 end subroutine PMERTStrip
 

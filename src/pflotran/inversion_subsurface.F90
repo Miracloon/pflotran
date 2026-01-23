@@ -1782,6 +1782,7 @@ subroutine InvSubsurfAdjAddSensitivities(this)
   use Grid_module
   use Option_module
   use Patch_module
+  use Petsc_Utility_module
   use Realization_Base_class
   use Solver_module
   use String_module
@@ -2036,15 +2037,9 @@ subroutine InvSubsurfAdjAddSensitivities(this)
   call VecDestroy(dReskp1_duk_lambdak,ierr);CHKERRQ(ierr)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
 
-  if (.not.PetscObjectIsNull(dResdKLambda)) then
-    call VecDestroy(dResdKLambda,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ndof_vec1)) then
-    call VecDestroy(ndof_vec1,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(ndof_vec2)) then
-    call VecDestroy(ndof_vec2,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(dResdKLambda)
+  call PUVecDestroy(ndof_vec1)
+  call PUVecDestroy(ndof_vec2)
 
   call timer%Stop()
   option%io_buffer = '    ' // &
@@ -2899,10 +2894,9 @@ subroutine InversionSubsurfaceStrip(this)
   ! Date: 09/20/21
   !
   use Utility_module
+  use Petsc_Utility_module
 
   class(inversion_subsurface_type) :: this
-
-  PetscErrorCode :: ierr
 
   call InversionBaseStrip(this)
 
@@ -2919,12 +2913,8 @@ subroutine InversionSubsurfaceStrip(this)
   call DeallocateArray(this%local_dobs_dunknown_values)
   call DeallocateArray(this%local_measurement_map)
 
-  if (.not.PetscObjectIsNull(this%quantity_of_interest)) then
-    call VecDestroy(this%quantity_of_interest,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%ref_quantity_of_interest)) then
-    call VecDestroy(this%ref_quantity_of_interest,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%quantity_of_interest)
+  call PUVecDestroy(this%ref_quantity_of_interest)
 
 end subroutine InversionSubsurfaceStrip
 

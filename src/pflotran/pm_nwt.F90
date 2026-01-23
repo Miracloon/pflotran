@@ -1855,6 +1855,7 @@ subroutine PMNWTCheckpointBinary(this,viewer)
   use Realization_Subsurface_class
   use Realization_Base_class
   use Field_module
+  use Petsc_Utility_module
   use Discretization_module
   use Variables_module, only : NWT_AUXILIARY
 
@@ -1921,9 +1922,7 @@ subroutine PMNWTCheckpointBinary(this,viewer)
     endif
   endif
 
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
 
 end subroutine PMNWTCheckpointBinary
 
@@ -2045,6 +2044,7 @@ subroutine PMNWTRestartBinary(this,viewer)
   use Discretization_module
   use Grid_module
   use Patch_module
+  use Petsc_Utility_module
   use Variables_module, only : NWT_AUXILIARY
 
   implicit none
@@ -2111,9 +2111,7 @@ subroutine PMNWTRestartBinary(this,viewer)
     enddo
   endif
 
-  if (.not.PetscObjectIsNull(global_vec)) then
-    call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(global_vec)
 
   call PetscBagDestroy(bag,ierr);CHKERRQ(ierr)
   call NWTUpdateAuxVars(realization,PETSC_FALSE,PETSC_TRUE)

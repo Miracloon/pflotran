@@ -558,10 +558,11 @@ end subroutine PMBasePrintErrMsg
 
 subroutine PMBaseDestroy(this)
 
-  implicit none
-  class(pm_base_type) :: this
+  use Petsc_Utility_module
 
-  PetscErrorCode :: ierr
+  implicit none
+
+  class(pm_base_type) :: this
 
   nullify(this%option)
   nullify(this%output_option)
@@ -569,9 +570,7 @@ subroutine PMBaseDestroy(this)
   nullify(this%next)
   call SolverDestroy(this%solver)
   call DebugDestroy(this%debug)
-  if (.not.PetscObjectIsNull(this%linear_system_scaling_vec)) then
-    call VecDestroy(this%linear_system_scaling_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%linear_system_scaling_vec)
 
 end subroutine PMBaseDestroy
 

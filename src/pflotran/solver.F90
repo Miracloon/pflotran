@@ -1894,7 +1894,7 @@ subroutine SolverDestroy(solver)
   ! Author: Glenn Hammond
   ! Date: 11/01/07
   !
-
+  use Petsc_Utility_module
   use String_module
 
   implicit none
@@ -1911,9 +1911,7 @@ subroutine SolverDestroy(solver)
   else if (.not.PetscObjectIsNull(solver%Mpre)) then
     call MatDestroy(solver%Mpre,ierr);CHKERRQ(ierr)
   endif
-  if (.not.PetscObjectIsNull(solver%M)) then
-    call MatDestroy(solver%M,ierr);CHKERRQ(ierr)
-  endif
+  call PUMatDestroy(solver%M)
   if (associated(solver%interpolation)) then
     do i=1,solver%galerkin_mg_levels-1
       call MatDestroy(solver%interpolation(i),ierr);CHKERRQ(ierr)
@@ -1959,36 +1957,16 @@ subroutine SolverDestroy(solver)
           solver%cprstash%CPR_type == "ADDITIVE") then
         call PCDestroy(solver%cprstash%T3_PC,ierr);CHKERRQ(ierr)
       endif
-      if (.not.PetscObjectIsNull(solver%cprstash%Ap)) then
-        call MatDestroy(solver%cprstash%Ap,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%As)) then
-        call MatDestroy(solver%cprstash%As,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%T1r)) then
-        call VecDestroy(solver%cprstash%T1r,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%T3r)) then
-        call VecDestroy(solver%cprstash%T3r,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%r2)) then
-        call VecDestroy(solver%cprstash%r2,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%s)) then
-        call VecDestroy(solver%cprstash%s,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%z)) then
-        call VecDestroy(solver%cprstash%z,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%factors1vec)) then
-        call VecDestroy(solver%cprstash%factors1vec,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%factors2vec)) then
-        call VecDestroy(solver%cprstash%factors2vec,ierr);CHKERRQ(ierr)
-      endif
-      if (.not.PetscObjectIsNull(solver%cprstash%factors3vec)) then
-        call VecDestroy(solver%cprstash%factors3vec,ierr);CHKERRQ(ierr)
-      endif
+      call PUMatDestroy(solver%cprstash%Ap)
+      call PUMatDestroy(solver%cprstash%As)
+      call PUVecDestroy(solver%cprstash%T1r)
+      call PUVecDestroy(solver%cprstash%T3r)
+      call PUVecDestroy(solver%cprstash%r2)
+      call PUVecDestroy(solver%cprstash%s)
+      call PUVecDestroy(solver%cprstash%z)
+      call PUVecDestroy(solver%cprstash%factors1vec)
+      call PUVecDestroy(solver%cprstash%factors2vec)
+      call PUVecDestroy(solver%cprstash%factors3vec)
       deallocate(solver%cprstash)
       nullify(solver%cprstash)
     endif

@@ -79,13 +79,12 @@ recursive subroutine DataMediatorVecStrip(this)
   !
   ! Author: Glenn Hammond
   ! Date: 03/24/15
-  !
+
+  use Petsc_Utility_module
 
   implicit none
 
   class(data_mediator_vec_type) :: this
-
-  PetscErrorCode :: ierr
 
   ! update the next one
   if (associated(this%next)) then
@@ -97,12 +96,8 @@ recursive subroutine DataMediatorVecStrip(this)
   ! Simply nullify the pointer as the dataset resides in a list to be
   ! destroyed separately.
   !nullify(data_mediator%dataset)
-  if (.not.PetscObjectIsNull(this%scatter_ctx)) then
-    call VecScatterDestroy(this%scatter_ctx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%vec)) then
-    call VecDestroy(this%vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecScatterDestroy(this%scatter_ctx)
+  call PUVecDestroy(this%vec)
 
 end subroutine DataMediatorVecStrip
 

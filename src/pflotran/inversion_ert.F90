@@ -1971,19 +1971,17 @@ subroutine InversionERTStrip(this)
   ! Author: Piyoosh Jaysaval
   ! Date: 06/14/21
   !
-  class(inversion_ert_type) :: this
+  use Petsc_Utility_module
 
-  PetscErrorCode :: ierr
+  implicit none
+
+  class(inversion_ert_type) :: this
 
   call InversionSubsurfaceStrip(this)
 
   nullify(this%realization)
-  if (.not.PetscObjectIsNull(this%quantity_of_interest)) then
-    call VecDestroy(this%quantity_of_interest,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(this%ref_quantity_of_interest)) then
-    call VecDestroy(this%ref_quantity_of_interest,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%quantity_of_interest)
+  call PUVecDestroy(this%ref_quantity_of_interest)
 
 end subroutine InversionERTStrip
 

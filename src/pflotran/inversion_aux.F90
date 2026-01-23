@@ -800,21 +800,16 @@ subroutine InversionAuxPerturbationStrip(perturbation)
   ! Author: Glenn Hammond
   ! Date: 09/24/21
   !
+  use Petsc_Utility_module
   use Utility_module
 
   type(inversion_perturbation_type), pointer :: perturbation
 
-  PetscErrorCode :: ierr
-
   if (.not.associated(perturbation)) return
 
   call DeallocateArray(perturbation%select_cells)
-  if (.not.PetscObjectIsNull(perturbation%base_parameter_vec)) then
-    call VecDestroy(perturbation%base_parameter_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(perturbation%base_measurement_vec)) then
-    call VecDestroy(perturbation%base_measurement_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(perturbation%base_parameter_vec)
+  call PUVecDestroy(perturbation%base_measurement_vec)
   deallocate(perturbation)
   nullify(perturbation)
 
@@ -830,11 +825,11 @@ subroutine InversionAuxDestroy(aux)
   ! Date: 09/22/21
   !
   use Utility_module, only : DeallocateArray
+  use Petsc_Utility_module
 
   type(inversion_aux_type), pointer :: aux
 
   PetscInt :: i
-  PetscErrorCode :: ierr
 
   if (.not.associated(aux)) return
 
@@ -858,36 +853,15 @@ subroutine InversionAuxDestroy(aux)
     deallocate(aux%parameters)
   endif
   nullify(aux%parameters)
-  if (.not.PetscObjectIsNull(aux%measurement_vec)) then
-    call VecDestroy(aux%measurement_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%dist_measurement_vec)) then
-    call VecDestroy(aux%dist_measurement_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%parameter_vec)) then
-    call VecDestroy(aux%parameter_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%dist_parameter_vec)) then
-    call VecDestroy(aux%dist_parameter_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%del_parameter_vec)) then
-    call VecDestroy(aux%del_parameter_vec,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%scatter_measure_to_dist_measure)) then
-    call VecScatterDestroy(aux%scatter_measure_to_dist_measure, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%scatter_param_to_dist_param)) then
-    call VecScatterDestroy(aux%scatter_measure_to_dist_measure, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%scatter_global_to_dist_param)) then
-    call VecScatterDestroy(aux%scatter_measure_to_dist_measure, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%JsensitivityT)) then
-    call MatDestroy(aux%JsensitivityT,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(aux%measurement_vec)
+  call PUVecDestroy(aux%dist_measurement_vec)
+  call PUVecDestroy(aux%parameter_vec)
+  call PUVecDestroy(aux%dist_parameter_vec)
+  call PUVecDestroy(aux%del_parameter_vec)
+  call PUVecScatterDestroy(aux%scatter_measure_to_dist_measure)
+  call PUVecScatterDestroy(aux%scatter_param_to_dist_param)
+  call PUVecScatterDestroy(aux%scatter_global_to_dist_param)
+  call PUMatDestroy(aux%JsensitivityT)
 
   ! nullify objects owned by other objects
   nullify(aux%driver)

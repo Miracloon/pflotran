@@ -205,23 +205,18 @@ subroutine InvForwardTSAuxDestroyMatrices(aux)
   ! Author: Glenn Hammond
   ! Date: 11/19/21
   !
+  use Petsc_Utility_module
   use Utility_module, only : DeallocateArray
 
   type(inversion_forward_ts_aux_type), pointer :: aux
-
-  PetscErrorCode :: ierr
 
   if (.not.associated(aux)) return
 
   nullify(aux%prev)
   nullify(aux%next)
 
-  if (.not.PetscObjectIsNull(aux%dResdu)) then
-    call MatDestroy(aux%dResdu,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%dResdparam)) then
-    call MatDestroy(aux%dResdparam,ierr);CHKERRQ(ierr)
-  endif
+  call PUMatDestroy(aux%dResdu)
+  call PUMatDestroy(aux%dResdparam)
   call DeallocateArray(aux%dRes_du_k)
 
   deallocate(aux)

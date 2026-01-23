@@ -163,48 +163,25 @@ subroutine SimAuxDestroy(aux)
   ! Date: 08/20/13
   !
 
+  use Petsc_Utility_module
+
   implicit none
 
   type(simulation_aux_type), pointer :: aux
 
-  PetscErrorCode :: ierr
-
   if (.not.associated(aux)) return
 
-  if (.not.PetscObjectIsNull(aux%subsurf_pres)) then
-    call VecDestroy(aux%subsurf_pres,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_temp)) then
-    call VecDestroy(aux%subsurf_temp,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_fluid_den)) then
-    call VecDestroy(aux%subsurf_fluid_den,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_por0)) then
-    call VecDestroy(aux%subsurf_por0,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_por)) then
-    call VecDestroy(aux%subsurf_por,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_perm0)) then !DANNY
-    call VecDestroy(aux%subsurf_perm0,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_perm)) then
-    call VecDestroy(aux%subsurf_perm,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_stress)) then
-    call VecDestroy(aux%subsurf_stress,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%subsurf_strain)) then
-    call VecDestroy(aux%subsurf_strain,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(aux%subsurf_to_geomechanics)) then
-    call VecScatterDestroy(aux%subsurf_to_geomechanics,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(aux%geomechanics_to_subsurf)) then
-    call VecScatterDestroy(aux%geomechanics_to_subsurf,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(aux%subsurf_pres)
+  call PUVecDestroy(aux%subsurf_temp)
+  call PUVecDestroy(aux%subsurf_fluid_den)
+  call PUVecDestroy(aux%subsurf_por0)
+  call PUVecDestroy(aux%subsurf_por)
+  call PUVecDestroy(aux%subsurf_perm0)
+  call PUVecDestroy(aux%subsurf_perm)
+  call PUVecDestroy(aux%subsurf_strain)
+  call PUVecDestroy(aux%subsurf_stress)
+  call PUVecScatterDestroy(aux%subsurf_to_geomechanics)
+  call PUVecScatterDestroy(aux%geomechanics_to_subsurf)
 
   deallocate(aux)
   nullify(aux)

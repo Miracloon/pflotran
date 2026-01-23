@@ -172,7 +172,8 @@ subroutine FieldDestroy(field)
   !
   ! Author: Glenn Hammond
   ! Date: 11/15/07
-  !
+
+  use Petsc_Utility_module
 
   implicit none
 
@@ -185,165 +186,57 @@ subroutine FieldDestroy(field)
   if (.not.associated(field)) return
 
   ! Destroy PetscVecs
-  if (.not.PetscObjectIsNull(field%porosity0)) then
-    call VecDestroy(field%porosity0,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%porosity_base_store)) then
-    call VecDestroy(field%porosity_base_store,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%porosity_geomech_store)) then
-    call VecDestroy(field%porosity_geomech_store,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%porosity_t)) then
-    call VecDestroy(field%porosity_t,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%porosity_tpdt)) then
-    call VecDestroy(field%porosity_tpdt,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tortuosity0)) then
-    call VecDestroy(field%tortuosity0,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_xx)) then
-    call VecDestroy(field%perm0_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_yy)) then
-    call VecDestroy(field%perm0_yy,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_zz)) then
-    call VecDestroy(field%perm0_zz,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_xy)) then
-    call VecDestroy(field%perm0_xy,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_xz)) then
-    call VecDestroy(field%perm0_xz,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%perm0_yz)) then
-    call VecDestroy(field%perm0_yz,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%work)) then
-    call VecDestroy(field%work,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%work_loc)) then
-    call VecDestroy(field%work_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%volume0)) then
-    call VecDestroy(field%volume0,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%compressibility0)) then
-    call VecDestroy(field%compressibility0,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%flow_r)) then
-    call VecDestroy(field%flow_r,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_scaled_xx)) then
-    call VecDestroy(field%flow_scaled_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_work_loc)) then
-    call VecDestroy(field%flow_work_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_xx)) then
-    call VecDestroy(field%flow_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_xx_loc)) then
-    call VecDestroy(field%flow_xx_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_dxx)) then
-    call VecDestroy(field%flow_dxx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_yy)) then
-    call VecDestroy(field%flow_yy,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_accum)) then
-    call VecDestroy(field%flow_accum,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_accum2)) then
-    call VecDestroy(field%flow_accum2,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_xxdot)) then
-    call VecDestroy(field%flow_xxdot,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_xxdot_loc)) then
-    call VecDestroy(field%flow_xxdot_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_rhs)) then
-    call VecDestroy(field%flow_rhs,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%tran_r)) then
-    call VecDestroy(field%tran_r,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_log_xx)) then
-    call VecDestroy(field%tran_log_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_xx)) then
-    call VecDestroy(field%tran_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_xx_loc)) then
-    call VecDestroy(field%tran_xx_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_dxx)) then
-    call VecDestroy(field%tran_dxx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_yy)) then
-    call VecDestroy(field%tran_yy,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_accum)) then
-    call VecDestroy(field%tran_accum,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_work_loc)) then
-    call VecDestroy(field%tran_work_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%flow_mass_transfer)) then
-    call VecDestroy(field%flow_mass_transfer,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_mass_transfer)) then
-    call VecDestroy(field%tran_mass_transfer,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%flow_ts_mass_balance)) then
-    call VecDestroy(field%flow_ts_mass_balance,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flow_total_mass_balance)) then
-    call VecDestroy(field%flow_total_mass_balance,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_ts_mass_balance)) then
-    call VecDestroy(field%tran_ts_mass_balance,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%tran_total_mass_balance)) then
-    call VecDestroy(field%tran_total_mass_balance,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%tvd_ghosts)) then
-    call VecDestroy(field%tvd_ghosts,ierr);CHKERRQ(ierr)
-  endif
-
+  call PUVecDestroy(field%porosity0)
+  call PUVecDestroy(field%porosity_base_store)
+  call PUVecDestroy(field%porosity_geomech_store)
+  call PUVecDestroy(field%porosity_t)
+  call PUVecDestroy(field%porosity_tpdt)
+  call PUVecDestroy(field%tortuosity0)
+  call PUVecDestroy(field%perm0_xx)
+  call PUVecDestroy(field%perm0_yy)
+  call PUVecDestroy(field%perm0_zz)
+  call PUVecDestroy(field%perm0_xy)
+  call PUVecDestroy(field%perm0_xz)
+  call PUVecDestroy(field%perm0_yz)
+  call PUVecDestroy(field%work)
+  call PUVecDestroy(field%work_loc)
+  call PUVecDestroy(field%volume0)
+  call PUVecDestroy(field%compressibility0)
+  call PUVecDestroy(field%flow_r)
+  call PUVecDestroy(field%flow_xx)
+  call PUVecDestroy(field%flow_xx_loc)
+  call PUVecDestroy(field%flow_scaled_xx)
+  call PUVecDestroy(field%flow_work_loc)
+  call PUVecDestroy(field%flow_dxx)
+  call PUVecDestroy(field%flow_yy)
+  call PUVecDestroy(field%flow_accum)
+  call PUVecDestroy(field%flow_accum2)
+  call PUVecDestroy(field%flow_xxdot)
+  call PUVecDestroy(field%flow_xxdot_loc)
+  call PUVecDestroy(field%flow_rhs)
+  call PUVecDestroy(field%tran_r)
+  call PUVecDestroy(field%tran_log_xx)
+  call PUVecDestroy(field%tran_xx)
+  call PUVecDestroy(field%tran_xx_loc)
+  call PUVecDestroy(field%tran_dxx)
+  call PUVecDestroy(field%tran_yy)
+  call PUVecDestroy(field%tran_accum)
+  call PUVecDestroy(field%tran_work_loc)
+  call PUVecDestroy(field%flow_mass_transfer)
+  call PUVecDestroy(field%tran_mass_transfer)
+  call PUVecDestroy(field%flow_ts_mass_balance)
+  call PUVecDestroy(field%flow_total_mass_balance)
+  call PUVecDestroy(field%tran_ts_mass_balance)
+  call PUVecDestroy(field%tran_total_mass_balance)
+  call PUVecDestroy(field%tvd_ghosts)
   do ivar = 1,field%nvars
-    call VecDestroy(field%avg_vars_vec(ivar),ierr);CHKERRQ(ierr)
+    call PUVecDestroy(field%avg_vars_vec(ivar))
   enddo
-
-  if (.not.PetscObjectIsNull(field%flowrate_inst)) then
-    call VecDestroy(field%flowrate_inst,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%flowrate_aveg)) then
-    call VecDestroy(field%flowrate_aveg,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(field%vx_face_inst)) then
-    call VecDestroy(field%vx_face_inst,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%vy_face_inst)) then
-    call VecDestroy(field%vy_face_inst,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(field%vz_face_inst)) then
-    call VecDestroy(field%vz_face_inst,ierr);CHKERRQ(ierr)
-  endif
-
+  call PUVecDestroy(field%flowrate_inst)
+  call PUVecDestroy(field%flowrate_aveg)
+  call PUVecDestroy(field%vx_face_inst)
+  call PUVecDestroy(field%vy_face_inst)
+  call PUVecDestroy(field%vz_face_inst)
   if (associated(field%max_change_vecs)) then
     !geh: kludge as the compiler returns i4 in 64-bit
     num_vecs = size(field%max_change_vecs)

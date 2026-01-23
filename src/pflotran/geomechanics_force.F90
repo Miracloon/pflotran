@@ -112,7 +112,6 @@ subroutine GeomechForceSetupPatch(geomech_realization)
 
   ! Young's modulus
   if (geomech_parameter%youngs_modulus_spatially_varying) then
-!    geomech_parameter%youngs_modulus_vec = patch%geomech_field%youngs_modulus
   else
     allocate(geomech_parameter%youngs_modulus &
       (size(geomech_realization%geomech_material_property_array)))
@@ -124,7 +123,6 @@ subroutine GeomechForceSetupPatch(geomech_realization)
   endif
   ! Poisson's ratio
   if (geomech_parameter%poissons_ratio_spatially_varying) then
-!    geomech_parameter%poissons_ratio_vec = patch%geomech_field%poissons_ratio
   else
     allocate(geomech_parameter%poissons_ratio &
       (size(geomech_realization%geomech_material_property_array)))
@@ -136,7 +134,6 @@ subroutine GeomechForceSetupPatch(geomech_realization)
   endif
   ! Density
   if (geomech_parameter%density_spatially_varying) then
-!    geomech_parameter%density_vec = patch%geomech_field%density
   else
     allocate(geomech_parameter%density &
       (size(geomech_realization%geomech_material_property_array)))
@@ -148,7 +145,6 @@ subroutine GeomechForceSetupPatch(geomech_realization)
   endif
   ! Biot's coefficient
   if (geomech_parameter%biot_coeff_spatially_varying) then
-!    geomech_parameter%biot_coeff_vec = patch%geomech_field%biot_coeff
   else
     allocate(geomech_parameter%biot_coeff &
       (size(geomech_realization%geomech_material_property_array)))
@@ -160,7 +156,6 @@ subroutine GeomechForceSetupPatch(geomech_realization)
   endif
   ! Thermal expansion coefficient
   if (geomech_parameter%thermal_exp_coeff_spatially_varying) then
-!    geomech_parameter%thermal_exp_coeff_vec = patch%geomech_field%thermal_exp_coeff
   else
     allocate(geomech_parameter%thermal_exp_coeff &
       (size(geomech_realization%geomech_material_property_array)))

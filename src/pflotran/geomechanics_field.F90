@@ -137,129 +137,53 @@ subroutine GeomechFieldDestroy(geomech_field)
   !
   ! Author: Satish Karra, LANL
   ! Date: 06/05/13
-  !
+
+  use Petsc_Utility_module
 
   implicit none
 
   type(geomech_field_type), pointer :: geomech_field
-  PetscErrorCode :: ierr
 
   if (.not.associated(geomech_field)) return
 
   ! Destroy PetscVecs
-  if (.not.PetscObjectIsNull(geomech_field%work)) then
-    call VecDestroy(geomech_field%work,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%work_loc)) then
-    call VecDestroy(geomech_field%work_loc,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(geomech_field%work)
+  call PUVecDestroy(geomech_field%work_loc)
+  call PUVecDestroy(geomech_field%rhs)
+  call PUVecDestroy(geomech_field%disp_xx)
+  call PUVecDestroy(geomech_field%disp_xx_loc)
+  call PUVecDestroy(geomech_field%disp_xx_init_loc)
+  call PUVecDestroy(geomech_field%press)
+  call PUVecDestroy(geomech_field%press_loc)
+  call PUVecDestroy(geomech_field%press_init_loc)
+  call PUVecDestroy(geomech_field%temp)
+  call PUVecDestroy(geomech_field%temp_loc)
+  call PUVecDestroy(geomech_field%temp_init_loc)
+  call PUVecDestroy(geomech_field%subsurf_vec_1dof)
+  call PUVecDestroy(geomech_field%imech_loc)
+  call PUVecDestroy(geomech_field%strain)
+  call PUVecDestroy(geomech_field%strain_loc)
+  call PUVecDestroy(geomech_field%stress)
+  call PUVecDestroy(geomech_field%stress_loc)
+  call PUVecDestroy(geomech_field%stress_total)
+  call PUVecDestroy(geomech_field%stress_total_loc)
+  call PUVecDestroy(geomech_field%strain_subsurf)
+  call PUVecDestroy(geomech_field%stress_subsurf)
+  call PUVecDestroy(geomech_field%strain_subsurf_loc)
+  call PUVecDestroy(geomech_field%stress_subsurf_loc)
+  call PUVecDestroy(geomech_field%porosity)
+  call PUVecDestroy(geomech_field%porosity_loc)
+  call PUVecDestroy(geomech_field%porosity_init_loc)
+  call PUVecDestroy(geomech_field%youngs_modulus)
+  call PUVecDestroy(geomech_field%poissons_ratio)
+  call PUVecDestroy(geomech_field%density)
+  call PUVecDestroy(geomech_field%biot_coeff)
+  call PUVecDestroy(geomech_field%thermal_exp_coeff)
+  call PUVecDestroy(geomech_field%fluid_density)
+  call PUVecDestroy(geomech_field%fluid_density_loc)
+  call PUVecDestroy(geomech_field%fluid_density_init_loc)
 
-  if (.not.PetscObjectIsNull(geomech_field%rhs)) then
-    call VecDestroy(geomech_field%rhs,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%disp_xx)) then
-    call VecDestroy(geomech_field%disp_xx,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%disp_xx_loc)) then
-    call VecDestroy(geomech_field%disp_xx_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%disp_xx_init_loc)) then
-    call VecDestroy(geomech_field%disp_xx_init_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%press)) then
-    call VecDestroy(geomech_field%press,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%press_loc)) then
-    call VecDestroy(geomech_field%press_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%press_init_loc)) then
-    call VecDestroy(geomech_field%press_init_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%temp)) then
-    call VecDestroy(geomech_field%temp,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%temp_loc)) then
-    call VecDestroy(geomech_field%temp_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%temp_init_loc)) then
-    call VecDestroy(geomech_field%temp_init_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%subsurf_vec_1dof) ) then
-    call VecDestroy(geomech_field%subsurf_vec_1dof,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%imech_loc)) then
-    call VecDestroy(geomech_field%imech_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%strain)) then
-    call VecDestroy(geomech_field%strain,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%strain_loc)) then
-    call VecDestroy(geomech_field%strain_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress)) then
-    call VecDestroy(geomech_field%stress,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress_loc)) then
-    call VecDestroy(geomech_field%stress_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress_total)) then
-    call VecDestroy(geomech_field%stress_total,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress_total_loc)) then
-    call VecDestroy(geomech_field%stress_total_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%strain_subsurf)) then
-    call VecDestroy(geomech_field%strain_subsurf,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress_subsurf)) then
-    call VecDestroy(geomech_field%stress_subsurf,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%strain_subsurf_loc)) then
-    call VecDestroy(geomech_field%strain_subsurf_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%stress_subsurf_loc)) then
-    call VecDestroy(geomech_field%stress_subsurf_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%porosity)) then
-    call VecDestroy(geomech_field%porosity,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%porosity_loc)) then
-    call VecDestroy(geomech_field%porosity_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%porosity_init_loc)) then
-    call VecDestroy(geomech_field%porosity_init_loc,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%youngs_modulus)) then
-    call VecDestroy(geomech_field%youngs_modulus,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%poissons_ratio)) then
-    call VecDestroy(geomech_field%poissons_ratio,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%density)) then
-    call VecDestroy(geomech_field%density,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%biot_coeff)) then
-    call VecDestroy(geomech_field%biot_coeff,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%thermal_exp_coeff)) then
-    call VecDestroy(geomech_field%thermal_exp_coeff,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(geomech_field%fluid_density)) then
-    call VecDestroy(geomech_field%fluid_density,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%fluid_density_loc)) then
-    call VecDestroy(geomech_field%fluid_density_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(geomech_field%fluid_density_init_loc)) then
-    call VecDestroy(geomech_field%fluid_density_init_loc,ierr);CHKERRQ(ierr)
-  endif
+  PetscObjectNullify(geomech_field%A)
 
   if (associated(geomech_field)) deallocate(geomech_field)
   nullify(geomech_field)

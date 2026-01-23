@@ -1465,6 +1465,7 @@ subroutine CondControlAssignRTTranInitCond(realization)
   use Grid_module
   use Dataset_Base_class
   use Patch_module
+  use Petsc_Utility_module
   use Reactive_Transport_module, only : RTUpdateAuxVars, &
                                         RTUpdateActivityCoefficients
   use Reactive_Transport_Aux_module
@@ -1960,12 +1961,8 @@ subroutine CondControlAssignRTTranInitCond(realization)
     call RTUpdateAuxVars(realization,PETSC_TRUE,PETSC_FALSE,PETSC_TRUE)
   endif
 
-  if (.not.PetscObjectIsNull(vec1_loc)) then
-    call VecDestroy(vec1_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(vec2_loc)) then
-    call VecDestroy(vec2_loc,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(vec1_loc)
+  call PUVecDestroy(vec2_loc)
 
 end subroutine CondControlAssignRTTranInitCond
 
@@ -1990,6 +1987,7 @@ subroutine CondControlAssignNWTranInitCond(realization)
   use Grid_module
   use Global_Aux_module
   use Patch_module
+  use Petsc_Utility_module
   use NW_Transport_module
   use NW_Transport_Aux_module
   use NWT_Equilibrium_module
@@ -2134,12 +2132,8 @@ subroutine CondControlAssignNWTranInitCond(realization)
 
   call NWTUpdateAuxVars(realization,PETSC_TRUE,PETSC_FALSE)
 
-  if (.not.PetscObjectIsNull(vec1_loc)) then
-    call VecDestroy(vec1_loc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(vec2_loc)) then
-    call VecDestroy(vec2_loc,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(vec1_loc)
+  call PUVecDestroy(vec2_loc)
 
 end subroutine CondControlAssignNWTranInitCond
 

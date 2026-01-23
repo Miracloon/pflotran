@@ -823,16 +823,17 @@ end subroutine GMGridMapIndices
 ! date: 05/22/13
 !
 ! ************************************************************************** !
+
 subroutine GMGridDestroy(geomech_grid)
 
   use Utility_module, only : DeallocateArray
+  use Petsc_Utility_module
 
   implicit none
 
   type(geomech_grid_type), pointer :: geomech_grid
 
   PetscInt :: i
-  PetscErrorCode :: ierr
 
   if (.not.associated(geomech_grid)) return
 
@@ -845,11 +846,8 @@ subroutine GMGridDestroy(geomech_grid)
   call DeallocateArray(geomech_grid%node_ids_local_natural)
   call DeallocateArray(geomech_grid%ghosted_node_ids_natural)
   call DeallocateArray(geomech_grid%ghosted_node_ids_petsc)
-  if (.not.PetscObjectIsNull(geomech_grid%ao_natural_to_petsc)) &
-    call AODestroy(geomech_grid%ao_natural_to_petsc,ierr);CHKERRQ(ierr)
-  if (.not.PetscObjectIsNull(geomech_grid%ao_natural_to_petsc_nodes)) then
-    call AODestroy(geomech_grid%ao_natural_to_petsc_nodes,ierr);CHKERRQ(ierr)
-  endif
+  call PUAODestroy(geomech_grid%ao_natural_to_petsc)
+  call PUAODestroy(geomech_grid%ao_natural_to_petsc_nodes)
 
   if (associated(geomech_grid%nodes)) &
     deallocate(geomech_grid%nodes)
@@ -873,13 +871,8 @@ subroutine GMGridDestroy(geomech_grid)
   endif
   nullify(geomech_grid%gauss_surf_node)
 
-  if (.not.PetscObjectIsNull(geomech_grid%no_elems_sharing_node_loc)) then
-    call VecDestroy(geomech_grid%no_elems_sharing_node_loc, &
-                    ierr);CHKERRQ(ierr)
-  endif
-  if ( .not.PetscObjectIsNull(geomech_grid%no_elems_sharing_node)) then
-    call VecDestroy(geomech_grid%no_elems_sharing_node,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(geomech_grid%no_elems_sharing_node_loc)
+  call PUVecDestroy(geomech_grid%no_elems_sharing_node)
 
   deallocate(geomech_grid%nG2L)
   deallocate(geomech_grid%nL2G)
@@ -901,64 +894,34 @@ end subroutine GMGridDestroy
 ! ************************************************************************** !
 subroutine GMDMDestroy(gmdm)
 
+  use Petsc_Utility_module
+
   implicit none
 
   type(gmdm_type), pointer :: gmdm
 
-  PetscErrorCode :: ierr
-
   if (.not.associated(gmdm)) return
 
-  if (.not.PetscObjectIsNull(gmdm%is_ghosted_local)) then
-    call ISDestroy(gmdm%is_ghosted_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_local_local)) then
-    call ISDestroy(gmdm%is_local_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_ghosted_petsc)) then
-    call ISDestroy(gmdm%is_ghosted_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_local_petsc)) then
-    call ISDestroy(gmdm%is_local_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_ghosts_local)) then
-    call ISDestroy(gmdm%is_ghosts_local,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_ghosts_petsc)) then
-    call ISDestroy(gmdm%is_ghosts_petsc,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%is_local_natural)) then
-    call ISDestroy(gmdm%is_local_natural,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_ltog)) then
-    call VecScatterDestroy(gmdm%scatter_ltog,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_gtol)) then
-    call VecScatterDestroy(gmdm%scatter_gtol,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_ltol)) then
-    call VecScatterDestroy(gmdm%scatter_ltol,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_gton)) then
-    call VecScatterDestroy(gmdm%scatter_gton,ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_gton_elem)) then
-    call VecScatterDestroy(gmdm%scatter_gton_elem,ierr);CHKERRQ(ierr)
-  endif
-  call ISLocalToGlobalMappingDestroy(gmdm%mapping_ltog,ierr);CHKERRQ(ierr)
-  call ISLocalToGlobalMappingDestroy(gmdm%mapping_ltog_elem, &
-                                     ierr);CHKERRQ(ierr)
-  call VecDestroy(gmdm%global_vec,ierr);CHKERRQ(ierr)
-  call VecDestroy(gmdm%local_vec,ierr);CHKERRQ(ierr)
-  call VecDestroy(gmdm%global_vec_elem,ierr);CHKERRQ(ierr)
-  if (.not.PetscObjectIsNull(gmdm%scatter_subsurf_to_geomech_ndof)) then
-    call VecScatterDestroy(gmdm%scatter_subsurf_to_geomech_ndof, &
-                           ierr);CHKERRQ(ierr)
-  endif
-  if (.not.PetscObjectIsNull(gmdm%scatter_geomech_to_subsurf_ndof)) then
-    call VecScatterDestroy(gmdm%scatter_geomech_to_subsurf_ndof, &
-                           ierr);CHKERRQ(ierr)
-  endif
+  call PUISDestroy(gmdm%is_ghosted_local)
+  call PUISDestroy(gmdm%is_local_local)
+  call PUISDestroy(gmdm%is_ghosted_petsc)
+  call PUISDestroy(gmdm%is_local_petsc)
+  call PUISDestroy(gmdm%is_ghosts_local)
+  call PUISDestroy(gmdm%is_ghosts_petsc)
+  call PUISDestroy(gmdm%is_local_natural)
+  call PUVecScatterDestroy(gmdm%scatter_ltog)
+  call PUVecScatterDestroy(gmdm%scatter_gtol)
+  call PUVecScatterDestroy(gmdm%scatter_ltol)
+  call PUVecScatterDestroy(gmdm%scatter_gton)
+  call PUVecScatterDestroy(gmdm%scatter_gton_elem)
+  call PUISLocalToGlobalMappingDestroy(gmdm%mapping_ltog)
+  call PUISLocalToGlobalMappingDestroy(gmdm%mapping_ltog_elem)
+  call PUVecDestroy(gmdm%global_vec)
+  call PUVecDestroy(gmdm%local_vec)
+  call PUVecDestroy(gmdm%global_vec_elem)
+  call PUVecScatterDestroy(gmdm%scatter_subsurf_to_geomech_ndof)
+  call PUVecScatterDestroy(gmdm%scatter_geomech_to_subsurf_ndof)
+
   deallocate(gmdm)
   nullify(gmdm)
 

@@ -2864,12 +2864,11 @@ subroutine InversionZFlowDestroy(this)
   !
 
   use Utility_module, only : DeallocateArray
+  use Petsc_Utility_module
 
   implicit none
 
   class(inversion_zflow_type), pointer :: this
-
-  PetscErrorCode :: ierr
 
   if (.not.associated(this)) return
 
@@ -2882,13 +2881,8 @@ subroutine InversionZFlowDestroy(this)
   call DeallocateArray(this%Wm)
   call DeallocateArray(this%rblock)
 
-  if (.not.PetscObjectIsNull(this%dist_parameter_tmp_vec)) then
-    call VecDestroy(this%dist_parameter_tmp_vec,ierr);CHKERRQ(ierr)
-  endif
-
-  if (.not.PetscObjectIsNull(this%parameter_tmp_vec)) then
-    call VecDestroy(this%parameter_tmp_vec,ierr);CHKERRQ(ierr)
-  endif
+  call PUVecDestroy(this%dist_parameter_tmp_vec)
+  call PUVecDestroy(this%parameter_tmp_vec)
 
   call ConstrainedBlockDestroy(this%constrained_block)
 

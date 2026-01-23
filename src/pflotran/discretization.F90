@@ -1473,47 +1473,32 @@ subroutine DiscretizationDestroy(discretization)
   ! Author: Glenn Hammond
   ! Date: 11/01/07
   !
+  use Petsc_Utility_module
 
   implicit none
 
   type(discretization_type), pointer :: discretization
 
-  PetscErrorCode :: ierr
   PetscInt :: i
 
   if (.not.associated(discretization)) return
 
   select case(discretization%itype)
     case(STRUCTURED_GRID)
-      if (.not.PetscObjectIsNull(discretization%dm_1dof%dm)) then
-        call DMDestroy(discretization%dm_1dof%dm,ierr);CHKERRQ(ierr)
-      endif
-      PetscObjectNullify(discretization%dm_1dof%dm)
-      if (.not.PetscObjectIsNull(discretization%dm_nflowdof%dm)) then
-        call DMDestroy(discretization%dm_nflowdof%dm,ierr);CHKERRQ(ierr)
-      endif
-      PetscObjectNullify(discretization%dm_nflowdof%dm)
-      if (.not.PetscObjectIsNull(discretization%dm_ntrandof%dm)) then
-        call DMDestroy(discretization%dm_ntrandof%dm,ierr);CHKERRQ(ierr)
-      endif
-      PetscObjectNullify(discretization%dm_n_stress_strain_dof%dm)
-      if (.not.PetscObjectIsNull(discretization%dm_nflowdof%dm)) then
-        call DMDestroy(discretization%dm_n_stress_strain_dof%dm, &
-                       ierr);CHKERRQ(ierr)
-      endif
-      PetscObjectNullify(discretization%dm_n_stress_strain_dof%dm)
+      call PUDMDestroy(discretization%dm_1dof%dm)
+      call PUDMDestroy(discretization%dm_nflowdof%dm)
+      call PUDMDestroy(discretization%dm_ntrandof%dm)
+      call PUDMDestroy(discretization%dm_n_stress_strain_dof%dm)
       if (associated(discretization%dmc_nflowdof)) then
         do i=1,size(discretization%dmc_nflowdof)
-          call DMDestroy(discretization%dmc_nflowdof(i)%dm, &
-                         ierr);CHKERRQ(ierr)
+          call PUDMDestroy(discretization%dmc_nflowdof(i)%dm)
         enddo
         deallocate(discretization%dmc_nflowdof)
         nullify(discretization%dmc_nflowdof)
       endif
       if (associated(discretization%dmc_ntrandof)) then
         do i=1,size(discretization%dmc_ntrandof)
-          call DMDestroy(discretization%dmc_ntrandof(i)%dm, &
-                         ierr);CHKERRQ(ierr)
+          call PUDMDestroy(discretization%dmc_ntrandof(i)%dm)
         enddo
         deallocate(discretization%dmc_ntrandof)
         nullify(discretization%dmc_ntrandof)
@@ -1527,7 +1512,6 @@ subroutine DiscretizationDestroy(discretization)
         call UGridDMDestroy(discretization%dm_ntrandof%ugdm)
       if (associated(discretization%dm_n_stress_strain_dof%ugdm)) &
         call UGridDMDestroy(discretization%dm_n_stress_strain_dof%ugdm)
-
   end select
   if (associated(discretization%dm_1dof)) &
     deallocate(discretization%dm_1dof)
@@ -1542,11 +1526,7 @@ subroutine DiscretizationDestroy(discretization)
     deallocate(discretization%dm_n_stress_strain_dof)
   nullify(discretization%dm_n_stress_strain_dof)
 
-
-  if (.not.PetscObjectIsNull(discretization%tvd_ghost_scatter)) then
-    call VecScatterDestroy(discretization%tvd_ghost_scatter, &
-                           ierr);CHKERRQ(ierr)
-  endif
+  call PUVecScatterDestroy(discretization%tvd_ghost_scatter)
 
   call GridDestroy(discretization%grid)
 

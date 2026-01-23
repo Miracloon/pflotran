@@ -1652,11 +1652,9 @@ subroutine WriteHDF5CoordinatesUGrid(grid,option,file_id)
   call VecRestoreArray(global_y_vertex_vec,vec_y_ptr,ierr);CHKERRQ(ierr)
   call VecRestoreArray(global_z_vertex_vec,vec_z_ptr,ierr);CHKERRQ(ierr)
 
-
   call VecDestroy(global_x_vertex_vec,ierr);CHKERRQ(ierr)
   call VecDestroy(global_y_vertex_vec,ierr);CHKERRQ(ierr)
   call VecDestroy(global_z_vertex_vec,ierr);CHKERRQ(ierr)
-
 
   !
   !  Write elements
