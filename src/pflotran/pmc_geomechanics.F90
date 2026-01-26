@@ -279,11 +279,6 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
 
   call this%timestepper%StepDT(this%pm_list,local_stop_flag)
 
-  ! Check if it is initial solve
-  if (this%timestepper%steps == 1) then
-    this%option%geomechanics%initial_flag = PETSC_TRUE
-  endif
-
   ! Have to loop over all process models coupled in this object and update
   ! the time step size.  Still need code to force all process models to
   ! use the same time step size if tightly or iteratively coupled.
@@ -651,7 +646,7 @@ subroutine PMCGeomechanicsSetAuxData(this)
               ! calc volumetric strain
               strain_vol = local_strain(1) + local_strain(2) + local_strain(3)
 
-              if (this%timestepper%steps < 0) then ! before init
+              if (option%geomechanics%initial_flag) then ! part of pre-processing
                 global_auxvar%parameters(press_0_id) = local_pressure
                 global_auxvar%parameters(flow_porosity_id) = &
                  pmc%subsurf_realization%patch%aux%Material% &
@@ -661,23 +656,25 @@ subroutine PMCGeomechanicsSetAuxData(this)
                   pmc%subsurf_realization%patch%aux%Material% &
                   auxvars(local_id)%porosity_0
 
-              elseif (this%timestepper%steps == 0) then ! at init
-                global_auxvar%parameters(strainv_0_id) = strain_vol
-                global_auxvar%parameters(strainv_id) = strain_vol
-                global_auxvar%parameters(flow_porosity_id) = &
-                  pmc%subsurf_realization%patch%aux%Material% &
-                  auxvars(local_id)%porosity_0
-                global_auxvar%parameters(id_porosity_mech) = &
-                  pmc%subsurf_realization%patch%aux%Material% &
-                  auxvars(local_id)%porosity_0
-                if (this%option%iflowmode == TH_MODE) then
-                  global_auxvar%parameters(temp_0_id) = local_temp
-                endif
+              else ! after initial solve
+                if (this%timestepper%steps == 0) then ! at init
+                  global_auxvar%parameters(strainv_0_id) = strain_vol
+                  global_auxvar%parameters(strainv_id) = strain_vol
+                  global_auxvar%parameters(flow_porosity_id) = &
+                    pmc%subsurf_realization%patch%aux%Material% &
+                    auxvars(local_id)%porosity_0
+                  global_auxvar%parameters(id_porosity_mech) = &
+                    pmc%subsurf_realization%patch%aux%Material% &
+                    auxvars(local_id)%porosity_0
+                  if (this%option%iflowmode == TH_MODE) then
+                    global_auxvar%parameters(temp_0_id) = local_temp
+                  endif
 
-              else ! post init
-                global_auxvar%parameters(strainv_id) = strain_vol
-                global_auxvar%parameters(id_porosity_mech) = &
-                global_auxvar%parameters(flow_porosity_id)
+                else ! for steps >= 1
+                  global_auxvar%parameters(strainv_id) = strain_vol
+                  global_auxvar%parameters(id_porosity_mech) = &
+                  global_auxvar%parameters(flow_porosity_id)
+                endif
               endif
 
               global_auxvar%parameters(id_pressure_mech) = &
