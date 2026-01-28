@@ -1,0 +1,19 @@
+#Description: 3D test problem for testing chemical reactions
+#             based on chemistry from Hammond and Lichtner, WRR, 2010
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+    /
+  /
+END
+
+SUBSURFACE
+
+INACTIVE_CELL_VOLUME_THRESHOLD 1501.
+
+EXTERNAL_FILE 543_flow.txt
+
+END_SUBSURFACE
