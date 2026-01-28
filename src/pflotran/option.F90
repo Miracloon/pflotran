@@ -163,6 +163,7 @@ module Option_module
     PetscReal :: min_allowable_scale
 
     PetscBool :: print_ekg
+    PetscReal :: inactive_cell_volume_threshold
 
   end type option_type
 
@@ -579,6 +580,8 @@ subroutine OptionInitRealization(option)
   option%min_allowable_scale = 1.0d-10
 
   option%print_ekg = PETSC_FALSE
+
+  option%inactive_cell_volume_threshold = UNINITIALIZED_DOUBLE
 
   option%coupled_well = PETSC_FALSE
 

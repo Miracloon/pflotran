@@ -2571,6 +2571,11 @@ subroutine FactorySubsurfReadInput(simulation,input)
         call PMFracReadPass2(input,option)
 
 !....................
+      case('INACTIVE_CELL_VOLUME_THRESHOLD')
+        call InputReadDouble(input,option,option%inactive_cell_volume_threshold)
+        call InputErrorMsg(input,option,card,'threshold volume')
+
+!....................
       case ('END_SUBSURFACE')
         exit
 

@@ -37,6 +37,7 @@ subroutine SubsurfInitMaterialProperties(realization)
 
   call SubsurfAllocMatPropDataStructs(realization)
   call InitSubsurfAssignMatIDsToRegns(realization)
+  call InitSubsurfInactiveSmallCells(realization)
   call InitSubsurfAssignMatProperties(realization)
 
 end subroutine SubsurfInitMaterialProperties
@@ -270,6 +271,57 @@ subroutine InitSubsurfAssignMatIDsToRegns(realization)
   enddo
 
 end subroutine InitSubsurfAssignMatIDsToRegns
+
+! ************************************************************************** !
+
+subroutine InitSubsurfInactiveSmallCells(realization)
+  !
+  ! Inactivates small grid cells based on a prescribed tolerance
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/28/26
+  !
+  use Discretization_module
+  use Field_module
+  use Grid_module
+  use Material_Aux_module
+  use Option_module
+  use Patch_module
+  use Realization_Subsurface_class
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+
+  PetscInt :: ghosted_id
+
+  type(option_type), pointer :: option
+  type(patch_type), pointer :: patch
+  type(field_type), pointer :: field
+  type(material_auxvar_type), pointer :: material_auxvars(:)
+  PetscReal, pointer :: vec_p(:)
+  PetscErrorCode :: ierr
+
+  option => realization%option
+  patch => realization%patch
+  field => realization%field
+
+  if (Initialized(option%inactive_cell_volume_threshold)) then
+    call DiscretizationGlobalToLocal(realization%discretization, &
+                                     field%volume0, &
+                                     field%work_loc,ONEDOF)
+    call VecGetArray(field%work_loc,vec_p,ierr);CHKERRQ(ierr)
+    material_auxvars => patch%aux%Material%auxvars
+    do ghosted_id = 1, patch%grid%ngmax
+      if (vec_p(ghosted_id) <= option%inactive_cell_volume_threshold) then
+        patch%imat(ghosted_id) = 0
+        material_auxvars(ghosted_id)%id = 0
+      endif
+    enddo
+    call VecRestoreArray(field%work_loc,vec_p,ierr);CHKERRQ(ierr)
+  endif
+
+end subroutine InitSubsurfInactiveSmallCells
 
 ! ************************************************************************** !
 
