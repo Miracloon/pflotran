@@ -191,6 +191,7 @@ subroutine PMSCO2SetFlowMode(pm,pm_well,option)
 
 
   option%iflowmode = SCO2_MODE
+  option%flowmode = 'sco2'
 
   ! liquid, gas, precipitate composite properties
   option%nphase = 3

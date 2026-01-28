@@ -128,6 +128,7 @@ subroutine PMTHSetFlowMode(this,pm_well,option)
   type(option_type) :: option
 
   option%iflowmode = TH_MODE
+  option%flowmode = 'th'
   option%nphase = 1
   option%nflowdof = 2
   option%nflowspec = 1

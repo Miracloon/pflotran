@@ -265,6 +265,7 @@ subroutine PMHydrateSetFlowMode(pm_well,option)
   type(option_type) :: option
 
   option%iflowmode = H_MODE
+  option%flowmode = 'hydrate'
   option%nphase = 5
   option%liquid_phase = 1  ! liquid_pressure
   option%gas_phase = 2     ! gas_pressure

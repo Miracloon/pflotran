@@ -159,11 +159,13 @@ subroutine PMGeneralSetFlowMode(pm,option)
 !   PetscReal, pointer :: abs_update_inf_tol(:,:)
 !   PetscReal, pointer :: rel_update_inf_tol(:,:)
 
-   PetscReal, allocatable :: residual_abs_inf_tol(:)
-   PetscReal, allocatable :: residual_scaled_inf_tol(:)
-   PetscReal, allocatable :: abs_update_inf_tol(:,:)
-   PetscReal, allocatable :: rel_update_inf_tol(:,:)
+  PetscReal, allocatable :: residual_abs_inf_tol(:)
+  PetscReal, allocatable :: residual_scaled_inf_tol(:)
+  PetscReal, allocatable :: abs_update_inf_tol(:,:)
+  PetscReal, allocatable :: rel_update_inf_tol(:,:)
+
   option%iflowmode = G_MODE
+  option%flowmode = 'general'
   allocate(general_max_states)
   allocate(max_change_index)
 

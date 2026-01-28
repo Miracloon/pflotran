@@ -110,6 +110,7 @@ subroutine PMRichardsSetFlowMode(pm_well,option)
   type(option_type) :: option
 
   option%iflowmode = RICHARDS_MODE
+  option%flowmode = 'richards'
   option%nphase = 1
   option%nflowdof = 1
   option%nflowspec = 1

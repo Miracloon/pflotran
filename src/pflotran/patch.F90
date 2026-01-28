@@ -974,6 +974,25 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
             coupler%itype == BOUNDARY_COUPLER_TYPE .or. &
             coupler%itype == PRESCRIBED_COUPLER_TYPE) then
 
+          if (coupler%itype == PRESCRIBED_COUPLER_TYPE) then
+            select case(option%iflowmode)
+              case(NULL_MODE)
+              case(RICHARDS_MODE,RICHARDS_TS_MODE,TH_MODE,TH_TS_MODE)
+              case default
+                option%io_buffer = 'PRESCRIBED_CONDITIONs are not supported by &
+                  &flow mode: ' // trim(option%flowmode)
+                call PrintErrMsg(option)
+            end select
+            select case(option%itranmode)
+              case(NULL_MODE)
+              case(RT_MODE)
+              case default
+                option%io_buffer = 'PRESCRIBED_CONDITIONs are not supported by &
+                  &transport mode: ' // trim(option%tranmode)
+                call PrintErrMsg(option)
+            end select
+          endif
+
           if (associated(coupler%flow_condition%pressure) .or. &
               associated(coupler%flow_condition%concentration) .or. &
               associated(coupler%flow_condition%saturation) .or. &
