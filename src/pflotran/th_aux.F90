@@ -554,7 +554,7 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
       auxvar%pc = 0.d0
       auxvar%sat = 1.d0
       auxvar%kr = 1.d0
-      pw = auxvar%pres
+      pw = max(auxvar%pres,pw)
       dpw_dp = 1.d0
     else
       call characteristic_curves%liq_rel_perm_function% &
@@ -570,8 +570,7 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
     auxvar%pc = 0.d0
     auxvar%sat = 1.d0
     auxvar%kr = 1.d0
-!   pw = auxvar%pres
-    pw = auxvar%pres
+    pw = max(auxvar%pres,pw)
     dpw_dp = 1.d0
   endif
 

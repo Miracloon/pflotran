@@ -356,7 +356,7 @@ subroutine RichardsAuxVarCompute(x,auxvar,global_auxvar,material_auxvar, &
     auxvar%pc = 0.d0
     global_auxvar%sat = 1.d0
     kr = 1.d0
-    pw = global_auxvar%pres(1)
+    pw = max(global_auxvar%pres(1),pw)
   endif
 
   if (.not.option%flow%density_depends_on_salinity) then

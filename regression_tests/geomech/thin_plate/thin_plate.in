@@ -54,7 +54,7 @@ SUBSURFACE
     CHARACTERISTIC_CURVES default
         SATURATION_FUNCTION VAN_GENUCHTEN
             M 0.5
-            ALPHA 0
+            ALPHA 1.d-4
             LIQUID_RESIDUAL_SATURATION 0.1
             MAX_CAPILLARY_PRESSURE 100000000
         END
@@ -97,7 +97,7 @@ SUBSURFACE
             TEMPERATURE dirichlet
         END
         LIQUID_PRESSURE 101325
-        TEMPERATURE 0
+        TEMPERATURE 25.
     END
     FLOW_CONDITION BC2_BC_0_flow
         TYPE
