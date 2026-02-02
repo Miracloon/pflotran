@@ -876,13 +876,13 @@ subroutine GeomechGridLocalizeRegFromSideSet(geomech_grid, &
   tet_faces_vert(2,:) = (/ 1, 4, 3 /)! face opposite to v2
   tet_faces_vert(3,:) = (/ 1, 2, 4 /)! face opposite to v3
   tet_faces_vert(4,:) = (/ 1, 3, 2 /)! face opposite to v4
-  ! jaa: my own experimentation shows this gives outward pointing normal
-  quad_faces_vert(1,:) = (/ 4, 3, 2, 1 /)
-  quad_faces_vert(2,:) = (/ 8, 7, 6, 5 /)
-  quad_faces_vert(3,:) = (/ 2, 6, 5, 1 /)
-  quad_faces_vert(4,:) = (/ 8, 7, 3, 4 /)
-  quad_faces_vert(5,:) = (/ 5, 8, 4, 1 /)
-  quad_faces_vert(6,:) = (/ 3, 7, 6, 2 /)
+  ! convension from EXODUS II
+  quad_faces_vert(1,:) = (/ 1, 2, 3, 4 /)! bottom
+  quad_faces_vert(2,:) = (/ 5, 6, 7, 8 /)! top
+  quad_faces_vert(3,:) = (/ 1, 2, 6, 5 /)! front
+  quad_faces_vert(4,:) = (/ 4, 3, 7, 8 /)! back
+  quad_faces_vert(5,:) = (/ 1, 4, 8, 5 /)! left
+  quad_faces_vert(6,:) = (/ 2, 3, 7, 6 /)! right
 
   face_type = TRI_FACE_TYPE
   num_faces_per_ele = FOUR_INTEGER
