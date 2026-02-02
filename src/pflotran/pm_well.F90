@@ -7081,11 +7081,6 @@ subroutine PMWellUpdateReservoirSrcSinkFlow(pm_well)
                                       -1.d0 * pm_well%well%liq%Q(k) ! [kg/s]
               source_sink%flow_condition%hydrate%rate%dataset%rarray(2) = &
                                       -1.d0 * pm_well%well%gas%Q(k) ! [kg/s]
-            else
-              source_sink%flow_condition%hydrate%rate%dataset%rarray(1) = &
-                -1.d0 * pm_well%well%liq%Q(k) ! [kmol/s]
-              source_sink%flow_condition%hydrate%rate%dataset%rarray(2) = &
-                -1.d0 * pm_well%well%gas%Q(k) ! [kmol/s]
             endif
             source_sink%flow_condition%hydrate%liquid_pressure%aux_real(1) = &
                                                             pm_well%well%pl(k)
