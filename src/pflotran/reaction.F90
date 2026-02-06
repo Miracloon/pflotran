@@ -175,7 +175,7 @@ subroutine ReactionReadPass1(reaction,input,option)
 
   srfcplx_count = 0
   input%ierr = INPUT_ERROR_NONE
-  call InputPushBlock(input,option)
+  call InputPushBlock(input,'CHEMISTRY',option)
   do
 
     call InputReadPflotranString(input,option)
@@ -903,14 +903,28 @@ subroutine ReactionReadPass1(reaction,input,option)
         call InputErrorMsg(input,option,'maximum_reaction_cuts','CHEMISTRY')
       case('MAXIMUM_REACTION_ITERATIONS')
         call InputReadInt(input,option,reaction%maximum_reaction_iterations)
-        call InputErrorMsg(input,option,'maximum_reaction_cuts','CHEMISTRY')
+        call InputErrorMsg(input,option,'maximum_reaction_iterations','CHEMISTRY')
       case('DONT_STOP_ON_RREACT_FAILURE')
         reaction%stop_on_rreact_failure = PETSC_FALSE
       case('USE_TOTAL_CONCENTRATION_AS_GUESS')
         reaction%use_total_as_guess = PETSC_TRUE
       case('DECOUPLE_CO2')
         option%transport%force_decouple_co2 = PETSC_TRUE
-
+      case('ELECTRICAL_CONDUCTIVITY_METHOD')
+        error_string = 'CHEMISTRY,'//word
+        call InputReadWord(input,option,word,PETSC_TRUE)
+        call InputErrorMsg(input,option,'value',error_string)
+        call StringToUpper(word)
+        select case(word)
+          case('LINEAR')
+            reaction%elec_cond_method = ELEC_COND_LINEAR
+          case('PSEUDO_LINEAR')
+            reaction%elec_cond_method = ELEC_COND_PSEUDO_LINEAR
+          case('MOBILITY')
+            reaction%elec_cond_method = ELEC_COND_MOBILITY
+          case default
+            call InputKeywordUnrecognized(input,word,error_string,option)
+        end select
       case default
         call InputKeywordUnrecognized(input,word,'CHEMISTRY',option)
     end select
@@ -1009,7 +1023,7 @@ subroutine ReactionReadPass2(reaction,input,option)
   character(len=MAXWORDLENGTH) :: card
   character(len=MAXSTRINGLENGTH) :: error_string
 
-  call InputPushBlock(input,'CHEMISTRY_2ND_PASS',option)
+  call InputPushBlock(input,'CHEMISTRY',option)
   do
     call InputReadPflotranString(input,option)
     call InputReadStringErrorMsg(input,option,card)
@@ -3293,7 +3307,7 @@ subroutine ReactionReadOutput(reaction,input,option)
   print_something = PETSC_FALSE
   do_not_print_anything = PETSC_FALSE
   input%ierr = INPUT_ERROR_NONE
-  call InputPushBlock(input,option)
+  call InputPushBlock(input,'OUTPUT',option)
   do
 
     call InputReadPflotranString(input,option)
@@ -3369,21 +3383,7 @@ subroutine ReactionReadOutput(reaction,input,option)
         reaction%print%ionic_strength = PETSC_TRUE
       case('ELECTRICAL_CONDUCTIVITY')
         print_something = PETSC_TRUE
-        call InputReadWord(input,option,word,PETSC_TRUE)
-        call PrintErrMsg(option)
-        call StringToUpper(word)
-        select case(word)
-          case('LINEAR')
-            reaction%print%electrical_conductivity_type = ELEC_COND_LINEAR
-          case('PSEUDO_LINEAR')
-            reaction%print%electrical_conductivity_type = &
-              ELEC_COND_PSEUDO_LINEAR
-          case('MOBILITY')
-            reaction%print%electrical_conductivity_type = ELEC_COND_MOBILITY
-          case default
-            error_string = trim(error_string) // keyword
-            call InputKeywordUnrecognized(input,word,error_string,option)
-        end select
+        reaction%print%electrical_conductivity = PETSC_TRUE
       case('EH')
         print_something = PETSC_TRUE
         reaction%print%Eh = PETSC_TRUE
@@ -4769,7 +4769,7 @@ function RElectricalConductivity(rt_auxvar,global_auxvar,material_auxvar, &
   PetscReal :: tempreal
   PetscReal, parameter :: FARADAY_CONSTANT = 96485.3321 ! [C/mol]
 
-  select case(reaction%elec_cond_algorithm)
+  select case(reaction%elec_cond_method)
     case(ELEC_COND_LINEAR)
       ec = 6.2d4 * RIonicStrength(rt_auxvar,reaction)
     case(ELEC_COND_PSEUDO_LINEAR)
@@ -6606,7 +6606,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
                                  IONIC_STRENGTH)
   endif
 
-  if (Initialized(reaction%print%electrical_conductivity_type)) then
+  if (reaction%print%electrical_conductivity) then
     name = 'Electrical Conductivity'
     units = 'S/m'
     call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &

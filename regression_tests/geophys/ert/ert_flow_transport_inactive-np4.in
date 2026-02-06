@@ -84,6 +84,7 @@ CHEMISTRY
   FORCE_READ_OF_REACTION_DATABASE
   DATABASE ../../../database/hanford.dat
   MOBILITY_DATABASE ../../../database/mobilities.dat
+  ELECTRICAL_CONDUCTIVITY_METHOD MOBILITY
   OUTPUT
     TOTAL
     ALL

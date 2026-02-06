@@ -143,10 +143,10 @@ module Reaction_Aux_module
     PetscBool :: ionic_strength
     PetscBool :: auxiliary
     PetscBool :: verbose_constraints
+    PetscBool :: electrical_conductivity
     PetscInt :: free_conc_type
     PetscInt :: tot_conc_type
     PetscInt :: secondary_conc_type
-    PetscInt :: electrical_conductivity_type
   end type rt_print_type
 
   type, public, extends(reaction_base_type) :: reaction_rt_type
@@ -182,7 +182,7 @@ module Reaction_Aux_module
     type(generic_parameter_type), pointer :: gas_diffusion_coefficients
     PetscInt :: act_coef_update_frequency
     PetscInt :: act_coef_update_algorithm
-    PetscInt :: elec_cond_algorithm
+    PetscInt :: elec_cond_method
     PetscBool :: checkpoint_activity_coefs
     PetscBool :: act_coef_use_bdot
     PetscBool :: use_activity_h2o
@@ -390,7 +390,7 @@ function ReactionAuxCreateAux()
   reaction%act_coef_use_bdot = PETSC_TRUE
   reaction%act_coef_update_frequency = ACT_COEF_FREQUENCY_OFF
   reaction%act_coef_update_algorithm = ACT_COEF_ALGORITHM_LAG
-  reaction%elec_cond_algorithm = ELEC_COND_MOBILITY
+  reaction%elec_cond_method = UNINITIALIZED_INTEGER
   reaction%checkpoint_activity_coefs = PETSC_TRUE
   reaction%truncated_concentration = UNINITIALIZED_DOUBLE
   reaction%check_update = PETSC_TRUE
@@ -423,10 +423,10 @@ function ReactionAuxCreateAux()
   reaction%print%total_component = PETSC_FALSE
   reaction%print%free_ion = PETSC_FALSE
   reaction%print%total_bulk = PETSC_FALSE
+  reaction%print%electrical_conductivity = PETSC_FALSE
   reaction%print%free_conc_type = UNINITIALIZED_INTEGER
   reaction%print%tot_conc_type = UNINITIALIZED_INTEGER
   reaction%print%secondary_conc_type = UNINITIALIZED_INTEGER
-  reaction%print%electrical_conductivity_type = UNINITIALIZED_INTEGER
 
   reaction%logging_verbosity = 0
   reaction%maximum_reaction_cuts = 10
@@ -1695,7 +1695,7 @@ function ReactionOutputRequiresDatabase(reaction)
      print%total_mass_kg .or. &
      print%ionic_strength .or. &
      print%verbose_constraints .or. &
-     Initialized(print%electrical_conductivity_type))
+     print%electrical_conductivity)
 
 end function ReactionOutputRequiresDatabase
 

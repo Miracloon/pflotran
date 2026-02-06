@@ -390,6 +390,13 @@
        29:   0.0000000000000E+00
         1:   0.0000000000000E+00
        31:   0.0000000000000E+00
+-- GENERIC: Electrical Conductivity --
+      Max:   4.2684667346175E+02
+      Min:   4.2673988444429E+02
+     Mean:   4.2681193073500E+02
+       29:   4.2682908118580E+02
+        1:   4.2679505556049E+02
+       31:   4.2682799930726E+02
 -- DISCRETE: Material ID --
       Max:         4
       Min:         1
@@ -402,7 +409,7 @@
         1:   1.7493744287630E-02 -1.0115891435073E-03 -7.4782433812858E-04
        31:   3.2195395871542E-01  4.8482337009044E-02  1.1895353829029E-02
 -- SOLUTION: Flow --
-   Time (seconds):   1.0993686999882E-02
+   Time (seconds):   1.0077748000640E-02
    Time Steps:           10
    Newton Iterations:           20
    Linear Solver Iterations:           20
@@ -410,7 +417,7 @@
    Solution 2-Norm:   1.8523989172911E+06
    Residual 2-Norm:   7.8962130027606E-13
 -- SOLUTION: Transport --
-   Time (seconds):   1.2168441339999E+00
+   Time (seconds):   1.2081059200004E+00
    Time Steps:           10
    Newton Iterations:           31
    Linear Solver Iterations:           31

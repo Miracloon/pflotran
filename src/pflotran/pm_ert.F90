@@ -390,11 +390,18 @@ subroutine PMERTSetup(this)
       call PrintErrMsg(this%option)
     endif
   else if (this%option%itranmode == RT_MODE) then
+    if (this%calc_fluid_cond_from_chemistry .and. &
+        Uninitialized(this%realization%reaction%elec_cond_method)) then
+      this%option%io_buffer = 'Calculation of fluid conductivity from &
+        &water chemistry for ERT has been specified without an &
+        &ELECTRICAL_CONDUCTIVITY_METHOD being specified under CHEMISTRY.'
+      call PrintErrMsg(this%option)
+    endif
   else ! no transport
     if (this%calc_fluid_cond_from_chemistry) then
       this%option%io_buffer = 'Calculation of fluid conductivity from &
-        &water chemistry has be specified without a reactive transport &
-        &process model being employed.'
+        &water chemistry for ERT has been specified without a reactive &
+        &transport process model being employed.'
       call PrintErrMsg(this%option)
     endif
     if (Initialized(this%tracer_water_conductivity )) then
