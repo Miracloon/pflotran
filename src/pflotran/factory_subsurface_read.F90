@@ -1014,6 +1014,7 @@ subroutine FactorySubsurfReadInput(simulation,input)
 
   PetscReal :: dt_init
   PetscReal :: dt_min
+  PetscReal :: time_incr
   PetscReal :: units_conversion
 
   class(timestepper_base_type), pointer :: temp_timestepper
@@ -1970,14 +1971,15 @@ subroutine FactorySubsurfReadInput(simulation,input)
               select case(trim(word))
                 case('TIME')
                   string = 'OUTPUT,PERIODIC,TIME'
-                  call InputReadDouble(input,option,temp_real)
+                  call InputReadDouble(input,option,time_incr)
                   call InputErrorMsg(input,option,'time increment',string)
                   internal_units = 'sec'
-                  call InputReadAndConvertUnits(input,temp_real, &
+                  call InputReadAndConvertUnits(input,time_incr, &
                                                 internal_units,string,option)
-                  output_option%periodic_snap_output_time_incr = temp_real
                   call InputReadCard(input,option,word)
-                  if (.not.InputError(input)) then
+                  if (InputError(input)) then
+                    output_option%periodic_snap_output_time_incr = time_incr
+                  else
                     if (StringCompareIgnoreCase(word,'between')) then
                       call InputReadDouble(input,option,temp_real)
                       call InputErrorMsg(input,option,'start time',string)
@@ -2004,11 +2006,9 @@ subroutine FactorySubsurfReadInput(simulation,input)
                         waypoint%print_snap_output = PETSC_TRUE
                         call WaypointInsertInList(waypoint,waypoint_list, &
                                                   option)
-                        temp_real = temp_real + &
-                          output_option%periodic_snap_output_time_incr
+                        temp_real = temp_real + time_incr
                         if (temp_real > temp_real2) exit
                       enddo
-                      output_option%periodic_snap_output_time_incr = 0.d0
                     else
                       input%ierr = INPUT_ERROR_DEFAULT
                       call InputErrorMsg(input,option,'BETWEEN', &
