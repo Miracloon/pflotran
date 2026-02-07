@@ -2712,6 +2712,7 @@ subroutine RealizationLimitDTByCFL(realization,cfl_governor,dt,dt_max)
   !
   use Option_module
   use Output_Aux_module
+  use String_module
 
   implicit none
 
@@ -2746,10 +2747,10 @@ subroutine RealizationLimitDTByCFL(realization,cfl_governor,dt,dt_max)
       ! for timestepper_base%revert_dt in TimestepperBaseSetTargetTime
       dt_max = dt
       if (print_to_screen .or. print_to_file) then
-        write(string,'(" CFL Limiting (",f4.1,"): ",1pe12.4," -> ",1pe12.4, &
-              &" [",a,"]")') &
-              cfl_governor,prev_dt/output_option%tconv, &
-              dt/output_option%tconv,trim(output_option%tunit)
+        string = ' CFL Limiting (' // StringWrite('(f0.1)',cfl_governor) // &
+          '): ' // StringWrite(prev_dt/output_option%tconv) // &
+          ' -> ' // StringWrite(dt/output_option%tconv) // &
+          ' [' // trim(output_option%tunit) // ']'
         if (print_to_screen) write(STDOUT_UNIT,'(a)') trim(string)
         if (print_to_file) write(realization%option%fid_out,'(a)') trim(string)
       endif
