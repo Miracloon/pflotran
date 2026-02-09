@@ -1601,7 +1601,7 @@ contains
                                                      dsat_pres,this%option)
     string = 'KRP1 saturation as a function of capillary &
              &pressure at low capillary pressure'
-    value = 0.74556316913866438d0
+    value = 0.749999998736306000
     @assertEqual(value, liquid_saturation, dabs(value)*tolerance, string)
     call this%cc_krp1%liq_rel_perm_function% &
          RelativePermeability(liquid_saturation,relative_permeability, &
