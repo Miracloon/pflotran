@@ -692,7 +692,7 @@ subroutine SFKRP1Saturation(this,capillary_pressure, &
     return
   else
     n = 1.d0/(1.d0-this%m)
-    Se2 = (((capillary_pressure**n)/P0) + 1.d0)**(-1.d0*this%m)
+    Se2 = ((capillary_pressure/P0)**n + 1.d0)**(-1.d0*this%m)
     liquid_saturation = this%Sr + (1.d0-this%Sr-this%Srg)*Se2
   endif
 
