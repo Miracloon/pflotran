@@ -330,7 +330,7 @@ contains
         sf%Srg = 0.25d0
     end select
     this%cc_krp1%gas_rel_perm_function => RPFKRP1GasCreate()
-    this%cc_krp1%gas_rel_perm_function%Sr = 0.25d0
+    this%cc_krp1%gas_rel_perm_function%Sr = 0.20d0
     select type(sf=>this%cc_krp1%gas_rel_perm_function)
       class is(rpf_KRP1_gas_type)
         sf%m = 0.60d0
@@ -1601,21 +1601,23 @@ contains
                                                      dsat_pres,this%option)
     string = 'KRP1 saturation as a function of capillary &
              &pressure at low capillary pressure'
-    value = 0.749999998736306000
+    value = 0.749999998736306000d0
     @assertEqual(value, liquid_saturation, dabs(value)*tolerance, string)
+
+    liquid_saturation = 0.22d0
     call this%cc_krp1%liq_rel_perm_function% &
          RelativePermeability(liquid_saturation,relative_permeability, &
                               dkr_sat,this%option)
     string = 'KRP1 liquid relative permeability as a function of &
-             &capillary pressure at low capillary pressure'
-    value = 0.10878895018640269d0
+             &liquid saturation at low saturation'
+    value = 0.0000002602820040d0
     @assertEqual(value, relative_permeability, dabs(value)*tolerance, string)
     call this%cc_krp1%gas_rel_perm_function% &
          RelativePermeability(liquid_saturation,relative_permeability, &
                               dkr_sat,this%option)
     string = 'KRP1 gas relative permeability as a function of &
-             &capillary pressure at low capillary pressure'
-    value = 5.9765155008000600d-4
+             &liquid saturation at low liquid saturation'
+    value = 0.97695004883984200d0
     @assertEqual(value, relative_permeability, dabs(value)*tolerance, string)
 
     liquid_saturation = 0.81
@@ -1635,21 +1637,21 @@ contains
                                                      dsat_pres,this%option)
     string = 'KRP1 saturation as a function of capillary &
              &pressure at high capillary pressure'
-    value = 0.20000256369851988d0
+    value = 0.2217640992780230d0
     @assertEqual(value, liquid_saturation, dabs(value)*tolerance, string)
     call this%cc_krp1%liq_rel_perm_function% &
          RelativePermeability(liquid_saturation,relative_permeability, &
                               dkr_sat,this%option)
     string = 'KRP1 liquid relative permeability as a function of &
              &capillary pressure at high capillary pressure'
-    value = 3.1269006686492169d-22
+    value = 0.0000003599355750d0
     @assertEqual(value, relative_permeability, dabs(value)*tolerance, string)
     call this%cc_krp1%gas_rel_perm_function% &
          RelativePermeability(liquid_saturation,relative_permeability, &
                               dkr_sat,this%option)
     string = 'KRP1 gas relative permeability as a function of &
              &capillary pressure at high capillary pressure'
-    value = 1.0d0
+    value = 0.97461329605410900d0
     @assertEqual(value, relative_permeability, dabs(value)*tolerance, string)
 
   end subroutine testsf_KRP1
