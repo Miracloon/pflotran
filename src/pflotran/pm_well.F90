@@ -498,9 +498,11 @@ module PM_Well_class
     PetscBool :: setup_complete
     PetscInt, pointer :: well_cells(:)
     PetscReal :: inlet_temperature
-    PetscReal :: pipe_diameter
+    PetscReal :: pipe_inner_diameter
     PetscReal :: pipe_wall_thickness
     PetscReal :: pipe_wall_thermal_conductivity
+    PetscReal :: insulator_thickness
+    PetscReal :: insulator_thermal_conductivity
     PetscReal :: flow_velocity
     PetscReal :: heat_flux(2,2)
     type(connection_set_type), pointer :: connection_set
@@ -729,9 +731,11 @@ function PMWellUShapeCreate()
   pm_well%use_well_index = PETSC_FALSE
   pm_well%setup_complete = PETSC_FALSE
   pm_well%inlet_temperature = UNINITIALIZED_DOUBLE
-  pm_well%pipe_diameter = UNINITIALIZED_DOUBLE
+  pm_well%pipe_inner_diameter = UNINITIALIZED_DOUBLE
   pm_well%pipe_wall_thickness = UNINITIALIZED_DOUBLE
   pm_well%pipe_wall_thermal_conductivity = UNINITIALIZED_DOUBLE
+  pm_well%insulator_thickness = UNINITIALIZED_DOUBLE
+  pm_well%insulator_thermal_conductivity = UNINITIALIZED_DOUBLE
   pm_well%flow_velocity = UNINITIALIZED_DOUBLE
   pm_well%heat_flux = 0.d0
   nullify(pm_well%well_cells)
@@ -4325,8 +4329,8 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
                   case('INLET_TEMPERATURE')
                     call InputReadDouble(input,option,pm%inlet_temperature)
                     call InputErrorMsg(input,option,word,error_string)
-                  case('PIPE_DIAMETER')
-                    call InputReadDouble(input,option,pm%pipe_diameter)
+                  case('PIPE_INNER_DIAMETER')
+                    call InputReadDouble(input,option,pm%pipe_inner_diameter)
                     call InputErrorMsg(input,option,word,error_string)
                   case('PIPE_WALL_THICKNESS')
                     call InputReadDouble(input,option,pm%pipe_wall_thickness)
@@ -4334,6 +4338,12 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
                   case('PIPE_WALL_THERMAL_CONDUCTIVITY')
                     call InputReadDouble(input,option, &
                                          pm%pipe_wall_thermal_conductivity)
+                    call InputErrorMsg(input,option,word,error_string)
+                  case('INSULATOR_THICKNESS')
+                    call InputReadDouble(input,option,pm%insulator_thickness)
+                    call InputErrorMsg(input,option,word,error_string)
+                  case('INSULATOR_THERMAL_CONDUCTIVITY')
+                    call InputReadDouble(input,option,pm%insulator_thermal_conductivity)
                     call InputErrorMsg(input,option,word,error_string)
                   case('PIPE_FLOW_VELOCITY')
                     call InputReadDouble(input,option,pm%flow_velocity)

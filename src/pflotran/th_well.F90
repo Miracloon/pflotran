@@ -97,27 +97,43 @@ subroutine THWellSetup(pm_well_base,realization)
   auxvars => patch%aux%TH%auxvars
 
   if (Uninitialized(pm_well%inlet_temperature)) then
-    option%io_buffer = 'Well INLET_TEMPERATURE must be specified'
+    option%io_buffer = 'Well INLET_TEMPERATURE must be specified.'
     call PrintErrMsg(option)
   endif
-  if (Uninitialized(pm_well%pipe_diameter)) then
-    option%io_buffer = 'Well PIPE_DIAMETER must be specified'
+  if (Uninitialized(pm_well%pipe_inner_diameter)) then
+    option%io_buffer = 'Well PIPE_INNER_DIAMETER must be specified.'
     call PrintErrMsg(option)
   endif
-  if (Uninitialized(pm_well%pipe_wall_thickness)) then
-    option%io_buffer = 'Well PIPE_WALL_THICKNESS must be specified'
+  if (Uninitialized(pm_well%pipe_wall_thickness) .and. &
+      Initialized(pm_well%pipe_wall_thermal_conductivity)) then
+    option%io_buffer = 'Well PIPE_WALL_THICKNESS must be specified when &
+      &PIPE_WALL_THERMAL_CONDUCTIVITY is specified.'
     call PrintErrMsg(option)
   endif
-  if (Uninitialized(pm_well%pipe_wall_thermal_conductivity)) then
-    option%io_buffer = 'Well PIPE_WALL_THERMAL_CONDUCTIVITY must be specified'
+  if (Initialized(pm_well%pipe_wall_thickness) .and. &
+      Uninitialized(pm_well%pipe_wall_thermal_conductivity)) then
+    option%io_buffer = 'Well PIPE_WALL_THERMAL_CONDUCTIVITY must be &
+      &specified when PIPE_WALL_THICKNESS is specified.'
+    call PrintErrMsg(option)
+  endif
+  if (Uninitialized(pm_well%insulator_thickness) .and. &
+      Initialized(pm_well%insulator_thermal_conductivity)) then
+    option%io_buffer = 'Well INSULATOR_THICKNESS must be specified when &
+      &INSULATOR_THERMAL_CONDUCTIVITY is specified.'
+    call PrintErrMsg(option)
+  endif
+  if (Initialized(pm_well%insulator_thickness) .and. &
+      Uninitialized(pm_well%insulator_thermal_conductivity)) then
+    option%io_buffer = 'Well INSULATOR_THERMAL_CONDUCTIVITY must be &
+      &specified when INSULATOR_THICKNESS is specified.'
     call PrintErrMsg(option)
   endif
   if (Uninitialized(pm_well%flow_velocity)) then
-    option%io_buffer = 'Well PIPE_FLOW_VELOCITY must be specified'
+    option%io_buffer = 'Well PIPE_FLOW_VELOCITY must be specified.'
     call PrintErrMsg(option)
   endif
 
-  pipe_cross_sectional_area = PI*(0.5d0*pm_well%pipe_diameter)**2
+  pipe_cross_sectional_area = PI*(0.5d0*pm_well%pipe_inner_diameter)**2
 
   nx = grid%structured_grid%nx
   ny = grid%structured_grid%ny
@@ -132,6 +148,7 @@ subroutine THWellSetup(pm_well_base,realization)
                        int(0.5001d0*grid%structured_grid%nx) - 2
     case(4)
       num_well_cells = pm_well%well_grid%nsegments
+    case default
       option%io_buffer = 'Unrecognized scenario in THWellSetup()'
       call PrintErrMsg(option)
   end select
@@ -385,7 +402,7 @@ subroutine THWellSetup(pm_well_base,realization)
     auxvars_well(i)%volume = segment_length * &
                              pipe_cross_sectional_area
     auxvars_well(i)%surface_area = segment_length * &
-                                   pm_well%pipe_diameter * PI
+                                   pm_well%pipe_inner_diameter * PI
     rock_thermal_conductivity = th_parameter%ckwet(patch%cct_id(ghosted_id))
     call THWellWI(rock_thermal_conductivity, &
                   rock_thermal_conductivity, &
@@ -396,7 +413,7 @@ subroutine THWellSetup(pm_well_base,realization)
                   len_(1,ghosted_id), &
                   len_(2,ghosted_id), &
                   len_(3,ghosted_id), &
-                  pm_well%pipe_diameter, &
+                  pm_well%pipe_inner_diameter, &
                   0.d0, & ! s
                   auxvars_well(i)%well_index)
     auxvars_well(i)%therm_cond_borehole_to_cell = auxvars_well(i)%well_index / &
@@ -1021,6 +1038,106 @@ end subroutine THWellFluxDerivative
 
 ! ************************************************************************** !
 
+function THWellResistanceWellIndex(auxvar_well,pm_well)
+  !
+  ! Calculates heat flux between pipe wall and insulator
+  !
+  ! Author: Glenn Hammond
+  ! Date: 02/10/26
+  !
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+
+  PetscReal :: THWellResistanceWellIndex
+
+  if (pm_well%use_well_index) then
+    ! [K/MW] = 1 / [MW/m^2-K]
+    THWellResistanceWellIndex = 1.d0 / auxvar_well%well_index
+  else
+    THWellResistanceWellIndex = 0.d0
+  endif
+
+end function THWellResistanceWellIndex
+
+! ************************************************************************** !
+
+function THWellResistanceInsulator(auxvar_well,pm_well,inner_radius)
+  !
+  ! Calculates heat flux between pipe wall and insulator
+  !
+  ! Author: Glenn Hammond
+  ! Date: 02/10/26
+  !
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+  PetscReal :: inner_radius
+
+  PetscReal :: THWellResistanceInsulator
+
+  if (pm_well%insulator_thermal_conductivity > 0.d0) then
+    ! [K/MW] = 1 / ([MW/m-K] * [m])
+    THWellResistanceInsulator = &
+      log((inner_radius+pm_well%insulator_thickness)/inner_radius) / &
+      (2.d0 * PI * pm_well%insulator_thermal_conductivity * &
+       pm_well%insulator_thickness)
+  elseif (pm_well%insulator_thermal_conductivity < 0.d0) then
+    THWellResistanceInsulator = 0.d0
+  else
+    THWellResistanceInsulator = MAX_DOUBLE
+  endif
+
+end function THWellResistanceInsulator
+
+! ************************************************************************** !
+
+function THWellResistancePipeWall(auxvar_well,pm_well,inner_radius)
+  !
+  ! Calculates heat flux between fluid centerline and pipe wall
+  !
+  ! Author: Glenn Hammond
+  ! Date: 02/10/26
+  !
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+  PetscReal :: inner_radius
+
+  PetscReal :: THWellResistancePipeWall
+
+  if (pm_well%pipe_wall_thermal_conductivity > 0.d0) then
+    ! [K/MW] = 1 / ([MW/m-K] * [m])
+    THWellResistancePipeWall = &
+      log((inner_radius+pm_well%pipe_wall_thickness)/inner_radius) / &
+      (2.d0 * PI * pm_well%pipe_wall_thermal_conductivity * &
+       pm_well%pipe_wall_thickness)
+  elseif (pm_well%pipe_wall_thermal_conductivity < 0.d0) then
+    THWellResistancePipeWall = 0.d0
+  else
+    THWellResistancePipeWall = MAX_DOUBLE
+  endif
+
+end function THWellResistancePipeWall
+
+! ************************************************************************** !
+
+function THWellResistanceFluid(auxvar_well,pm_well)
+  !
+  ! Calculates heat flux between fluid centerline and pipe wall
+  !
+  ! Author: Glenn Hammond
+  ! Date: 02/10/26
+  !
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+
+  PetscReal :: THWellResistanceFluid
+
+  ! [K/MW]
+  THWellResistanceFluid = 0.d0
+
+end function THWellResistanceFluid
+
+! ************************************************************************** !
+
 subroutine THWellHeatExchange(auxvar,auxvar_well,pm_well, &
                               Res,J,ndof, &
                               calculate_derivatives)
@@ -1040,30 +1157,30 @@ subroutine THWellHeatExchange(auxvar,auxvar_well,pm_well, &
 
   PetscReal :: tcell, tpipe
   PetscReal :: diffusive_energy_flux
+  PetscReal :: total_thermal_resistance
+  PetscReal :: inner_radius
   PetscReal :: tempreal
 
   Res = 0.d0
 
   tcell = auxvar%temp
   tpipe = auxvar_well%temp
+  inner_radius = 0.5d0 * pm_well%pipe_inner_diameter
 
-  ! conduction
-  if (.not.pm_well%use_well_index) then
-    ! [MW] = [MW/m-K] * [m^2] * [C] / [m]
-    tempreal = pm_well%pipe_wall_thermal_conductivity * &
-               auxvar_well%surface_area / pm_well%pipe_wall_thickness
-  else
-    ! [MW] = [MW/m^2-K] * [m^2] * [C]
-    tempreal = auxvar_well%therm_cond_borehole_to_cell * &
-              auxvar_well%surface_area
-  endif
-  diffusive_energy_flux = tempreal * (tcell-tpipe)
+  total_thermal_resistance = &  ! [K/MW]
+    THWellResistanceFluid(auxvar_well,pm_well) + &
+    THWellResistancePipeWall(auxvar_well,pm_well,inner_radius) + &
+    THWellResistanceInsulator(auxvar_well,pm_well,inner_radius) + &
+    THWellResistanceWellIndex(auxvar_well,pm_well)
+
+  diffusive_energy_flux = (tcell-tpipe) / total_thermal_resistance
 
   Res(TH_ENERGY_EQUATION_INDEX) = diffusive_energy_flux
   Res(th_well_eq) = -diffusive_energy_flux
 
   if (calculate_derivatives) then
     J = 0.d0
+    tempreal = 1.d0 / total_thermal_resistance
     J(TH_ENERGY_EQUATION_INDEX,th_well_dof) = -tempreal
     J(TH_ENERGY_EQUATION_INDEX,TH_TEMPERATURE_DOF) = tempreal
     J(th_well_eq,th_well_dof) = tempreal
