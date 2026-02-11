@@ -2028,85 +2028,6 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
   call VecAssemblyBegin(rhs,ierr);CHKERRQ(ierr)
   call VecAssemblyEnd(rhs,ierr);CHKERRQ(ierr)
 
-  ! Find the boundary nodes with dirichlet and set the residual at those nodes
-  ! to zero, later set the Jacobian to 1
-
-  ! displacement boundary conditions
-  boundary_condition => patch%geomech_boundary_condition_list%first
-  do
-    if (.not.associated(boundary_condition)) exit
-    region => boundary_condition%region
-    do ivertex = 1, region%num_verts
-      local_id = region%vertex_ids(ivertex)
-      ghosted_id = grid%nL2G(local_id)
-      petsc_id = grid%node_ids_ghosted_petsc(ghosted_id)
-      if (associated(patch%imat)) then
-        if (patch%imat(ghosted_id) <= 0) cycle
-      endif
-
-      ! X displacement
-      if (associated(boundary_condition%geomech_condition%displacement_x)) then
-        select case(boundary_condition%geomech_condition%displacement_x%itype)
-          case(DIRICHLET_BC)
-            call VecSetValue(rhs, &
-                             (petsc_id-1)*option% &
-                               ngeomechdof+GEOMECH_DISP_X_DOF-1, &
-                             boundary_condition% &
-                             geomech_aux_real_var(GEOMECH_DISP_X_DOF, &
-                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
-          case(ZERO_GRADIENT_BC)
-           ! do nothing
-          case(NEUMANN_BC)
-            option%io_buffer = 'Neumann BC for displacement not available.'
-            call PrintErrMsg(option)
-        end select
-      endif
-
-      ! Y displacement
-      if (associated(boundary_condition%geomech_condition%displacement_y)) then
-        select case(boundary_condition%geomech_condition%displacement_y%itype)
-          case(DIRICHLET_BC)
-            call VecSetValue(rhs, &
-                             (petsc_id-1)*option% &
-                               ngeomechdof+GEOMECH_DISP_Y_DOF-1, &
-                             boundary_condition% &
-                             geomech_aux_real_var(GEOMECH_DISP_Y_DOF, &
-                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
-          case(ZERO_GRADIENT_BC)
-           ! do nothing
-          case(NEUMANN_BC)
-            option%io_buffer = 'Neumann BC for displacement not available.'
-            call PrintErrMsg(option)
-        end select
-      endif
-
-      ! Z displacement
-      if (associated(boundary_condition%geomech_condition%displacement_z)) then
-        select case(boundary_condition%geomech_condition%displacement_z%itype)
-          case(DIRICHLET_BC)
-            call VecSetValue(rhs, &
-                             (petsc_id-1)*option% &
-                               ngeomechdof+GEOMECH_DISP_Z_DOF-1, &
-                             boundary_condition% &
-                             geomech_aux_real_var(GEOMECH_DISP_Z_DOF, &
-                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
-          case(ZERO_GRADIENT_BC)
-           ! do nothing
-          case(NEUMANN_BC)
-            option%io_buffer = 'Neumann BC for displacement not available.'
-            call PrintErrMsg(option)
-        end select
-      endif
-
-    enddo
-    boundary_condition => boundary_condition%next
-  enddo
-
-  ! Need to assemby here since one cannot mix INSERT_VALUES
-  ! and ADD_VALUES
-  call VecAssemblyBegin(rhs,ierr);CHKERRQ(ierr)
-  call VecAssemblyEnd(rhs,ierr);CHKERRQ(ierr)
-
   ! Force boundary conditions
   boundary_condition => patch%geomech_boundary_condition_list%first
   do
@@ -2179,6 +2100,86 @@ subroutine GeomechForceSetupLinearSystem(A,solution,rhs,geomech_realization, &
     boundary_condition => boundary_condition%next
   enddo
 
+  call VecAssemblyBegin(rhs,ierr);CHKERRQ(ierr)
+  call VecAssemblyEnd(rhs,ierr);CHKERRQ(ierr)
+
+  ! Find the boundary nodes with dirichlet and set the residual at those nodes
+  ! to zero, later set the Jacobian to 1
+
+  ! displacement boundary conditions
+  ! jaa: apply displacement to RHS last
+  boundary_condition => patch%geomech_boundary_condition_list%first
+  do
+    if (.not.associated(boundary_condition)) exit
+    region => boundary_condition%region
+    do ivertex = 1, region%num_verts
+      local_id = region%vertex_ids(ivertex)
+      ghosted_id = grid%nL2G(local_id)
+      petsc_id = grid%node_ids_ghosted_petsc(ghosted_id)
+      if (associated(patch%imat)) then
+        if (patch%imat(ghosted_id) <= 0) cycle
+      endif
+
+      ! X displacement
+      if (associated(boundary_condition%geomech_condition%displacement_x)) then
+        select case(boundary_condition%geomech_condition%displacement_x%itype)
+          case(DIRICHLET_BC)
+            call VecSetValue(rhs, &
+                             (petsc_id-1)*option% &
+                               ngeomechdof+GEOMECH_DISP_X_DOF-1, &
+                             boundary_condition% &
+                             geomech_aux_real_var(GEOMECH_DISP_X_DOF, &
+                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
+          case(ZERO_GRADIENT_BC)
+           ! do nothing
+          case(NEUMANN_BC)
+            option%io_buffer = 'Neumann BC for displacement not available.'
+            call PrintErrMsg(option)
+        end select
+      endif
+
+      ! Y displacement
+      if (associated(boundary_condition%geomech_condition%displacement_y)) then
+        select case(boundary_condition%geomech_condition%displacement_y%itype)
+          case(DIRICHLET_BC)
+            call VecSetValue(rhs, &
+                             (petsc_id-1)*option% &
+                               ngeomechdof+GEOMECH_DISP_Y_DOF-1, &
+                             boundary_condition% &
+                             geomech_aux_real_var(GEOMECH_DISP_Y_DOF, &
+                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
+          case(ZERO_GRADIENT_BC)
+           ! do nothing
+          case(NEUMANN_BC)
+            option%io_buffer = 'Neumann BC for displacement not available.'
+            call PrintErrMsg(option)
+        end select
+      endif
+
+      ! Z displacement
+      if (associated(boundary_condition%geomech_condition%displacement_z)) then
+        select case(boundary_condition%geomech_condition%displacement_z%itype)
+          case(DIRICHLET_BC)
+            call VecSetValue(rhs, &
+                             (petsc_id-1)*option% &
+                               ngeomechdof+GEOMECH_DISP_Z_DOF-1, &
+                             boundary_condition% &
+                             geomech_aux_real_var(GEOMECH_DISP_Z_DOF, &
+                             ivertex),INSERT_VALUES,ierr);CHKERRQ(ierr)
+          case(ZERO_GRADIENT_BC)
+           ! do nothing
+          case(NEUMANN_BC)
+            option%io_buffer = 'Neumann BC for displacement not available.'
+            call PrintErrMsg(option)
+        end select
+      endif
+
+    enddo
+    boundary_condition => boundary_condition%next
+  enddo
+
+  ! Need to assemby here since one cannot mix INSERT_VALUES
+  ! and ADD_VALUES
   call VecAssemblyBegin(rhs,ierr);CHKERRQ(ierr)
   call VecAssemblyEnd(rhs,ierr);CHKERRQ(ierr)
 
