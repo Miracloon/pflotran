@@ -192,6 +192,8 @@ subroutine OutputConservation(realization_base)
   PetscReal :: flow_dof_scale(10)
   PetscReal :: tempreal
   PetscInt :: istart, iend
+  PetscInt :: icomp
+  PetscInt :: max_tran_size
   PetscInt :: j
 
   PetscMPIInt :: int_mpi
@@ -214,6 +216,7 @@ subroutine OutputConservation(realization_base)
   end select
   select case(option%itranmode)
     case(NULL_MODE)
+    case(RT_MODE)
     case default
       option%io_buffer = 'Mass conservation must be set up for the "' // &
       trim(option%tranmode) // '" transport mode.'
@@ -327,6 +330,76 @@ subroutine OutputConservation(realization_base)
       end select
     endif
   endif
+
+  if (option%ntrandof > 0) then
+     select case(option%itranmode)
+       case(RT_MODE)
+         if (option%transport%nphase > 1) then
+         !TODO(geh): Within RTComputeMassBalance() all the mass is lumped into the
+         !           liquid phase.  This need to be split out.  Also, the below
+         !           where mass is summed across minerals needs to be moved
+         !           to reactive_transport.F90.
+           option%io_buffer = 'OutputConservation() needs to be refactored to &
+             &consider species in the gas phase.'
+     !      call PrintErrMsg(option)
+        endif
+        max_tran_size = max(reaction%naqcomp,reaction%mineral%nkinmnrl, &
+                          reaction%immobile%nimmobile,reaction%gas%nactive_gas)
+        ! see RTComputeMassBalance for indexing used below
+        allocate(array(max_tran_size,8))
+        allocate(array_global(max_tran_size,8))
+        array = 0.d0
+        select type(realization_base)
+          class is(realization_subsurface_type)
+            call RTComputeMassBalance(realization_base, &
+                                      realization_base%patch%grid%nlmax, &
+                                      max_tran_size,array)
+          class default
+            option%io_buffer = 'Unrecognized realization class in MassBalance().'
+            call PrintErrMsg(option)
+        end select
+        int_mpi = max_tran_size*8
+        call MPI_Reduce(array,array_global,int_mpi,MPI_DOUBLE_PRECISION, &
+                        MPI_SUM,option%comm%io_rank,option%mycomm, &
+                        ierr);CHKERRQ(ierr)
+
+        if (OptionIsIORank(option)) then
+          ! total across all phases
+          do icomp = 1, reaction%naqcomp
+            if (reaction%primary_species_print(icomp)) then
+              write(fid,110,advance="no") array_global(icomp,1)
+            endif
+          enddo
+          ! immobile species
+          do i = 1, reaction%immobile%nimmobile
+            if (reaction%immobile%print_me(i)) then
+              write(fid,110,advance="no") &
+                array_global(i,7)
+            endif
+          enddo
+          ! gas species
+          do i = 1, reaction%gas%nactive_gas
+            if (reaction%gas%active_print_me(i)) then
+              write(fid,110,advance="no") &
+                array_global(i,8)
+            endif
+          enddo
+        endif
+    !   print out mineral contribution to mass balance
+        if (option%mass_bal_detailed) then
+          if (OptionIsIORank(option)) then
+            do i = 1, reaction%mineral%nkinmnrl
+              if (reaction%mineral%kinmnrl_print(i)) then
+                write(fid,110,advance="no") array_global(i,6)
+              endif
+            enddo
+          endif
+        endif
+        deallocate(array,array_global)
+      case(NWT_MODE)
+    end select
+  endif
+
 
 120 format(100es17.8e3)
 
