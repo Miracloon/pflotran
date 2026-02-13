@@ -6211,8 +6211,6 @@ subroutine EOSWaterSurfaceTension(T,sigma)
 
 end subroutine EOSWaterSurfaceTension
 
-
-
 ! ************************************************************************** !
 
 subroutine EOSWaterKelvin(Pc,rhow,T,Psat,Pv)
@@ -6246,5 +6244,71 @@ subroutine EOSWaterKelvin(Pc,rhow,T,Psat,Pv)
 end subroutine EOSWaterKelvin
 
 ! ************************************************************************** !
+
+subroutine EOSWaterThermalConductivityIF97(rho,T,lambda)
+  !
+  ! Calculates the thermal conductivity of water
+  !
+  ! Wagner and Kretzschmar (2008) International Steam Tables: Properties
+  ! of Water and Stream Based on the Industrial Formulation IAPWS-IF97,
+  ! 2nd Edition, Springer-Verlag, Berlin.
+  ! Eq. 3.4-7 (pg 155-156)
+  !
+  ! Author: Glenn Hammond
+  ! Date: 02/12/26
+  !
+  implicit none
+
+  PetscReal :: rho    ! [kg/m^3]
+  PetscReal :: T      ! [C]
+  PetscReal :: lambda ! [MW/m/K]
+
+  PetscReal, parameter :: Tref = 647.26d0
+  PetscReal, parameter :: rhoref = 317.7d0
+
+  PetscReal, parameter :: n35(4) = [0.102811d-1,0.299621d-1, &
+                                    0.156146d-1,-0.422464d-2]
+  PetscReal, parameter :: n36(5) = [-0.397070d0,0.400302d0,0.106d1, &
+                                    -0.171587d0,0.239219d1]
+  PetscReal, parameter :: n37(10) = [0.701309d-1,0.118520d-1,0.642857d0, &
+                                     0.169937d-2,-0.102d1,-0.411717d1, &
+                                     0.617937d1,0.822994d-1,0.100932d2, &
+                                     0.308976d-2]
+
+  PetscReal :: theta
+  PetscReal :: delta
+  PetscReal :: Lambda0, Lambda1, Lambda2
+  PetscReal :: delta_theta
+  PetscReal :: tempreal
+  PetscReal :: A, B
+  PetscInt :: i
+
+  theta = T/Tref
+  delta = rho/rhoref
+
+  tempreal = 0.d0
+  do i = 1, 4
+    tempreal = tempreal + n35(i)*theta**(i-1)
+  enddo
+  Lambda0 = sqrt(theta)*tempreal
+
+  Lambda1 = n36(1) + n36(2)*delta + &
+            n36(3) * exp(n36(4) * (delta + n36(5))**2)
+
+  delta_theta = dabs(theta-1.d0) + n37(10)
+  A = 2.d0 + n37(8)*delta_theta**(-0.6d0)
+  if (theta >= 1.d0) then
+    B = 1.d0/delta_theta
+  else
+    B = n37(9)*delta_theta**(-0.6d0)
+  endif
+  Lambda2 = (n37(1)*theta**-10 + n37(2)) * delta**1.8d0 * &
+              exp(n37(3)*(1.d0-delta**2.8d0)) + &
+            n37(4) * A * delta**B * exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+            n37(5) * exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+
+  lambda = (Lambda0 + Lambda1 + Lambda2) * 1.d-6 ! [W/m/K -> MW/m/K]
+
+end subroutine EOSWaterThermalConductivityIF97
 
 end module EOS_Water_module
