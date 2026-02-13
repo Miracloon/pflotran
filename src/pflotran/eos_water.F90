@@ -6245,7 +6245,9 @@ end subroutine EOSWaterKelvin
 
 ! ************************************************************************** !
 
-subroutine EOSWaterThermalConductivityIF97(rho,T,lambda)
+subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
+                           calculate_derivative,drho_dp,drho_dT, &
+                           dlambda_dp,dlambda_dT)
   !
   ! Calculates the thermal conductivity of water
   !
@@ -6262,6 +6264,9 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda)
   PetscReal :: rho    ! [kg/m^3]
   PetscReal :: T      ! [C]
   PetscReal :: lambda ! [MW/m/K]
+  PetscBool, intent(in) :: calculate_derivative
+  PetscReal, intent(in) :: drho_dp, drho_dT
+  PetscReal, intent(out) :: dlambda_dp, dlambda_dT
 
   PetscReal, parameter :: Tref = 647.26d0
   PetscReal, parameter :: rhoref = 317.7d0
@@ -6282,6 +6287,12 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda)
   PetscReal :: tempreal
   PetscReal :: A, B
   PetscInt :: i
+
+  PetscReal :: dLambda0_dtheta, dLambda1_ddelta, dLambda2_ddelta, dLambda2_dtheta
+  PetscReal :: dlambda_drho
+  PetscReal :: ddelta_dT, ddelta_dp, dtheta_dT
+  PetscReal :: ddelta_drho
+  PetscReal :: dA_dtheta, dB_dtheta, ddelta_theta_dtheta
 
   theta = T/Tref
   delta = rho/rhoref
@@ -6307,7 +6318,73 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda)
             n37(4) * A * delta**B * exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
             n37(5) * exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
 
-  lambda = (Lambda0 + Lambda1 + Lambda2) * 1.d-6 ! [W/m/K -> MW/m/K]
+  lambda = (Lambda0 + Lambda1 + Lambda2)
+
+  dlambda_dp = UNINITIALIZED_DOUBLE
+  dlambda_dT = UNINITIALIZED_DOUBLE
+
+  if (calculate_derivative) then
+
+    ! Derivative of Lambda0 with respect to theta
+    tempreal = 0.d0
+    do i = 1, 4
+      tempreal = tempreal + (i-1)*n35(i)*theta**(i-2)
+    enddo
+    dLambda0_dtheta = 0.5d0*theta**(-0.5d0)*sum(n35*theta**(/(i-1, i=1,4)/)) + &
+              sqrt(theta)*tempreal
+
+    ! Derivative of Lambda1 with respect to delta
+    dLambda1_ddelta = n36(2) + &
+              2.d0*n36(3)*n36(4)*(delta + n36(5))* &
+              exp(n36(4) * (delta + n36(5))**2)
+
+    ! Derivative of delta_theta with respect to theta
+    if (theta >= 1.d0) then
+      ddelta_theta_dtheta = 1.d0
+    else
+      ddelta_theta_dtheta = -1.d0
+    endif
+
+    ! Derivatives of A and B with respect to theta
+    dA_dtheta = -0.6d0*n37(8)*delta_theta**(-1.6d0)*ddelta_theta_dtheta
+    if (theta >= 1.d0) then
+      dB_dtheta = -delta_theta**(-2)*ddelta_theta_dtheta
+    else
+      dB_dtheta = -0.6d0*n37(9)*delta_theta**(-1.6d0)*ddelta_theta_dtheta
+    endif
+
+    ! Derivative of Lambda2 with respect to delta
+    dLambda2_ddelta = 1.8d0*(n37(1)*theta**(-10) + n37(2))*delta**0.8d0* &
+              exp(n37(3)*(1.d0-delta**2.8d0)) - &
+              2.8d0*n37(3)*(n37(1)*theta**(-10) + n37(2))*delta**4.6d0* &
+              exp(n37(3)*(1.d0-delta**2.8d0)) + &
+              n37(4)*A*B*delta**(B-1.d0)*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B)))* &
+              (1.d0 - delta**(1.d0+B))
+
+    ! Derivative of Lambda2 with respect to theta
+    dLambda2_dtheta = -10.d0*n37(1)*theta**(-11)*delta**1.8d0* &
+              exp(n37(3)*(1.d0-delta**2.8d0)) + &
+              n37(4)*(dA_dtheta*delta**B + A*delta**B*log(delta)*dB_dtheta)* &
+              exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+              1.5d0*n37(5)*n37(6)*theta**0.5d0*exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+
+    dtheta_dT = 1.d0 / Tref
+    ddelta_drho = 1.d0 / rhoref
+
+    ! Total derivatives
+    dlambda_drho = (dLambda1_ddelta + dLambda2_ddelta)/rhoref
+    dlambda_dp = dlambda_drho * drho_dp
+    dlambda_dT = (dLambda0_dtheta*dtheta_dT + dLambda2_dtheta*dtheta_dT) + &
+                  dlambda_drho * drho_dT
+
+    ! convert from W/m/K to MW/m/K
+    dlambda_dp = dlambda_dp * 1.d-6
+    dlambda_dT = dlambda_dT * 1.d-6
+
+  endif
+
+  ! convert from W/m/K to MW/m/K
+  lambda = lambda * 1.d-6
 
 end subroutine EOSWaterThermalConductivityIF97
 
