@@ -6385,10 +6385,11 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
     ddelta_drho = 1.d0 / rhoref
 
     ! Total derivatives
-    dlambda_drho = (dLambda1_ddelta + dLambda2_ddelta)/rhoref
+    dlambda_drho = (dLambda1_ddelta + dLambda2_ddelta) * ddelta_drho
     dlambda_dp = dlambda_drho * drho_dp
-    dlambda_dT = (dLambda0_dtheta*dtheta_dT + dLambda2_dtheta*dtheta_dT) + &
-                  dlambda_drho * drho_dT
+    dlambda_dT = (dLambda0_dtheta + &
+                  dLambda2_dtheta) * dtheta_dT + &
+                 dlambda_drho * drho_dT
 
     ! convert from W/m/K to MW/m/K
     dlambda_dp = dlambda_dp * 1.d-6
