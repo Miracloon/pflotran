@@ -322,5 +322,134 @@ contains
 
   end subroutine testEOSWater_SatPresWagnerPruss
 
+! ************************************************************************** !
+
+  @Test
+  subroutine testEOSWater_ThermCondIF97(this)
+    !
+    ! verify that the EOSWaterThermalConductivityIF97 returns the correct values
+    !
+    use PFLOTRAN_constants_module
+
+    implicit none
+
+    class (Test_EOS_Water), intent(inout) :: this
+
+    PetscReal :: temperature
+    PetscReal :: liquid_pressure
+    PetscBool :: calculate_derivatives
+    PetscReal :: value
+
+    PetscReal :: lambda
+    PetscReal :: dlambda_dp
+    PetscReal :: dlambda_dT
+    PetscReal :: T_pert
+    PetscReal :: p_pert
+    PetscReal :: lambda_pert
+    PetscReal :: pert
+    PetscReal, parameter :: tol = 1.d-6
+    PetscReal, parameter :: assertion_tol = 1.d-6
+
+    call EOSWaterInit()
+    call EOSWaterSetDensity('IF97')
+
+    calculate_derivatives = PETSC_TRUE
+    temperature = 1.d0
+    liquid_pressure = 2.d5
+
+    call CalcLambda(temperature,liquid_pressure,lambda, &
+                    calculate_derivatives,dlambda_dp,dlambda_dT)
+    print *, 'temperature: ', temperature
+    print *, 'pressure: ', liquid_pressure
+    print *, 'lambda: ', lambda
+    print *, 'dlambda_dp: ', dlambda_dp
+    print *, 'dlambda_dT: ', dlambda_dT
+    value = 1624921647754263.2d0
+    @assertEqual(value, lambda, assertion_tol)
+    value = -35136187.568898663d0
+    @assertEqual(value, dlambda_dp, assertion_tol)
+    value = -16252652108745680.d0
+    @assertEqual(value, dlambda_dT, assertion_tol)
+
+    pert = liquid_pressure*tol
+    p_pert = liquid_pressure + pert
+    call CalcLambda(temperature,p_pert,lambda_pert, &
+                    PETSC_FALSE,dlambda_dp,dlambda_dT)
+    print *, 'dlambda_dp (pert): ', (lambda_pert-lambda)/pert
+
+    pert = temperature*tol
+    T_pert = temperature + pert
+    call CalcLambda(T_pert,liquid_pressure,lambda_pert, &
+                    PETSC_FALSE,dlambda_dp,dlambda_dT)
+    print *, 'dlambda_dT (pert): ', (lambda_pert-lambda)/pert
+
+!!!!!!
+    temperature = 75.d0
+    liquid_pressure = 7.d7
+
+    call CalcLambda(temperature,liquid_pressure,lambda, &
+                    calculate_derivatives,dlambda_dp,dlambda_dT)
+    print *, 'temperature: ', temperature
+    print *, 'pressure: ', liquid_pressure
+    print *, 'lambda: ', lambda
+    print *, 'dlambda_dp: ', dlambda_dp
+    print *, 'dlambda_dT: ', dlambda_dT
+    value = 2.4740361485630095d-4
+    @assertEqual(value, lambda, assertion_tol)
+    value = -4.0565401097771380d-12
+    @assertEqual(value, dlambda_dp, assertion_tol)
+    value = -2.6968407845714256d-5
+    @assertEqual(value, dlambda_dT, assertion_tol)
+
+    pert = liquid_pressure*tol
+    p_pert = liquid_pressure + pert
+    call CalcLambda(temperature,p_pert,lambda_pert, &
+                    PETSC_FALSE,dlambda_dp,dlambda_dT)
+    print *, 'dlambda_dp (pert): ', (lambda_pert-lambda)/pert
+
+    pert = temperature*tol
+    T_pert = temperature + pert
+    call CalcLambda(T_pert,liquid_pressure,lambda_pert, &
+                    PETSC_FALSE,dlambda_dp,dlambda_dT)
+    print *, 'dlambda_dT (pert): ', (lambda_pert-lambda)/pert
+
+  contains
+
+    subroutine CalcLambda(temperature,liquid_pressure,lambda, &
+                          calculate_derivatives,dlambda_dp,dlambda_dT)
+
+      use EOS_Water_module
+
+      implicit none
+
+      PetscReal :: temperature
+      PetscReal :: liquid_pressure
+      PetscReal :: lambda
+      PetscBool :: calculate_derivatives
+      PetscReal :: dlambda_dp
+      PetscReal :: dlambda_dT
+
+      PetscReal :: denw_kg
+      PetscReal :: denw_kmol
+      PetscReal :: ddenw_kmol_dp
+      PetscReal :: ddenw_kmol_dt
+      PetscReal :: ddenw_kg_dp
+      PetscReal :: ddenw_kg_dt
+
+      PetscErrorCode :: ierr
+
+      call EOSWaterDensity(temperature,liquid_pressure, &
+                           denw_kg,denw_kmol, &
+                           ddenw_kmol_dp,ddenw_kmol_dt,ierr)
+      ddenw_kg_dp = ddenw_kmol_dp*FMWH2O
+      ddenw_kg_dt = ddenw_kmol_dt*FMWH2O
+      call EOSWaterThermalConductivityIF97(denw_kg,temperature,lambda, &
+                       calculate_derivatives,ddenw_kg_dp,ddenw_kg_dt, &
+                      dlambda_dp,dlambda_dT)
+
+    end subroutine CalcLambda
+
+  end subroutine testEOSWater_ThermCondIF97
+
 end module Test_EOS_Water_module
 
