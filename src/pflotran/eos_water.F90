@@ -6292,10 +6292,16 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
 
   PetscReal :: dLambda0_dtheta, dLambda1_ddelta, dLambda2_ddelta, dLambda2_dtheta
   PetscReal :: dlambda_drho
-  PetscReal :: ddelta_dT, ddelta_dp, dtheta_dT
+  PetscReal :: dtheta_dT
   PetscReal :: ddelta_drho
   PetscReal :: dA_dtheta, dB_dtheta, ddelta_theta_dtheta
   PetscReal :: eq35sum
+  PetscReal :: eq37a_theta_pow_neg10
+  PetscReal :: eq37a_1_minus_delta28
+  PetscReal :: eq37b_b_over_1pb
+  PetscReal :: eq37b_1_minus_delta1pb
+  PetscReal :: eq37c_theta_pow_15
+  PetscReal :: eq37c_delta_pow_neg5
 
   theta = T/Tref
   delta = rho/rhoref
@@ -6316,14 +6322,20 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
   else
     B = n37(9)*delta_theta**(-0.6d0)
   endif
+  eq37a_theta_pow_neg10 = theta**(-10)
+  eq37a_1_minus_delta28 = 1.d0 - delta**2.8d0
+  eq37b_b_over_1pb = B/(1.d0+B)
+  eq37b_1_minus_delta1pb = 1.d0-delta**(1.d0+B)
+  eq37c_theta_pow_15 = theta**1.5d0
+  eq37c_delta_pow_neg5 = delta**(-5)
   Lambda2 = &
     !eq37a
-    (n37(1)*theta**-10 + n37(2)) * delta**1.8d0 * &
-              exp(n37(3)*(1.d0-delta**2.8d0)) + &
+    (n37(1)*eq37a_theta_pow_neg10 + n37(2)) * delta**1.8d0 * &
+              exp(n37(3)*eq37a_1_minus_delta28) + &
     !eq37b
-    n37(4) * A * delta**B * exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+    n37(4) * A * delta**B * exp(eq37b_b_over_1pb*eq37b_1_minus_delta1pb) + &
     !eq37c
-    n37(5) * exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+    n37(5) * exp(n37(6)*eq37c_theta_pow_15 + n37(7)*eq37c_delta_pow_neg5)
 
   lambda = (Lambda0 + Lambda1 + Lambda2)
 
@@ -6360,32 +6372,36 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
     ! Derivative of Lambda2 with respect to delta
     dLambda2_ddelta = &
       !eq37a
-      1.8d0*(n37(1)*theta**(-10) + n37(2))*delta**0.8d0* &
-        exp(n37(3)*(1.d0-delta**2.8d0)) - &
-      2.8d0*n37(3)*(n37(1)*theta**(-10) + n37(2))*delta** 3.6d0 * &
-        exp(n37(3)*(1.d0-delta**2.8d0)) + &
+      1.8d0*(n37(1)*eq37a_theta_pow_neg10 + n37(2))*delta**0.8d0* &
+        exp(n37(3)*eq37a_1_minus_delta28) - &
+      2.8d0*n37(3)*(n37(1)*eq37a_theta_pow_neg10 + n37(2))*delta**3.6d0 * &
+        exp(n37(3)*eq37a_1_minus_delta28) + &
       !eq37b
-      n37(4)*A*B*delta**(B-1.d0)*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+      n37(4)*A*B*delta**(B-1.d0)*exp(eq37b_b_over_1pb*eq37b_1_minus_delta1pb) + &
       !eq37c
-      -5.d0*n37(7)*delta**(-6)*n37(5)*exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+      !  eq37c_delta_pow_neg5/delta = delta**(-6)
+      (-5.d0)*n37(7)*eq37c_delta_pow_neg5/delta*n37(5)* &
+        exp(n37(6)*eq37c_theta_pow_15 + n37(7)*eq37c_delta_pow_neg5)
 
 
     ! Derivative of Lambda2 with respect to theta
     dLambda2_dtheta = &
       !eq37a
-      -10.d0*n37(1)*theta**(-11)*delta**1.8d0* &
-        exp(n37(3)*(1.d0-delta**2.8d0)) + &
+      ! eq37a_theta_pow_neg10/theta = theta**-11
+      -10.d0*n37(1)*eq37a_theta_pow_neg10/theta*delta**1.8d0* &
+        exp(n37(3)*eq37a_1_minus_delta28) + &
       !eq37b
-      n37(4)*dA_dtheta*delta**B*exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
+      n37(4)*dA_dtheta*delta**B*exp(eq37b_b_over_1pb*eq37b_1_minus_delta1pb) + &
       n37(4)*A*delta**B*log(delta)*dB_dtheta* &
-        exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
-      n37(4)*A*delta**B*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B)))* &
-        (dB_dtheta/(1.d0+B)*(1.d0-delta**(1.d0+B)) + &
-         -B/(1.d0+B)**2*dB_dtheta*(1-delta**(1.d0+B)) + &
-         -(B/(1.d0+B))*(1.d0+B)*delta**B*dB_dtheta) + &
+        exp(eq37b_b_over_1pb*eq37b_1_minus_delta1pb) + &
+      n37(4)*A*delta**B*exp(eq37b_b_over_1pb*eq37b_1_minus_delta1pb)* &
+        (dB_dtheta/(1.d0+B)*eq37b_1_minus_delta1pb + &
+         -eq37b_b_over_1pb**2*dB_dtheta*eq37b_1_minus_delta1pb + &
+         -eq37b_b_over_1pb*(1.d0+B)*delta**B*dB_dtheta) + &
       !eq37c
-      n37(5)*exp(n37(6)*theta**1.5d0+n37(7)*delta**(-5))* &
-        n37(6)*1.5d0*theta**0.5d0
+      !  eq37c_theta_pow_15/theta = theta**0.5
+      n37(5)*exp(n37(6)*eq37c_theta_pow_15+n37(7)*eq37c_delta_pow_neg5)* &
+        n37(6)*1.5d0*eq37c_theta_pow_15/theta
 
 
     dtheta_dT = 1.d0 / Tref
