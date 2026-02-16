@@ -6316,10 +6316,14 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
   else
     B = n37(9)*delta_theta**(-0.6d0)
   endif
-  Lambda2 = (n37(1)*theta**-10 + n37(2)) * delta**1.8d0 * &
+  Lambda2 = &
+    !eq37a
+    (n37(1)*theta**-10 + n37(2)) * delta**1.8d0 * &
               exp(n37(3)*(1.d0-delta**2.8d0)) + &
-            n37(4) * A * delta**B * exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
-            n37(5) * exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+    !eq37b
+    n37(4) * A * delta**B * exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+    !eq37c
+    n37(5) * exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
 
   lambda = (Lambda0 + Lambda1 + Lambda2)
 
@@ -6347,7 +6351,6 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
 
     ! Derivatives of A and B with respect to theta
     dA_dtheta = -0.6d0*n37(8)*delta_theta**(-1.6d0)*ddelta_theta_dtheta
-  !geh: there is an issue here
     if (theta >= 1.d0) then
       dB_dtheta = -delta_theta**(-2)*ddelta_theta_dtheta
     else
@@ -6355,30 +6358,34 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
     endif
 
     ! Derivative of Lambda2 with respect to delta
-    dLambda2_ddelta = 1.8d0*(n37(1)*theta**(-10) + n37(2))*delta**0.8d0* &
-              exp(n37(3)*(1.d0-delta**2.8d0)) - &
-!              2.8d0*n37(3)*(n37(1)*theta**(-10) + n37(2))*delta**4.6d0* &
-              2.8d0*n37(3)*(n37(1)*theta**(-10) + n37(2))*delta** 3.6d0 * &
-              exp(n37(3)*(1.d0-delta**2.8d0)) + &
-!              n37(4)*A*B*delta**(B-1.d0)*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B)))* &
-!              (1.d0 - delta**(1.d0+B))
-              n37(4)*A*B*delta**(B-1.d0)*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
-              -5.d0*n37(7)*delta**(-6)*n37(5)*exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
+    dLambda2_ddelta = &
+      !eq37a
+      1.8d0*(n37(1)*theta**(-10) + n37(2))*delta**0.8d0* &
+        exp(n37(3)*(1.d0-delta**2.8d0)) - &
+      2.8d0*n37(3)*(n37(1)*theta**(-10) + n37(2))*delta** 3.6d0 * &
+        exp(n37(3)*(1.d0-delta**2.8d0)) + &
+      !eq37b
+      n37(4)*A*B*delta**(B-1.d0)*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
+      !eq37c
+      -5.d0*n37(7)*delta**(-6)*n37(5)*exp(n37(6)*theta**1.5d0 + n37(7)*delta**(-5))
 
 
     ! Derivative of Lambda2 with respect to theta
-    dLambda2_dtheta = -10.d0*n37(1)*theta**(-11)*delta**1.8d0* &
-              exp(n37(3)*(1.d0-delta**2.8d0)) + &
-!              n37(4)*(dA_dtheta*delta**B + A*delta**B*log(delta)*dB_dtheta)* &
-!              exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B))) + &
-              n37(4)*dA_dtheta*delta**B*exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
-              n37(4)*A*delta**B*log(delta)*dB_dtheta*exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
-              n37(4)*A*delta**B*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B)))* &
-              (dB_dtheta/(1.d0+B)*(1.d0-delta**(1.d0+B)) + &
-               -B/(1.d0+B)**2*dB_dtheta*(1-delta**(1.d0+B)) + &
-               -(B/(1.d0+B))*(1.d0+B)*delta**B*dB_dtheta) + &
-              n37(5)*exp(n37(6)*theta**1.5d0+n37(7)*delta**(-5))* &
-              n37(6)*1.5d0*theta**0.5d0
+    dLambda2_dtheta = &
+      !eq37a
+      -10.d0*n37(1)*theta**(-11)*delta**1.8d0* &
+        exp(n37(3)*(1.d0-delta**2.8d0)) + &
+      !eq37b
+      n37(4)*dA_dtheta*delta**B*exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
+      n37(4)*A*delta**B*log(delta)*dB_dtheta* &
+        exp((B/(1.d0+B))*(1-delta**(1.d0+B))) + &
+      n37(4)*A*delta**B*exp((B/(1.d0+B))*(1.d0-delta**(1.d0+B)))* &
+        (dB_dtheta/(1.d0+B)*(1.d0-delta**(1.d0+B)) + &
+         -B/(1.d0+B)**2*dB_dtheta*(1-delta**(1.d0+B)) + &
+         -(B/(1.d0+B))*(1.d0+B)*delta**B*dB_dtheta) + &
+      !eq37c
+      n37(5)*exp(n37(6)*theta**1.5d0+n37(7)*delta**(-5))* &
+        n37(6)*1.5d0*theta**0.5d0
 
 
     dtheta_dT = 1.d0 / Tref
