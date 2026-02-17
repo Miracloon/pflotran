@@ -369,7 +369,7 @@ contains
       PetscReal :: liquid_pressure
 
       PetscBool :: calculate_derivatives
-      PetscReal :: value
+!      PetscReal :: value
       PetscReal :: lambda
       PetscReal :: dlambda_dp
       PetscReal :: dlambda_dT
