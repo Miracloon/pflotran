@@ -133,11 +133,24 @@ module TH_Aux_module
     PetscReal :: du_dT
     PetscReal :: dh_dT
     PetscReal :: volume
-    PetscReal :: surface_area
+    PetscReal :: segment_length
     PetscReal :: heat_transfer_coef
     PetscReal :: well_index
     PetscReal :: therm_cond_borehole_to_cell
-        ! for numerical derivatives
+    ! Fluid properties for convective heat transfer
+    PetscReal :: den                 ! density [kmol/m^3]
+    PetscReal :: den_kg              ! density [kg/m^3]
+    PetscReal :: vis                 ! viscosity [Pa-s]
+    PetscReal :: therm_cond_fluid    ! thermal conductivity of fluid [W/m/K]
+    PetscReal :: spec_heat_fluid     ! specific heat capacity of fluid [J/kg/K]
+    ! derivatives
+    PetscReal :: dden_dT
+    PetscReal :: dtherm_cond_fluid_dT
+    ! Dimensionless numbers
+    PetscReal :: reynolds            ! Reynolds number [-]
+    PetscReal :: prandtl             ! Prandtl number [-]
+    PetscReal :: nusselt             ! Nusselt number [-]
+    ! for numerical derivatives
     PetscReal :: pert
     type(th_well_auxvar_type), pointer :: auxvar_pert(:)
   end type th_well_auxvar_type
@@ -1253,10 +1266,20 @@ recursive subroutine THWellAuxVarInit(auxvar,option,allocate_perturbation)
   auxvar%du_dT = 0.d0
   auxvar%dh_dT = 0.d0
   auxvar%volume = 0.d0
-  auxvar%surface_area = 0.d0
+  auxvar%segment_length = 0.d0
   auxvar%heat_transfer_coef = 0.d0
   auxvar%well_index = 0.d0
   auxvar%therm_cond_borehole_to_cell = 0.d0
+  auxvar%den = 0.d0
+  auxvar%den_kg = 0.d0
+  auxvar%vis = 0.d0
+  auxvar%therm_cond_fluid = 0.d0
+  auxvar%spec_heat_fluid = 0.d0
+  auxvar%dden_dT = 0.d0
+  auxvar%dtherm_cond_fluid_dT = 0.d0
+  auxvar%reynolds = 0.d0
+  auxvar%prandtl = 0.d0
+  auxvar%nusselt = 0.d0
 
   auxvar%pert = 0.d0
   if (allocate_perturbation) then
@@ -1288,11 +1311,21 @@ recursive subroutine THWellAuxVarCopyParamsToPert(auxvar)
   do i = 1, size(auxvar%auxvar_pert)
     auxvar%auxvar_pert(i)%local_id = auxvar%local_id
     auxvar%auxvar_pert(i)%volume = auxvar%volume
-    auxvar%auxvar_pert(i)%surface_area = auxvar%surface_area
+    auxvar%auxvar_pert(i)%segment_length = auxvar%segment_length
     auxvar%auxvar_pert(i)%heat_transfer_coef = auxvar%heat_transfer_coef
     auxvar%auxvar_pert(i)%well_index = auxvar%well_index
     auxvar%auxvar_pert(i)%therm_cond_borehole_to_cell = &
       auxvar%therm_cond_borehole_to_cell
+    auxvar%auxvar_pert(i)%den = auxvar%den
+    auxvar%auxvar_pert(i)%den_kg = auxvar%den_kg
+    auxvar%auxvar_pert(i)%vis = auxvar%vis
+    auxvar%auxvar_pert(i)%therm_cond_fluid = auxvar%therm_cond_fluid
+    auxvar%auxvar_pert(i)%spec_heat_fluid = auxvar%spec_heat_fluid
+    auxvar%auxvar_pert(i)%reynolds = auxvar%reynolds
+    auxvar%auxvar_pert(i)%prandtl = auxvar%prandtl
+    auxvar%auxvar_pert(i)%nusselt = auxvar%nusselt
+    auxvar%auxvar_pert(i)%dden_dT = auxvar%dden_dT
+    auxvar%auxvar_pert(i)%dtherm_cond_fluid_dT = auxvar%dtherm_cond_fluid_dT
   enddo
 
 end subroutine THWellAuxVarCopyParamsToPert
@@ -1318,26 +1351,68 @@ subroutine THWellAuxVarCompute(liquid_pressure,x,auxvar,natural_id,option)
   PetscInt :: natural_id
 
   PetscReal :: pw, dw_kmol, hw
-  PetscReal :: dw_dT
+  PetscReal :: dw_dT, dw_dp, dw_kg
   PetscReal :: hw_dp, hw_dT
+  PetscReal :: vis, dvis_dp, dvis_dT
+  PetscReal :: sat_pressure, dpsat_dT
+  PetscReal :: therm_cond, dtherm_cond_dp, dtherm_cond_dT
   PetscErrorCode :: ierr
 
   pw = liquid_pressure
   auxvar%temp = x(th_well_dof)
 
-  dw_kmol = 1.d3 / FMWH2O
-  dw_dT = 0.d0
+  ! Compute density [kg/m^3] and [kmol/m^3]
+  call EOSWaterDensity(auxvar%temp,pw,dw_kg,dw_kmol,dw_dp,dw_dT,ierr)
+  if (ierr /= 0) then
+    call PrintMsgByCell(option,natural_id, &
+      'Error in THWellAuxVarCompute->EOSWaterDensity')
+  endif
+  auxvar%den = dw_kmol
+  auxvar%den_kg = dw_kg
+  auxvar%dden_dT = dw_dT
+
   call EOSWaterEnthalpy(auxvar%temp,pw,hw,hw_dp,hw_dT,ierr)
-  auxvar%h = hw
-  auxvar%u = auxvar%h - pw / dw_kmol
-  auxvar%dh_dT = hw_dT
-  auxvar%du_dT = hw_dT + pw/(dw_kmol*dw_kmol)*dw_dT
+  if (ierr /= 0) then
+    call PrintMsgByCell(option,natural_id, &
+      'Error in THWellAuxVarCompute->EOSWaterEnthalpy')
+  endif
+
+  ! Compute specific heat capacity [J/kg-K] from enthalpy derivative
+  ! c_p = dh/dT
+  ! We have hw_dT in [J/kmol-K], convert to [J/kg-K]
+  auxvar%spec_heat_fluid = hw_dT / FMWH2O
 
   ! J/kmol -> whatever units (default of option%scale is 1.e-6)
-  auxvar%h = auxvar%h * option%scale
-  auxvar%u = auxvar%u * option%scale
-  auxvar%dh_dT = auxvar%dh_dT * option%scale
-  auxvar%du_dT = auxvar%du_dT * option%scale
+  hw = hw * option%scale
+  hw_dp = hw_dp * option%scale
+  hw_dT = hw_dT * option%scale
+  auxvar%h = hw
+  auxvar%u = auxvar%h - pw / dw_kmol * option%scale
+  auxvar%dh_dT = hw_dT
+  auxvar%du_dT = hw_dT + pw/(dw_kmol*dw_kmol)*dw_dT*option%scale
+
+  ! Compute saturation pressure (needed for viscosity calculation)
+  call EOSWaterSaturationPressure(auxvar%temp,sat_pressure,dpsat_dT,ierr)
+  if (ierr /= 0) then
+    call PrintMsgByCell(option,natural_id, &
+      'Error in THWellAuxVarCompute->EOSWaterSaturationPressure')
+  endif
+
+  ! Compute viscosity [Pa-s]
+  call EOSWaterViscosity(auxvar%temp,pw,sat_pressure,dpsat_dT,vis, &
+                         dvis_dT,dvis_dp,ierr)
+  if (ierr /= 0) then
+    call PrintMsgByCell(option,natural_id, &
+      'Error in THWellAuxVarCompute->EOSWaterViscosity')
+  endif
+  auxvar%vis = vis
+
+  ! Compute thermal conductivity of  water [MW/m-K]
+  call EOSWaterThermalConductivityIF97(dw_kg,auxvar%temp,therm_cond, &
+                                       PETSC_TRUE,dw_dp,dw_dT, &
+                                       dtherm_cond_dp,dtherm_cond_dT)
+  auxvar%therm_cond_fluid = therm_cond
+  auxvar%dtherm_cond_fluid_dT = dtherm_cond_dT
 
 end subroutine THWellAuxVarCompute
 

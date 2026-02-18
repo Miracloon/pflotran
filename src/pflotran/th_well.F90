@@ -12,7 +12,6 @@ module TH_Well_module
   private
 
   PetscReal :: liquid_pressure = 1.d6
-  PetscReal :: liquid_density_kmol = 1.d3 / FMWH2O
   PetscReal :: thermal_diffusivity = 0.143d-6
 
   public :: THWellSetup, &
@@ -58,6 +57,7 @@ subroutine THWellSetup(pm_well_base,realization)
   type(th_auxvar_type), pointer :: auxvars(:)
   type(th_well_auxvar_type), pointer :: auxvars_well(:)
   PetscReal :: dist_up, dist_dn
+  PetscReal :: surface_area
   PetscInt :: local_id
   PetscInt :: ghosted_id, ghosted_id_up, ghosted_id_dn
   PetscInt :: grid_id_up, grid_id_dn
@@ -399,10 +399,10 @@ subroutine THWellSetup(pm_well_base,realization)
     segment_length = sqrt(len_(1,ghosted_id)**2 + &
                           len_(2,ghosted_id)**2 + &
                           len_(3,ghosted_id)**2)
+    auxvars_well(i)%segment_length = segment_length
     auxvars_well(i)%volume = segment_length * &
                              pipe_cross_sectional_area
-    auxvars_well(i)%surface_area = segment_length * &
-                                   pm_well%pipe_inner_diameter * PI
+    surface_area = segment_length * pm_well%pipe_inner_diameter * PI
     rock_thermal_conductivity = th_parameter%ckwet(patch%cct_id(ghosted_id))
     call THWellWI(rock_thermal_conductivity, &
                   rock_thermal_conductivity, &
@@ -417,7 +417,7 @@ subroutine THWellSetup(pm_well_base,realization)
                   0.d0, & ! s
                   auxvars_well(i)%well_index)
     auxvars_well(i)%therm_cond_borehole_to_cell = auxvars_well(i)%well_index / &
-                                                  auxvars_well(i)%surface_area
+                                                  surface_area
     if (th_numerical_derivatives) then
       ! must copy parameters down to perturbed auxvars
       call THWellAuxVarCopyParamsToPert(auxvars_well(i))
@@ -883,7 +883,7 @@ subroutine THWellAccumulation(auxvar_well,Res,Jac,ndof)
   !            volume [m^3 liquid]
   Res = 0.d0
   Jac = 0.d0
-  tempreal = auxvar_well%volume * liquid_density_kmol
+  tempreal = auxvar_well%volume * auxvar_well%den
   Res(ndof) = tempreal * auxvar_well%u
   Jac(ndof,ndof) = tempreal * auxvar_well%du_dT
 
@@ -961,12 +961,13 @@ subroutine THWellFlux(auxvar_well_up,auxvar_well_dn, &
   if (velocity > 0) then
     enthalpy = auxvar_well_up%h
     dh_dTup = auxvar_well_up%dh_dT
+    q_kmol = velocity * area * auxvar_well_up%den
   else
     enthalpy = auxvar_well_dn%h
     dh_dTdn = auxvar_well_dn%dh_dT
+    q_kmol = velocity * area * auxvar_well_dn%den
   endif
 
-  q_kmol = velocity * area * liquid_density_kmol
   convective_energy_flux = q_kmol * enthalpy
 
   ! conduction
@@ -1051,7 +1052,7 @@ function THWellResistanceWellIndex(auxvar_well,pm_well)
   PetscReal :: THWellResistanceWellIndex
 
   if (pm_well%use_well_index) then
-    ! [K/MW] = 1 / [MW/m^2-K]
+    ! [K/MW] = 1 / [MW/K]
     THWellResistanceWellIndex = 1.d0 / auxvar_well%well_index
   else
     THWellResistanceWellIndex = 0.d0
@@ -1061,7 +1062,7 @@ end function THWellResistanceWellIndex
 
 ! ************************************************************************** !
 
-function THWellResistanceInsulator(auxvar_well,pm_well,inner_radius)
+function THWellResistanceInsulator(auxvar_well,pm_well)
   !
   ! Calculates heat flux between pipe wall and insulator
   !
@@ -1070,16 +1071,21 @@ function THWellResistanceInsulator(auxvar_well,pm_well,inner_radius)
   !
   type(th_well_auxvar_type) :: auxvar_well
   class(pm_well_closed_loop_type) :: pm_well
-  PetscReal :: inner_radius
 
   PetscReal :: THWellResistanceInsulator
 
-  if (pm_well%insulator_thermal_conductivity > 0.d0) then
-    ! [K/MW] = 1 / ([MW/m-K] * [m])
+  PetscReal :: r_inner
+  PetscReal :: r_outer
+
+  r_inner = 0.5d0 * pm_well%pipe_inner_diameter + pm_well%pipe_wall_thickness
+  r_outer = r_inner + pm_well%insulator_thickness
+
+  if (pm_well%insulator_thermal_conductivity > 0.d0 .and. &
+       r_inner > 0.d0 .and. auxvar_well%segment_length > 0.d0) then
+    ! Cylindrical conduction resistance: R = ln(r_o/r_i)/(2*pi*k*L) [K/MW]
     THWellResistanceInsulator = &
-      log((inner_radius+pm_well%insulator_thickness)/inner_radius) / &
-      (2.d0 * PI * pm_well%insulator_thermal_conductivity * &
-       pm_well%insulator_thickness)
+      log(r_outer/r_inner) / (2.d0 * PI * &
+      pm_well%insulator_thermal_conductivity * auxvar_well%segment_length)
   elseif (pm_well%insulator_thermal_conductivity < 0.d0) then
     THWellResistanceInsulator = 0.d0
   else
@@ -1090,7 +1096,7 @@ end function THWellResistanceInsulator
 
 ! ************************************************************************** !
 
-function THWellResistancePipeWall(auxvar_well,pm_well,inner_radius)
+function THWellResistancePipeWall(auxvar_well,pm_well)
   !
   ! Calculates heat flux between fluid centerline and pipe wall
   !
@@ -1099,16 +1105,21 @@ function THWellResistancePipeWall(auxvar_well,pm_well,inner_radius)
   !
   type(th_well_auxvar_type) :: auxvar_well
   class(pm_well_closed_loop_type) :: pm_well
-  PetscReal :: inner_radius
 
   PetscReal :: THWellResistancePipeWall
 
-  if (pm_well%pipe_wall_thermal_conductivity > 0.d0) then
-    ! [K/MW] = 1 / ([MW/m-K] * [m])
+  PetscReal :: r_inner
+  PetscReal :: r_outer
+
+  r_inner = 0.5d0 * pm_well%pipe_inner_diameter
+  r_outer = r_inner + pm_well%pipe_wall_thickness
+
+  if (pm_well%pipe_wall_thermal_conductivity > 0.d0 .and. &
+      r_inner > 0.d0 .and. auxvar_well%segment_length > 0.d0) then
+    ! Cylindrical conduction resistance: R = ln(r_o/r_i)/(2*pi*k*L) [K/MW]
     THWellResistancePipeWall = &
-      log((inner_radius+pm_well%pipe_wall_thickness)/inner_radius) / &
-      (2.d0 * PI * pm_well%pipe_wall_thermal_conductivity * &
-       pm_well%pipe_wall_thickness)
+      log(r_outer/r_inner) / (2.d0 * PI * &
+      pm_well%pipe_wall_thermal_conductivity * auxvar_well%segment_length)
   elseif (pm_well%pipe_wall_thermal_conductivity < 0.d0) then
     THWellResistancePipeWall = 0.d0
   else
@@ -1130,9 +1141,21 @@ function THWellResistanceFluid(auxvar_well,pm_well)
   class(pm_well_closed_loop_type) :: pm_well
 
   PetscReal :: THWellResistanceFluid
+  PetscReal :: thermal_coeff_fluid
+  PetscReal :: surface_area
 
-  ! [K/MW]
-  THWellResistanceFluid = 0.d0
+  thermal_coeff_fluid = THWellComputeConvCoefficient(auxvar_well,pm_well)
+  ! Inner wall surface area for convection
+  surface_area = PI * pm_well%pipe_inner_diameter * auxvar_well%segment_length
+
+  ! Convective resistance: R = 1/(h*A) [K/MW] as h [MW/m^2-K] and A [m^2]
+  if (thermal_coeff_fluid > 0.d0 .and. surface_area > 0.d0) then
+    THWellResistanceFluid = 1.d0 / (thermal_coeff_fluid * surface_area)
+  elseif (thermal_coeff_fluid < 0.d0) then
+    THWellResistanceFluid = 0.d0
+  else
+    THWellResistanceFluid = MAX_DOUBLE
+  endif
 
 end function THWellResistanceFluid
 
@@ -1158,19 +1181,17 @@ subroutine THWellHeatExchange(auxvar,auxvar_well,pm_well, &
   PetscReal :: tcell, tpipe
   PetscReal :: diffusive_energy_flux
   PetscReal :: total_thermal_resistance
-  PetscReal :: inner_radius
   PetscReal :: tempreal
 
   Res = 0.d0
 
   tcell = auxvar%temp
   tpipe = auxvar_well%temp
-  inner_radius = 0.5d0 * pm_well%pipe_inner_diameter
 
   total_thermal_resistance = &  ! [K/MW]
     THWellResistanceFluid(auxvar_well,pm_well) + &
-    THWellResistancePipeWall(auxvar_well,pm_well,inner_radius) + &
-    THWellResistanceInsulator(auxvar_well,pm_well,inner_radius) + &
+    THWellResistancePipeWall(auxvar_well,pm_well) + &
+    THWellResistanceInsulator(auxvar_well,pm_well) + &
     THWellResistanceWellIndex(auxvar_well,pm_well)
 
   diffusive_energy_flux = (tcell-tpipe) / total_thermal_resistance
@@ -1300,6 +1321,185 @@ subroutine THWellWI(kx,ky,kz,dx,dy,dz,lenx,leny,lenz,pipe_diameter,s,wi)
   wi = sqrt(wi_x**2 + wi_y**2 + wi_z**2)
 
 end subroutine THWellWI
+
+! ************************************************************************** !
+
+subroutine THWellComputePipeCoefficient(auxvar_well,pm_well)
+  !
+  ! Computes pipe wall conduction coefficient for cylindrical wall
+  ! h_pipe = k_wall / (r_outer * ln(r_outer/r_inner))
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 02/18/26
+  !
+  implicit none
+
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+
+  PetscReal :: thermal_cond_pipe_wall ! wall thermal conductivity [MW/m-K]
+  PetscReal :: r_inner                ! inner radius [m]
+  PetscReal :: r_outer                ! outer radius [m]
+  PetscReal :: h_pipe_wall            ! [MW/m^2-K]
+
+  thermal_cond_pipe_wall = pm_well%pipe_wall_thermal_conductivity
+  r_inner = 0.5d0 * pm_well%pipe_inner_diameter
+  r_outer = r_inner + pm_well%pipe_wall_thickness
+
+  if (r_outer > r_inner .and. r_inner > 0.d0) then
+    ! For cylindrical wall: R_wall = ln(r_o/r_i)/(2*pi*L*k)
+    ! Per unit area (dividing by 2*pi*r_o*L): h = k/(r_o*ln(r_o/r_i))
+    h_pipe_wall = thermal_cond_pipe_wall / (r_outer * log(r_outer/r_inner))
+  else if (r_outer <= r_inner) then
+    ! No wall thickness - infinite conductivity (no resistance)
+    h_pipe_wall = 1.d20
+  else
+    h_pipe_wall = 0.d0
+  endif
+
+end subroutine THWellComputePipeCoefficient
+
+! ************************************************************************** !
+
+function THWellComputeConvCoefficient(auxvar_well,pm_well)
+  !
+  ! Computes convection heat transfer coefficient from fluid flow in well
+  ! h = Nu * k / D
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 02/18/26
+  !
+  implicit none
+
+  type(th_well_auxvar_type) :: auxvar_well
+  class(pm_well_closed_loop_type) :: pm_well
+
+  PetscReal :: density
+  PetscReal :: velocity
+  PetscReal :: pipe_diameter
+  PetscReal :: viscosity
+  PetscReal :: heat_capacity
+  PetscReal :: thermal_cond
+  PetscReal :: THWellComputeConvCoefficient
+
+  PetscReal :: reynolds
+  PetscReal :: prandtl
+  PetscReal :: nusselt
+
+  reynolds = 0.d0
+  prandtl = 0.d0
+  nusselt = 0.d0
+
+  velocity = pm_well%flow_velocity
+  pipe_diameter = pm_well%pipe_inner_diameter
+
+  density = auxvar_well%den_kg
+  viscosity = auxvar_well%vis
+  heat_capacity = auxvar_well%spec_heat_fluid
+  thermal_cond = auxvar_well%therm_cond_fluid
+
+  !Compute Reynolds number
+  reynolds = THWellComputeReynoldNumber(density,velocity,pipe_diameter, &
+                                        viscosity)
+  !Compute Prandtl number
+  prandtl = THWellComputePrandtlNumber(heat_capacity,viscosity,thermal_cond)
+  !Compute Nusselt number
+  nusselt = THWellComputeNusseltNumber(reynolds,prandtl)
+
+  if (pipe_diameter > 0.d0) then
+    THWellComputeConvCoefficient = nusselt * thermal_cond / pipe_diameter
+  else
+    THWellComputeConvCoefficient = 0.d0
+  endif
+
+end function THWellComputeConvCoefficient
+
+! ************************************************************************** !
+
+function THWellComputeReynoldNumber(density,velocity,pipe_diameter, &
+                                    viscosity)
+  !
+  ! Computes Reynolds number for borehole flow
+  ! Re = rho * u * D / mu
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 02/16/26
+  !
+  implicit none
+
+  PetscReal :: density
+  PetscReal :: velocity
+  PetscReal :: pipe_diameter
+  PetscReal :: viscosity
+  PetscReal :: THWellComputeReynoldNumber
+
+  if (viscosity > 0.d0) then
+    THWellComputeReynoldNumber = density * dabs(velocity) * pipe_diameter / &
+                                 viscosity
+  else
+    THWellComputeReynoldNumber = 0.d0
+  endif
+
+end function THWellComputeReynoldNumber
+
+! ************************************************************************** !
+
+function THWellComputePrandtlNumber(heat_capacity,viscosity,thermal_cond)
+  !
+  ! Computes Prandtl number for fluid
+  ! Pr = c_p * mu / k
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 02/17/26
+  !
+  implicit none
+
+  PetscReal :: heat_capacity
+  PetscReal :: viscosity
+  PetscReal :: thermal_cond
+  PetscReal :: THWellComputePrandtlNumber
+
+  if (thermal_cond > 0.d0) then
+    THWellComputePrandtlNumber = heat_capacity * viscosity / thermal_cond
+  else
+    THWellComputePrandtlNumber = 0.d0
+  endif
+
+end function THWellComputePrandtlNumber
+
+! ************************************************************************** !
+
+function THWellComputeNusseltNumber(reynolds,prandtl)
+  !
+  ! Computes Nusselt number using appropriate correlation
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 02/18/26
+  !
+  implicit none
+
+  PetscReal :: reynolds
+  PetscReal :: prandtl
+  PetscReal :: THWellComputeNusseltNumber
+
+  !TODO: maybe add OGS approach OR Gnielinski correlation?
+  if (reynolds > 2300.d0) then
+    ! turbulent flow,
+    ! Zhang et al. 2015. "The analytical solution of the water-rock heat
+    ! transfer coefficient and sensitivity analyses of parameters."
+    ! Proceedings World Geothermal Congress 2015, Melbourne, Australia,
+    ! 19-25, April 2015, pg 6
+    THWellComputeNusseltNumber = 8.7d-5 * (reynolds**0.92d0) * &
+                                 (prandtl**1.89d0)
+  elseif (reynolds > 0.d0) then
+    ! Laminar flow - use Nu = 4.36 for constant heat flux boundary condition
+    ! (Nu = 3.66 for constant wall temperature)
+    THWellComputeNusseltNumber = 4.36d0
+  else
+    THWellComputeNusseltNumber = 0.d0
+  endif
+
+end function THWellComputeNusseltNumber
 
 ! ************************************************************************** !
 
