@@ -4315,9 +4315,9 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
             end select
             call InputErrorMsg(input,option,'WELL_INDEX_MODEL',error_string)
         !-----------------------------
-          case('INLET_TEMPERATURE','PIPE_DIAMETER','PIPE_WALL_THICKNESS', &
+          case('INLET_TEMPERATURE','PIPE_INNER_DIAMETER','PIPE_WALL_THICKNESS', &
                'PIPE_WALL_THERMAL_CONDUCTIVITY','PIPE_FLOW_VELOCITY','SCENARIO', &
-               'USE_WELL_INDEX')
+               'USE_WELL_INDEX','INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY')
             select type(pm => pm_well)
               class is(pm_well_closed_loop_type)
                 select case(word)
