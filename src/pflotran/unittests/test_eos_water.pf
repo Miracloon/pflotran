@@ -337,86 +337,111 @@ contains
 
     PetscReal :: temperature
     PetscReal :: liquid_pressure
+    PetscReal :: correct_lambda
+    PetscReal :: correct_dlambda_dp
+    PetscReal :: correct_dlambda_dT
 
     call EOSWaterInit()
     call EOSWaterSetDensity('IF97')
 
     temperature = 1.d0
     liquid_pressure = 2.d5
-    call TestLambda(temperature,liquid_pressure)
+    correct_lambda = 1624921647754263.2d0
+    correct_dlambda_dp = -35136187.568898678d0
+    correct_dlambda_dT = -16252652108745676.d0
+    call TestLambda(temperature,liquid_pressure,correct_lambda, &
+                    correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 35.d0
     liquid_pressure = 5.d6
-    call TestLambda(temperature,liquid_pressure)
+    correct_lambda = 0.69176682831649794d0
+    correct_dlambda_dp = -1.2830176838297182d-8
+    correct_dlambda_dT = -0.18744961978361080d0
+    call TestLambda(temperature,liquid_pressure,correct_lambda, &
+                    correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 75.d0
     liquid_pressure = 1.d6
-    call TestLambda(temperature,liquid_pressure)
+    correct_lambda = 8.1048570161946836d-4
+    correct_dlambda_dp = -1.4633614223695007d-11
+    correct_dlambda_dT = -8.8312678348831443d-5
+    call TestLambda(temperature,liquid_pressure,correct_lambda, &
+                    correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 150.d0
     liquid_pressure = 7.d7
-    call TestLambda(temperature,liquid_pressure)
+    correct_lambda = 2.1633307322100089d-6
+    correct_dlambda_dp = -3.4438915694097937d-14
+    correct_dlambda_dT = -6.9064437703829282d-8
+    call TestLambda(temperature,liquid_pressure,correct_lambda, &
+                    correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 15.d0
     liquid_pressure = 5.d7
-    call TestLambda(temperature,liquid_pressure)
+    correct_lambda = 1112.2485011408173d0
+    correct_dlambda_dp = -2.0877824704577555d-5
+    correct_dlambda_dT = -729.55458582700680d0
+    call TestLambda(temperature,liquid_pressure,correct_lambda, &
+                    correct_dlambda_dp,correct_dlambda_dT)
 
   contains
 
-    subroutine TestLambda(temperature,liquid_pressure)
+    subroutine TestLambda(temperature,liquid_pressure,correct_lambda, &
+                          correct_dlambda_dp,correct_dlambda_dT)
 
       PetscReal :: temperature
       PetscReal :: liquid_pressure
+      PetscReal :: correct_lambda
+      PetscReal :: correct_dlambda_dp
+      PetscReal :: correct_dlambda_dT
 
       PetscBool :: calculate_derivatives
-!      PetscReal :: value
       PetscReal :: lambda
       PetscReal :: dlambda_dp
       PetscReal :: dlambda_dT
-      PetscReal :: dlambda_dp_pert
-      PetscReal :: dlambda_dT_pert
-      PetscReal :: T_pert
-      PetscReal :: p_pert
-      PetscReal :: lambda_pert
-      PetscReal :: pert
-      PetscReal :: dummy
+!      PetscReal :: dlambda_dp_pert
+!      PetscReal :: dlambda_dT_pert
+!      PetscReal :: T_pert
+!      PetscReal :: p_pert
+!      PetscReal :: lambda_pert
+!      PetscReal :: pert
+!      PetscReal :: dummy
       PetscReal, parameter :: tol = 1.d-6
       PetscReal, parameter :: assertion_tol = 1.d-6
 
       calculate_derivatives = PETSC_TRUE
       call CalcLambda(temperature,liquid_pressure,lambda, &
                       calculate_derivatives,dlambda_dp,dlambda_dT)
-      print *, 'temperature: ', temperature
-      print *, 'pressure: ', liquid_pressure
-      print *, 'lambda: ', lambda
-      print *, 'dlambda_dp: ', dlambda_dp
-      print *, 'dlambda_dT: ', dlambda_dT
-!      value = 1624921647754263.2d0
-!      @assertEqual(value, lambda, assertion_tol)
-!      value = -35136187.568898663d0
-!      @assertEqual(value, dlambda_dp, assertion_tol)
-!      value = -16252652108745680.d0
-!      @assertEqual(value, dlambda_dT, assertion_tol)
+!      print *, 'temperature: ', temperature
+!      print *, 'pressure: ', liquid_pressure
+!      print *, 'lambda: ', lambda
+!      print *, 'dlambda_dp: ', dlambda_dp
+!      print *, 'dlambda_dT: ', dlambda_dT
+      @assertEqual(correct_lambda, lambda, assertion_tol)
+      @assertEqual(correct_dlambda_dp, dlambda_dp, assertion_tol)
+      @assertEqual(correct_dlambda_dT, dlambda_dT, assertion_tol)
 
-      calculate_derivatives = PETSC_FALSE
-      pert = liquid_pressure*tol
-      p_pert = liquid_pressure + pert
-      call CalcLambda(temperature,p_pert,lambda_pert, &
-                      calculate_derivatives,dummy,dummy)
-      dlambda_dp_pert = (lambda_pert-lambda)/pert
-      print *, 'dlambda_dp (pert): ', dlambda_dp_pert
+!      calculate_derivatives = PETSC_FALSE
+!      pert = liquid_pressure*tol
+!      p_pert = liquid_pressure + pert
+!      call CalcLambda(temperature,p_pert,lambda_pert, &
+!                      calculate_derivatives,dummy,dummy)
+!      dlambda_dp_pert = (lambda_pert-lambda)/pert
+!      print *, 'dlambda_dp (pert): ', dlambda_dp_pert
 
-      pert = temperature*tol
-      T_pert = temperature + pert
-      call CalcLambda(T_pert,liquid_pressure,lambda_pert, &
-                      calculate_derivatives,dummy,dummy)
-      dlambda_dT_pert = (lambda_pert-lambda)/pert
-      print *, 'dlambda_dT (pert): ', dlambda_dT_pert
+!      pert = temperature*tol
+!      T_pert = temperature + pert
+!      call CalcLambda(T_pert,liquid_pressure,lambda_pert, &
+!                      calculate_derivatives,dummy,dummy)
+!      dlambda_dT_pert = (lambda_pert-lambda)/pert
+!      print *, 'dlambda_dT (pert): ', dlambda_dT_pert
 
-      print *
-      print *, 'dlambda_dp (rel diff): ', (dlambda_dp-dlambda_dp_pert)/dlambda_dp
-      print *, 'dlambda_dT (rel diff): ', (dlambda_dT-dlambda_dT_pert)/dlambda_dT
-      print *
+!      print *
+!      print *, 'dlambda_dp (rel diff): ', (dlambda_dp-dlambda_dp_pert) / &
+!                                          dlambda_dp
+!      print *, 'dlambda_dT (rel diff): ', (dlambda_dT-dlambda_dT_pert) / &
+!                                          dlambda_dT
+!      print *
 
     end subroutine TestLambda
 
