@@ -297,7 +297,7 @@ subroutine PatchProcessCouplers(patch,flow_conditions,transport_conditions, &
         len_trim(coupler%name) == 0) then
       option%io_buffer = 'All BOUNDARY_CONDITIONs &
         &must be named in the input file to differentiate &
-        &MASS_BALANCE outputs.'
+        &CONSERVATION and/or MASS_BALANCE outputs.'
       call PrintErrMsg(option)
     endif
 
@@ -601,6 +601,16 @@ subroutine PatchProcessCouplers(patch,flow_conditions,transport_conditions, &
   coupler => patch%prescribed_condition_list%first
   do
     if (.not.associated(coupler)) exit
+
+    ! ensure named for mass balance output
+    if (option%compute_mass_balance_new .and. &
+        len_trim(coupler%name) == 0) then
+      option%io_buffer = 'All PRESCRIBED_CONDITIONs &
+        &must be named in the input file to differentiate &
+        &CONSERVATION and/or MASS_BALANCE outputs.'
+      call PrintErrMsg(option)
+    endif
+
     ! pointer to region
     coupler%region => RegionGetPtrFromList(coupler%region_name, &
                                            patch%region_list)
