@@ -101,11 +101,9 @@ module Utility_module
             QuadraticPolynomialEvaluate, &
             CubicPolynomialSetup, &
             CubicPolynomialEvaluate, &
-            ConvertMatrixToVector, &
-            Kron, &
-            Transposer, &
             Determinant, &
             MatInv3, &
+            MatInv3WithDet, &
             InterfaceApproxWithDeriv, &
             InterfaceApproxWithoutDeriv, &
             UpdateProgressBar, &
@@ -2123,107 +2121,6 @@ end subroutine DeallocateArray2DString
 
 ! ************************************************************************** !
 
-subroutine ConvertMatrixToVector(A,vecA)
-  !
-  ! Converts a given matrix A to a vec
-  ! This vec is different from PETSc Vec
-  ! A = [a1 a2 a3 .... am], where ai, i = 1, m are the columns
-  ! then vec(A) = [a1
-  ! a2
-  ! .
-  ! .
-  ! .
-  ! am]
-  !
-  ! Author: Satish Karra, LANL
-  ! Date: 6/19/2013
-  !
-
-  PetscReal :: A(:,:)
-  PetscReal, allocatable :: vecA(:,:)
-  PetscInt :: m, n
-
-  m = size(A,1)
-  n = size(A,2)
-
-  allocate(vecA(m*n,ONE_INTEGER))
-
-  vecA = reshape(A,(/m*n,ONE_INTEGER/))
-
-end subroutine ConvertMatrixToVector
-
-! ************************************************************************** !
-
-subroutine Kron(A,B,K)
-  !
-  ! Returns the Kronecker product of two matrices A, B
-  ! Reference: The ubiquitous Kronecker product, by Charles F.Van Loan
-  ! for basics of Kronecker product
-  ! Also see wikipedia page: http://en.wikipedia.org/wiki/Kronecker_product
-  !
-  ! Author: Satish Karra, LANL
-  ! Date: 6/19/2013
-  !
-
-  PetscReal :: A(:,:),B(:,:)
-  PetscReal, allocatable :: K(:,:)
-  PetscInt :: mA,nA,mB,nB
-  PetscInt :: iA,jA,iB,jB,iK,jK
-
-  mA = size(A,1)
-  nA = size(A,2)
-  mB = size(B,1)
-  nB = size(B,2)
-
-  allocate(K(mA*mB,nA*nB))
-
-  do iB = 1, mB
-    do jB = 1, nB
-      do iA = 1, mA
-        do jA = 1, nA
-          iK = iB + (iA-1)*mB
-          jK = jB + (jA-1)*nB
-          K(iK,jK) = A(iA,jA)*B(iB,jB)
-        enddo
-      enddo
-    enddo
-  enddo
-
-end subroutine Kron
-
-! ************************************************************************** !
-
-subroutine Transposer(m,n,T)
-  !
-  ! Transposer Converts vec of a matrix to vec of its transpose
-  !
-  ! Author: Satish Karra, LANL
-  ! Date: 6/19/2013
-  !
-
-  PetscReal, allocatable :: T(:,:)
-  PetscInt :: m,n
-  PetscInt :: i,j
-  PetscReal :: A(m,n)
-  PetscReal, allocatable :: vecA(:,:)
-
-  allocate(T(m*n,m*n))
-  T = 0.d0
-
-  do i = 1,m
-    do j = 1,n
-      A = 0.d0
-      A(i,j) = 1.d0
-      call ConvertMatrixToVector(transpose(A),vecA)
-      T(:,i+m*(j-1)) = vecA(:,1)
-      deallocate(vecA)
-    enddo
-  enddo
-
-end subroutine Transposer
-
-! ************************************************************************** !
-
 subroutine Determinant(A,detA)
   !
   ! Determinant of a 3x3 matrix
@@ -2271,6 +2168,43 @@ subroutine MatInv3(A,invA)
   invA(3,3) = +1.d0/detA * (A(1,1)*A(2,2) - A(1,2)*A(2,1))
 
 end subroutine MatInv3
+
+subroutine MatInv3WithDet(A, Ainv, det)
+  !
+  ! Computes both inverse and determinant of a 3x3 matrix in one pass
+  !
+  PetscReal, intent(in)  :: A(3,3)
+  PetscReal, intent(out) :: Ainv(3,3)
+  PetscReal, intent(out) :: det
+
+  PetscReal :: cofactor(3,3)
+  PetscReal :: inv_det
+
+  cofactor(1,1) = A(2,2)*A(3,3) - A(2,3)*A(3,2)
+  cofactor(1,2) = -(A(2,1)*A(3,3) - A(2,3)*A(3,1))
+  cofactor(1,3) = A(2,1)*A(3,2) - A(2,2)*A(3,1)
+  cofactor(2,1) = -(A(1,2)*A(3,3) - A(1,3)*A(3,2))
+  cofactor(2,2) = A(1,1)*A(3,3) - A(1,3)*A(3,1)
+  cofactor(2,3) = -(A(1,1)*A(3,2) - A(1,2)*A(3,1))
+  cofactor(3,1) = A(1,2)*A(2,3) - A(1,3)*A(2,2)
+  cofactor(3,2) = -(A(1,1)*A(2,3) - A(1,3)*A(2,1))
+  cofactor(3,3) = A(1,1)*A(2,2) - A(1,2)*A(2,1)
+
+  det = A(1,1)*cofactor(1,1) + A(1,2)*cofactor(1,2) + A(1,3)*cofactor(1,3)
+  inv_det = 1.d0 / det
+
+  ! Inverse = transpose(cofactor) / det
+  Ainv(1,1) = cofactor(1,1)*inv_det
+  Ainv(1,2) = cofactor(2,1)*inv_det
+  Ainv(1,3) = cofactor(3,1)*inv_det
+  Ainv(2,1) = cofactor(1,2)*inv_det
+  Ainv(2,2) = cofactor(2,2)*inv_det
+  Ainv(2,3) = cofactor(3,2)*inv_det
+  Ainv(3,1) = cofactor(1,3)*inv_det
+  Ainv(3,2) = cofactor(2,3)*inv_det
+  Ainv(3,3) = cofactor(3,3)*inv_det
+
+end subroutine MatInv3WithDet
 
 ! ************************************************************************** !
 subroutine InterfaceApproxWithDeriv(v_up, v_dn, dv_up, dv_dn, dv_up2dn, &

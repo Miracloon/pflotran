@@ -44,6 +44,8 @@ subroutine GeomechForceSetup(geomech_realization)
   use Geomechanics_Realization_class
   use Output_Aux_module
 
+  implicit none
+
   class(realization_geomech_type) :: geomech_realization
   type(output_variable_list_type), pointer :: list
 
@@ -751,103 +753,67 @@ subroutine GeomechForceApplyTractionBCtoRHS(local_coordinates, &
   use Grid_Unstructured_Cell_module
   use Shape_Function_module
   use Option_module
-  use Utility_module
-
-  PetscInt :: size_facenodes
-  PetscReal, allocatable :: local_coordinates(:,:)
-  PetscInt :: facetype
-  PetscReal, pointer :: r(:,:), w(:)
-  PetscReal, allocatable :: rhs_vec(:)
+  implicit none
   type(option_type) :: option
-  PetscReal :: stress_bc(SIX_INTEGER)
-  type(shapefunction_type) :: shapefunction
-  PetscInt :: igpt
-  PetscInt :: len_w
-  PetscReal, allocatable :: x(:), J_map(:,:)
-  PetscReal :: xp_J(THREE_INTEGER)
-  PetscReal :: boundary_stress(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: traction(THREE_INTEGER,ONE_INTEGER)
-  PetscReal :: surf_J
-  PetscReal, allocatable :: N(:,:), force(:), kron_N_traction(:,:)
-  PetscReal :: normal_vec(THREE_INTEGER)
-  PetscInt :: shapefunc_eletype
+  PetscInt, intent(in) :: facetype
+  PetscReal, intent(in) :: local_coordinates(:,:)  ! (nen,3)
+  PetscReal, intent(in) :: stress_bc(SIX_INTEGER)
+  PetscReal, pointer, intent(in) :: r(:,:), w(:)
+  PetscReal, intent(inout) :: rhs_vec(:)           ! (3*nen)
 
-  rhs_vec = 0.d0
+  type(shapefunction_type) :: shapefunction
+  PetscInt :: igpt, len_w, nen, eletype, a, ia
+  PetscReal :: J_map(3,2), xp_J(3), surf_J
+  PetscReal :: boundary_stress(3,3), normal_vec(3), traction(3)
+  PetscReal :: wsurf
+
+  rhs_vec = 0.0d0
   len_w = size(w)
+  nen = size(local_coordinates,1)
+
+  eletype = merge(TRI_TYPE, QUAD_TYPE, facetype == TRI_FACE_TYPE)
+
+  boundary_stress = 0.0d0
+  boundary_stress(1,1) = stress_bc(1)
+  boundary_stress(2,2) = stress_bc(2)
+  boundary_stress(3,3) = stress_bc(3)
+  boundary_stress(1,2) = stress_bc(4); boundary_stress(2,1) = stress_bc(4)
+  boundary_stress(2,3) = stress_bc(5); boundary_stress(3,2) = stress_bc(5)
+  boundary_stress(3,1) = stress_bc(6); boundary_stress(1,3) = stress_bc(6)
 
   if (facetype == TRI_FACE_TYPE) then
-    size_facenodes = THREE_INTEGER
-    shapefunc_eletype = TRI_TYPE
-  endif
-  if (facetype == QUAD_FACE_TYPE) then
-    size_facenodes = FOUR_INTEGER
-    shapefunc_eletype = QUAD_TYPE
-  endif
+    normal_vec = face_unitnormal(local_coordinates(1,:), local_coordinates(2,:), local_coordinates(3,:))
+  else
+    normal_vec = face_unitnormal(local_coordinates(1,:), local_coordinates(2,:), local_coordinates(4,:))
+  end if
 
-  allocate(force(size_facenodes*option%ngeomechdof))
-  allocate(x(size_facenodes))
-  allocate(J_map(size_facenodes,TWO_INTEGER))
+  traction = matmul(boundary_stress, normal_vec)
 
-  force = 0.d0
-  boundary_stress = 0.d0
-
-  boundary_stress(1,1) = stress_bc(1) ! sigma_xx
-  boundary_stress(2,2) = stress_bc(2) ! sigma_yy
-  boundary_stress(3,3) = stress_bc(3) ! sigma_zz
-  boundary_stress(1,2) = stress_bc(4) ! sigma_xy
-  boundary_stress(2,3) = stress_bc(5) ! sigma_yz
-  boundary_stress(3,1) = stress_bc(6) ! sigma_zx
-
-  ! symm
-  boundary_stress(1,3) = boundary_stress(3,1) ! sigma_xz
-  boundary_stress(3,2) = boundary_stress(2,3) ! sigma_zy
-  boundary_stress(2,1) = boundary_stress(1,2) ! sigma_yx
-
-  if (facetype == TRI_FACE_TYPE) &
-    normal_vec = face_unitnormal(local_coordinates(1,:), &
-                                 local_coordinates(2,:), &
-                                 local_coordinates(3,:))
-  if (facetype == QUAD_FACE_TYPE) &
-    normal_vec = face_unitnormal(local_coordinates(1,:), &
-                                 local_coordinates(2,:), &
-                                 local_coordinates(4,:))
+  shapefunction%element_type = eletype
+  call ShapeFunctionInitialize(shapefunction)
 
   do igpt = 1, len_w
-
-    shapefunction%element_type = shapefunc_eletype
-    call ShapeFunctionInitialize(shapefunction)
     shapefunction%zeta = r(igpt,:)
     call ShapeFunctionCalculate(shapefunction)
-    x = matmul(transpose(local_coordinates),shapefunction%N)
-    J_map = matmul(transpose(local_coordinates),shapefunction%DN)
 
-    allocate(N(size(shapefunction%N),ONE_INTEGER))
-
-    N(:,1)= shapefunction%N
-    xp_J = cross_product(J_map(:,1), J_map(:,2))
+    J_map = matmul(transpose(local_coordinates), shapefunction%DN)  ! (3×2)
+    xp_J  = cross_product(J_map(:,1), J_map(:,2))
     surf_J = sqrt(dot_product(xp_J,xp_J))
-
-    if (surf_J <= 0.d0) then
-      option%io_buffer = 'GEOMECHANICS: The surface jacobian has' // &
-                         ' to be positive!'
+    if (surf_J <= 0.0d0) then
+      option%io_buffer = 'GEOMECHANICS: surface jacobian must be positive!'
       call PrintErrMsg(option)
-    endif
+    end if
 
-    traction(:,1) = matmul(boundary_stress,normal_vec)
-    call Kron(N,traction,kron_N_traction)
-    force = force + w(igpt)*kron_N_traction(:,1)*surf_J
-    call ShapeFunctionDestroy(shapefunction)
+    wsurf = w(igpt) * surf_J
+    do a = 1, nen
+      ia = 3*(a-1)
+      rhs_vec(ia+1) = rhs_vec(ia+1) + wsurf * shapefunction%N(a) * traction(1)
+      rhs_vec(ia+2) = rhs_vec(ia+2) + wsurf * shapefunction%N(a) * traction(2)
+      rhs_vec(ia+3) = rhs_vec(ia+3) + wsurf * shapefunction%N(a) * traction(3)
+    end do
+  end do
 
-    deallocate(kron_N_traction)
-    deallocate(N)
-
-  enddo
-
-  rhs_vec = rhs_vec + force
-
-  deallocate(force)
-  deallocate(x)
-  deallocate(J_map)
+  call ShapeFunctionDestroy(shapefunction)
 
 end subroutine GeomechForceApplyTractionBCtoRHS
 
@@ -1343,258 +1309,196 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
   use Shape_Function_module
   use Option_module
   use Utility_module
-
+  implicit none
   type(shapefunction_type) :: shapefunction
   type(option_type) :: option
 
-  PetscReal, allocatable :: local_coordinates(:,:)
-  PetscReal, allocatable :: B(:,:)
-  PetscReal, allocatable :: rhs_vec(:)
-  PetscReal, allocatable :: local_press(:)
-  PetscReal, allocatable :: local_temp(:)
-  PetscReal, allocatable :: local_youngs(:)
-  PetscReal, allocatable :: local_poissons(:)
-  PetscReal, allocatable :: local_density(:)
-  PetscReal, allocatable :: local_beta(:)
-  PetscReal, allocatable :: local_alpha(:)
+  PetscInt,  intent(in) :: size_elenodes, eletype, dim
+  PetscReal, intent(in) :: local_coordinates(:,:)        ! (nen,3)
+  PetscReal, intent(in) :: local_press(:), local_temp(:)
+  PetscReal, intent(in) :: local_youngs(:), local_poissons(:)
+  PetscReal, intent(in) :: local_density(:), local_beta(:), local_alpha(:)
+  PetscReal, pointer, intent(in) :: r(:,:), w(:)
+  PetscReal, intent(inout) :: rhs_vec(:)                 ! (3*nen)
 
-  PetscReal, pointer :: r(:,:), w(:)
-  PetscInt :: igpt
-  PetscInt :: len_w
-  PetscInt :: eletype
-  PetscReal :: x(THREE_INTEGER), J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: inv_J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: detJ_map
-  PetscInt :: i,j
-  PetscInt :: dim
-  PetscReal :: lambda, mu, beta, alpha
-  PetscReal :: density, youngs_mod, poissons_ratio
-  PetscInt :: load_type
-  PetscReal :: bf(THREE_INTEGER)
-  PetscReal :: identity(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: gauss_tot_weight
-
-  PetscReal, allocatable :: N(:,:)
-  PetscReal, allocatable :: vecB_transpose(:,:)
-  PetscReal, allocatable :: kron_N_eye(:,:)
+  PetscInt  :: igpt, len_w, a, ia
+  PetscReal :: J_map(3,3), inv_J_map(3,3), detJ_map
+  PetscReal :: dNdx(size_elenodes,3)
+  PetscReal :: x(3)
+  PetscReal :: lambda, mu, beta, alpha, density, youngs_mod, poissons_ratio
+  PetscInt  :: load_type
+  PetscReal :: bf(3)
+  PetscReal :: wdet, dp, dT, coefP, coefT
   PetscReal, allocatable :: gauss_tet_vol_weight(:)
-  PetscInt :: size_elenodes
+  PetscReal :: gauss_tot_weight
+  integer :: i
 
-  allocate(B(size_elenodes,dim))
+  rhs_vec = 0.0d0
+  len_w   = size(w)
 
-  rhs_vec = 0.d0
-  len_w = size(w)
+  if (dim /= 3) then
+    option%io_buffer = 'GEOMECHANICS: RHS routine expects dim=3.'
+    call PrintErrMsg(option)
+  end if
 
-  identity = 0.d0
-  do i = 1, THREE_INTEGER
-    do j = 1, THREE_INTEGER
-      if (i == j) identity(i,j) = 1.d0
-    enddo
-  enddo
-
-  if(option%geomechanics%improve_tet_weighting .and. &
-    eletype == TET_TYPE .and. len_w == 4) then
+  ! Optional improved tet weighting (unchanged logic)
+  if(option%geomechanics%improve_tet_weighting .and. eletype == TET_TYPE .and. len_w == 4) then
     allocate(gauss_tet_vol_weight(len_w))
-    call ComputeTetVolAtVertex(local_coordinates(1, :), &
-                               local_coordinates(2, :), &
-                               local_coordinates(3, :), &
-                               local_coordinates(4, :), &
-                               gauss_tet_vol_weight(1))
+    call ComputeTetVolAtVertex(local_coordinates(1,:),local_coordinates(2,:),local_coordinates(3,:),local_coordinates(4,:),gauss_tet_vol_weight(1))
+    call ComputeTetVolAtVertex(local_coordinates(2,:),local_coordinates(3,:),local_coordinates(4,:),local_coordinates(1,:),gauss_tet_vol_weight(2))
+    call ComputeTetVolAtVertex(local_coordinates(3,:),local_coordinates(4,:),local_coordinates(1,:),local_coordinates(2,:),gauss_tet_vol_weight(3))
+    call ComputeTetVolAtVertex(local_coordinates(4,:),local_coordinates(1,:),local_coordinates(2,:),local_coordinates(3,:),gauss_tet_vol_weight(4))
+    gauss_tot_weight = sum(gauss_tet_vol_weight)
+    do i=1,4
+      gauss_tet_vol_weight(i) = gauss_tet_vol_weight(i)/gauss_tot_weight
+    end do
+  end if
 
-    call ComputeTetVolAtVertex(local_coordinates(2, :), &
-                               local_coordinates(3, :), &
-                               local_coordinates(4, :), &
-                               local_coordinates(1, :), &
-                               gauss_tet_vol_weight(2))
-
-    call ComputeTetVolAtVertex(local_coordinates(3, :), &
-                               local_coordinates(4, :), &
-                               local_coordinates(1, :), &
-                               local_coordinates(2, :), &
-                               gauss_tet_vol_weight(3))
-
-    call ComputeTetVolAtVertex(local_coordinates(4, :), &
-                               local_coordinates(1, :), &
-                               local_coordinates(2, :), &
-                               local_coordinates(3, :), &
-                               gauss_tet_vol_weight(4))
-
-    gauss_tot_weight = gauss_tet_vol_weight(1) + &
-                       gauss_tet_vol_weight(2) + &
-                       gauss_tet_vol_weight(3) + &
-                       gauss_tet_vol_weight(4)
-    do i = 1, 4
-      gauss_tet_vol_weight(i) = gauss_tet_vol_weight(i) / gauss_tot_weight
-    enddo
-  endif
+  shapefunction%element_type = eletype
+  call ShapeFunctionInitialize(shapefunction)
 
   do igpt = 1, len_w
-    shapefunction%element_type = eletype
-    call ShapeFunctionInitialize(shapefunction)
     shapefunction%zeta = r(igpt,:)
     call ShapeFunctionCalculate(shapefunction)
-    x = matmul(transpose(local_coordinates),shapefunction%N)
-    J_map = matmul(transpose(local_coordinates),shapefunction%DN)
-    allocate(N(size(shapefunction%N),ONE_INTEGER))
-    call Determinant(J_map,detJ_map)
-    if (detJ_map <= 0.d0) then
-      option%io_buffer = 'GEOMECHANICS: Determinant of J_map has' // &
-                         ' to be positive!'
+
+    x     = matmul(transpose(local_coordinates), shapefunction%N)
+    J_map = matmul(transpose(local_coordinates), shapefunction%DN)
+
+    call MatInv3WithDet(J_map, inv_J_map, detJ_map)
+    if (detJ_map <= 0.0d0) then
+      option%io_buffer = 'GEOMECHANICS: Determinant of J_map has to be positive!'
       call PrintErrMsg(option)
-    endif
-    ! Find the inverse of J_map
-    call MatInv3(J_map,inv_J_map)
-    B = matmul(shapefunction%DN,inv_J_map)
-    youngs_mod = dot_product(shapefunction%N,local_youngs)
-    poissons_ratio = dot_product(shapefunction%N,local_poissons)
-    alpha = dot_product(shapefunction%N,local_alpha)
-    beta = dot_product(shapefunction%N,local_beta)
-    density = dot_product(shapefunction%N,local_density)
-    call GeomechGetLambdaMu(lambda,mu,youngs_mod,poissons_ratio)
-    call GeomechGetBodyForce(load_type,lambda,mu,x,bf,option)
-    call ConvertMatrixToVector(transpose(B),vecB_transpose)
-    N(:,1)= shapefunction%N
-    call Kron(N,identity,kron_N_eye)
-    if(option%geomechanics%improve_tet_weighting .and. &
-       eletype == TET_TYPE .and. len_w == 4) then
-      ! w(igpt) = 1/4 * 1/6 = 1/n_gausspoints * reference_tet_volume
-      ! and detJ_map * reference_tet_volume = current_tet_volume
-      ! so w(igpt)*detJ_map = 1/4 * current_tet_volume = proportion_of_current_tet_assigned_to_this_gauss_point
-      ! However we can do better than just using 1/4 (i.e. assigning it evenly).
-      ! This is what gauss_tet_vol_weight is
-      ! (a more careful assigning of the volume of the tetrahedron amongst the gauss points).
-      ! This approach only works for tetrahedrons with 4 gauss points,
-      ! as each guass point sits near a unique vertex.
-      rhs_vec = rhs_vec + w(igpt)*4.d0*gauss_tet_vol_weight(igpt)*density* &
-                      matmul(kron_N_eye,bf)*detJ_map
-    else
-      rhs_vec = rhs_vec + w(igpt)*density*matmul(kron_N_eye,bf)*detJ_map
-    endif
-    rhs_vec = rhs_vec + w(igpt)*beta*dot_product(N(:,1),local_press)* &
-      vecB_transpose(:,1)*detJ_map
-    rhs_vec = rhs_vec + w(igpt)*alpha*(3.d0*lambda+2.d0*mu)* &
-      dot_product(N(:,1),local_temp)*vecB_transpose(:,1)*detJ_map
-    call ShapeFunctionDestroy(shapefunction)
-    deallocate(N)
-    deallocate(vecB_transpose)
-    deallocate(kron_N_eye)
-  enddo
+    end if
 
-  if(option%geomechanics%improve_tet_weighting .and. &
-     eletype == TET_TYPE .and. len_w == 4) then
-    deallocate(gauss_tet_vol_weight)
-  endif
+    dNdx = matmul(shapefunction%DN, inv_J_map)
 
-  deallocate(B)
+    youngs_mod     = dot_product(shapefunction%N, local_youngs)
+    poissons_ratio = dot_product(shapefunction%N, local_poissons)
+    alpha          = dot_product(shapefunction%N, local_alpha)
+    beta           = dot_product(shapefunction%N, local_beta)
+    density        = dot_product(shapefunction%N, local_density)
+
+    call GeomechGetLambdaMu(lambda, mu, youngs_mod, poissons_ratio)
+    call GeomechGetBodyForce(load_type, lambda, mu, x, bf, option)
+
+    wdet = w(igpt) * detJ_map
+
+    ! Body force term: rhs += wdet*density*(N ⊗ I)*bf
+    if(option%geomechanics%improve_tet_weighting .and. eletype == TET_TYPE .and. len_w == 4) then
+      ! old code: w * 4*weight * density * (N⊗I)bf * detJ
+      wdet = wdet * 4.0d0 * gauss_tet_vol_weight(igpt)
+    end if
+
+    do a = 1, size_elenodes
+      ia = 3*(a-1)
+      rhs_vec(ia+1) = rhs_vec(ia+1) + wdet * density * shapefunction%N(a) * bf(1)
+      rhs_vec(ia+2) = rhs_vec(ia+2) + wdet * density * shapefunction%N(a) * bf(2)
+      rhs_vec(ia+3) = rhs_vec(ia+3) + wdet * density * shapefunction%N(a) * bf(3)
+    end do
+
+    ! Pressure and thermal coupling terms: old code uses + beta*dp * vecB + alpha*(3λ+2μ)*dT * vecB
+    dp    = dot_product(shapefunction%N, local_press)
+    dT    = dot_product(shapefunction%N, local_temp)
+    coefP = wdet * beta * dp
+    coefT = wdet * alpha * (3.0d0*lambda + 2.0d0*mu) * dT
+
+    do a = 1, size_elenodes
+      ia = 3*(a-1)
+      rhs_vec(ia+1) = rhs_vec(ia+1) + (coefP + coefT) * dNdx(a,1)
+      rhs_vec(ia+2) = rhs_vec(ia+2) + (coefP + coefT) * dNdx(a,2)
+      rhs_vec(ia+3) = rhs_vec(ia+3) + (coefP + coefT) * dNdx(a,3)
+    end do
+  end do
+
+  call ShapeFunctionDestroy(shapefunction)
+  if (allocated(gauss_tet_vol_weight)) deallocate(gauss_tet_vol_weight)
 
 end subroutine GeomechForceLocalElemRHS
 
 ! ************************************************************************** !
 
 subroutine GeomechForceAssembleCoeffMatrixLocal(size_elenodes,local_coordinates, &
-                                                local_disp, &
-                                                local_youngs,local_poissons, &
+                                                local_disp, local_youngs,local_poissons, &
                                                 eletype,dim,r,w,Kmat,option)
-  !
-  ! Computes the Coefficient matrix locally of an element
-  !
-  ! Author: Satish Karra
-  ! Date: 06/24/13
-  ! Modified: 06/12/25
-  !
-
-  use Grid_Unstructured_Cell_module
   use Shape_Function_module
   use Option_module
   use Utility_module
+  implicit none
 
   type(shapefunction_type) :: shapefunction
-  type(option_type) :: option
+  type(option_type)        :: option
+  PetscInt,  intent(in)    :: size_elenodes, eletype, dim
+  PetscReal, intent(in)    :: local_coordinates(:,:)     ! (nen,3)
+  PetscReal, intent(in)    :: local_disp(:)              ! unused here
+  PetscReal, intent(in)    :: local_youngs(:), local_poissons(:)
+  PetscReal, pointer, intent(in) :: r(:,:), w(:)
+  PetscReal, intent(inout) :: Kmat(:,:)                  ! (3*nen,3*nen)
 
-  PetscReal, allocatable :: local_coordinates(:,:)
-  PetscReal, allocatable :: B(:,:), Kmat(:,:)
-  PetscReal, allocatable :: local_disp(:)
-  PetscReal, pointer :: r(:,:), w(:)
-  PetscInt :: igpt
-  PetscInt :: len_w
-  PetscInt :: eletype
-  PetscReal :: x(THREE_INTEGER), J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: inv_J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: detJ_map
-  PetscInt :: i,j
-  PetscInt :: dim
-  PetscReal :: lambda, mu
-  PetscReal :: youngs_mod, poissons_ratio
-  PetscReal :: identity(THREE_INTEGER,THREE_INTEGER)
-  PetscReal, allocatable :: N(:,:)
-  PetscReal, allocatable :: vecB_transpose(:,:)
-  PetscReal, allocatable :: kron_B_eye(:,:)
-  PetscReal, allocatable :: kron_B_transpose_eye(:,:)
-  PetscReal, allocatable :: Trans(:,:)
-  PetscReal, allocatable :: kron_eye_B_transpose(:,:)
-  PetscReal, allocatable :: kron_N_eye(:,:)
-  PetscReal, allocatable :: local_youngs(:)
-  PetscReal, allocatable :: local_poissons(:)
-  PetscInt :: size_elenodes
+  PetscInt  :: igpt, len_w, a, b, ia, ib
+  PetscReal :: J_map(3,3), inv_J_map(3,3), detJ_map
+  PetscReal :: dNdx(size_elenodes,3)
+  PetscReal :: youngs_mod, poissons_ratio, lambda, mu, wdet
+  PetscReal :: gax,gay,gaz, gbx,gby,gbz, gg
 
-  allocate(B(size_elenodes,dim))
+  if (dim /= 3) then
+    option%io_buffer = 'GEOMECHANICS: this stiffness routine expects dim=3.'
+    call PrintErrMsg(option)
+  end if
 
-  Kmat = 0.d0
+  Kmat = 0.0d0
   len_w = size(w)
 
-  identity = 0.d0
-  do i = 1, THREE_INTEGER
-    do j = 1, THREE_INTEGER
-      if (i == j) identity(i,j) = 1.d0
-    enddo
-  enddo
-
-  call Transposer(option%ngeomechdof,size_elenodes,Trans)
+  shapefunction%element_type = eletype
+  call ShapeFunctionInitialize(shapefunction)
 
   do igpt = 1, len_w
-    shapefunction%element_type = eletype
-    call ShapeFunctionInitialize(shapefunction)
     shapefunction%zeta = r(igpt,:)
     call ShapeFunctionCalculate(shapefunction)
-    x = matmul(transpose(local_coordinates),shapefunction%N)
-    J_map = matmul(transpose(local_coordinates),shapefunction%DN)
-    allocate(N(size(shapefunction%N),ONE_INTEGER))
-    call Determinant(J_map,detJ_map)
-    if (detJ_map <= 0.d0) then
-      option%io_buffer = 'GEOMECHANICS: Determinant of J_map has' // &
-                         ' to be positive!'
+
+    J_map = matmul(transpose(local_coordinates), shapefunction%DN)
+    call MatInv3WithDet(J_map, inv_J_map, detJ_map)
+    if (detJ_map <= 0.0d0) then
+      option%io_buffer = 'GEOMECHANICS: det(J) must be positive!'
       call PrintErrMsg(option)
-    endif
-    ! Find the inverse of J_map
-    call MatInv3(J_map,inv_J_map)
-    B = matmul(shapefunction%DN,inv_J_map)
-    youngs_mod = dot_product(shapefunction%N,local_youngs)
-    poissons_ratio = dot_product(shapefunction%N,local_poissons)
-    call GeomechGetLambdaMu(lambda,mu,youngs_mod,poissons_ratio)
-    call ConvertMatrixToVector(transpose(B),vecB_transpose)
-    Kmat = Kmat + w(igpt)*lambda* &
-      matmul(vecB_transpose,transpose(vecB_transpose))*detJ_map
-    call Kron(B,identity,kron_B_eye)
-    call Kron(transpose(B),identity,kron_B_transpose_eye)
-    call Kron(identity,transpose(B),kron_eye_B_transpose)
-    N(:,1)= shapefunction%N
-    call Kron(N,identity,kron_N_eye)
-    Kmat = Kmat + w(igpt)*mu* &
-      matmul(kron_B_eye,kron_B_transpose_eye)*detJ_map
-    Kmat = Kmat + w(igpt)*mu* &
-      matmul(matmul(kron_B_eye,kron_eye_B_transpose),Trans)*detJ_map
-    call ShapeFunctionDestroy(shapefunction)
-    deallocate(N)
-    deallocate(vecB_transpose)
-    deallocate(kron_B_eye)
-    deallocate(kron_B_transpose_eye)
-    deallocate(kron_eye_B_transpose)
-    deallocate(kron_N_eye)
-  enddo
+    end if
 
-  deallocate(B)
-  deallocate(Trans)
+    dNdx = matmul(shapefunction%DN, inv_J_map)
 
+    youngs_mod     = dot_product(shapefunction%N, local_youngs)
+    poissons_ratio = dot_product(shapefunction%N, local_poissons)
+    call GeomechGetLambdaMu(lambda, mu, youngs_mod, poissons_ratio)
+
+    wdet = w(igpt) * detJ_map
+
+    do a = 1, size_elenodes
+      ia  = 3*(a-1)
+      gax = dNdx(a,1); gay = dNdx(a,2); gaz = dNdx(a,3)
+
+      do b = 1, size_elenodes
+        ib  = 3*(b-1)
+        gbx = dNdx(b,1); gby = dNdx(b,2); gbz = dNdx(b,3)
+
+        gg = gax*gbx + gay*gby + gaz*gbz
+
+        ! i=1 row
+        Kmat(ia+1,ib+1) = Kmat(ia+1,ib+1) + wdet*( lambda*gax*gbx + mu*gg + mu*gax*gbx )
+        Kmat(ia+1,ib+2) = Kmat(ia+1,ib+2) + wdet*( lambda*gax*gby          + mu*gay*gbx )
+        Kmat(ia+1,ib+3) = Kmat(ia+1,ib+3) + wdet*( lambda*gax*gbz          + mu*gaz*gbx )
+
+        ! i=2 row
+        Kmat(ia+2,ib+1) = Kmat(ia+2,ib+1) + wdet*( lambda*gay*gbx          + mu*gax*gby )
+        Kmat(ia+2,ib+2) = Kmat(ia+2,ib+2) + wdet*( lambda*gay*gby + mu*gg + mu*gay*gby )
+        Kmat(ia+2,ib+3) = Kmat(ia+2,ib+3) + wdet*( lambda*gay*gbz          + mu*gaz*gby )
+
+        ! i=3 row
+        Kmat(ia+3,ib+1) = Kmat(ia+3,ib+1) + wdet*( lambda*gaz*gbx          + mu*gax*gbz )
+        Kmat(ia+3,ib+2) = Kmat(ia+3,ib+2) + wdet*( lambda*gaz*gby          + mu*gay*gbz )
+        Kmat(ia+3,ib+3) = Kmat(ia+3,ib+3) + wdet*( lambda*gaz*gbz + mu*gg + mu*gaz*gbz )
+      end do
+    end do
+  end do
+
+  call ShapeFunctionDestroy(shapefunction)
 end subroutine GeomechForceAssembleCoeffMatrixLocal
 
 ! ************************************************************************** !
@@ -1629,6 +1533,8 @@ subroutine GeomechGetBodyForce(load_type,lambda,mu,coord,bf,option)
   !
 
   use Option_module
+
+  implicit none
 
   type(option_type) :: option
 
@@ -1784,6 +1690,7 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
        local_disp,youngs_vec,poissons_vec,eletype, &
        grid%gauss_node(ielem)%dim,grid%gauss_node(ielem)%r, &
        grid%gauss_node(ielem)%w,Jac_full,option)
+
     do id1 = 1, size(ghosted_ids)
       ghosted_id1 = ghosted_ids(id1)
       petsc_id1 = grid%node_ids_ghosted_petsc(ghosted_id1)
@@ -2509,116 +2416,106 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
   use Shape_Function_module
   use Option_module
   use Utility_module
-
+  implicit none
   type(shapefunction_type) :: shapefunction
   type(option_type) :: option
 
-  PetscReal, allocatable :: local_coordinates(:,:)
-  PetscReal, allocatable :: B(:,:)
-  PetscReal, allocatable :: local_disp(:,:)
-  PetscReal, allocatable :: local_temp(:)
-  PetscReal, allocatable :: local_press(:)
-  PetscReal, allocatable :: local_youngs(:)
-  PetscReal, allocatable :: local_poissons(:)
-  PetscReal, allocatable :: local_alpha(:)  ! Thermal expansion coefficient
-  PetscReal, allocatable :: local_beta(:)  ! Biot's coefficient
-  PetscReal, allocatable :: strain(:,:)
-  PetscReal, allocatable :: stress(:,:)
-  PetscReal :: strain_local(NINE_INTEGER,ONE_INTEGER)
-  PetscReal :: stress_local(NINE_INTEGER,ONE_INTEGER)
-  PetscBool :: compute_stress_total
+  PetscInt,  intent(in) :: size_elenodes, eletype, dim
+  PetscReal, intent(in) :: local_coordinates(:,:)      ! (nen,3)
+  PetscReal, intent(in) :: local_disp(:,:)             ! (nen,3)
+  PetscReal, intent(in) :: local_temp(:), local_press(:)
+  PetscReal, intent(in) :: local_youngs(:), local_poissons(:)
+  PetscReal, intent(in) :: local_alpha(:), local_beta(:)
+  PetscReal, intent(out) :: strain(:,:), stress(:,:)   ! (nen,6)
+  PetscBool, intent(in) :: compute_stress_total
 
-  PetscInt :: ivertex
-  PetscInt :: eletype
-  PetscReal :: identity(THREE_INTEGER,THREE_INTEGER)
-  PetscInt :: dim
-  PetscInt :: i, j
-  PetscReal :: lambda, mu
-  PetscReal :: youngs_mod, poissons_ratio, alpha, beta
-  PetscReal, allocatable :: kron_B_eye(:,:)
-  PetscReal, allocatable :: kron_B_transpose_eye(:,:)
-  PetscReal, allocatable :: Trans(:,:)
-  PetscReal, allocatable :: kron_eye_B_transpose(:,:)
-  PetscReal, allocatable :: vec_local_disp(:,:)
-  PetscInt :: size_elenodes
-  PetscReal :: J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: inv_J_map(THREE_INTEGER,THREE_INTEGER)
-  PetscReal :: eye_vec(NINE_INTEGER,ONE_INTEGER)
-  PetscReal :: dT, dP
+  PetscInt :: a, v
+  PetscReal :: J_map(3,3), inv_J_map(3,3)
+  PetscReal :: dNdx(size_elenodes,3)
+  PetscReal :: gradU(3,3), eps(3,3), sig(3,3)
+  PetscReal :: lambda, mu, E, nu, alpha, beta, dT, dP
+  PetscReal :: trE
 
-  allocate(B(size_elenodes,dim))
+  if (dim /= 3) then
+    option%io_buffer = 'GEOMECHANICS: stress/strain routine expects dim=3.'
+    call PrintErrMsg(option)
+  end if
 
-  call Transposer(option%ngeomechdof,size_elenodes,Trans)
-  strain = 0.d0
-  stress = 0.d0
+  strain = 0.0d0
+  stress = 0.0d0
 
-  call ConvertMatrixToVector(transpose(local_disp),vec_local_disp)
+  shapefunction%element_type = eletype
+  call ShapeFunctionInitialize(shapefunction)
 
-  identity = 0.d0
-  do i = 1, THREE_INTEGER
-    do j = 1, THREE_INTEGER
-      if (i == j) identity(i,j) = 1.d0
-    enddo
-  enddo
-
-  eye_vec = 0.d0
-  eye_vec(1,1) = 1.d0
-  eye_vec(5,1) = 1.d0
-  eye_vec(9,1) = 1.d0
-
-  do ivertex = 1, size_elenodes
-    strain_local = 0.d0
-    stress_local = 0.d0
-    shapefunction%element_type = eletype
-    call ShapeFunctionInitialize(shapefunction)
-    shapefunction%zeta = shapefunction%coord(ivertex,:)
+  do v = 1, size_elenodes
+    ! Evaluate at vertex location in reference element
+    shapefunction%zeta = shapefunction%coord(v,:)
     call ShapeFunctionCalculate(shapefunction)
-    J_map = matmul(transpose(local_coordinates),shapefunction%DN)
-    call MatInv3(J_map,inv_J_map)
-    B = matmul(shapefunction%DN,inv_J_map)
-    youngs_mod = dot_product(shapefunction%N,local_youngs)
-    poissons_ratio = dot_product(shapefunction%N,local_poissons)
-    alpha = dot_product(shapefunction%N,local_alpha)
-    beta = dot_product(shapefunction%N,local_beta)
-    call GeomechGetLambdaMu(lambda,mu,youngs_mod,poissons_ratio)
-    call Kron(B,identity,kron_B_eye)
-    call Kron(transpose(B),identity,kron_B_transpose_eye)
-    call Kron(identity,transpose(B),kron_eye_B_transpose)
-    strain_local =  0.5d0*matmul((kron_B_transpose_eye + &
-      matmul(kron_eye_B_transpose,Trans)),vec_local_disp)
-    stress_local = lambda*(strain_local(1,1)+ &
-                   strain_local(5,1)+strain_local(9,1))*eye_vec + &
-                   2.d0*mu*strain_local
+
+    J_map = matmul(transpose(local_coordinates), shapefunction%DN)
+    call MatInv3(J_map, inv_J_map)
+    dNdx = matmul(shapefunction%DN, inv_J_map)
+
+    E     = dot_product(shapefunction%N, local_youngs)
+    nu    = dot_product(shapefunction%N, local_poissons)
+    alpha = dot_product(shapefunction%N, local_alpha)
+    beta  = dot_product(shapefunction%N, local_beta)
+    call GeomechGetLambdaMu(lambda, mu, E, nu)
+
+    ! gradU(i,j) = sum_a dNdx(a,i) * u_a(j)
+    gradU = 0.0d0
+    do a = 1, size_elenodes
+      gradU(1,1) = gradU(1,1) + dNdx(a,1)*local_disp(a,1)
+      gradU(1,2) = gradU(1,2) + dNdx(a,1)*local_disp(a,2)
+      gradU(1,3) = gradU(1,3) + dNdx(a,1)*local_disp(a,3)
+
+      gradU(2,1) = gradU(2,1) + dNdx(a,2)*local_disp(a,1)
+      gradU(2,2) = gradU(2,2) + dNdx(a,2)*local_disp(a,2)
+      gradU(2,3) = gradU(2,3) + dNdx(a,2)*local_disp(a,3)
+
+      gradU(3,1) = gradU(3,1) + dNdx(a,3)*local_disp(a,1)
+      gradU(3,2) = gradU(3,2) + dNdx(a,3)*local_disp(a,2)
+      gradU(3,3) = gradU(3,3) + dNdx(a,3)*local_disp(a,3)
+    end do
+
+    eps = 0.5d0 * (gradU + transpose(gradU))
+    trE = eps(1,1) + eps(2,2) + eps(3,3)
+
+    sig = 2.0d0*mu*eps
+    sig(1,1) = sig(1,1) + lambda*trE
+    sig(2,2) = sig(2,2) + lambda*trE
+    sig(3,3) = sig(3,3) + lambda*trE
+
     if (compute_stress_total) then
-      dT = local_temp(ivertex)
-      dP = local_press(ivertex)
-      ! Add the thermal stress
-      stress_local = stress_local - alpha * dT * eye_vec * (3.d0*lambda +2.d0*mu)
-      ! Add Biot's contribution
-      stress_local = stress_local - beta * dP * eye_vec
-    endif
-    call ShapeFunctionDestroy(shapefunction)
-    deallocate(kron_B_eye)
-    deallocate(kron_B_transpose_eye)
-    deallocate(kron_eye_B_transpose)
-    strain(ivertex,1) = strain_local(1,1)
-    strain(ivertex,2) = strain_local(5,1)
-    strain(ivertex,3) = strain_local(9,1)
-    strain(ivertex,4) = strain_local(2,1)
-    strain(ivertex,5) = strain_local(6,1)
-    strain(ivertex,6) = strain_local(3,1)
-    stress(ivertex,1) = stress_local(1,1)
-    stress(ivertex,2) = stress_local(5,1)
-    stress(ivertex,3) = stress_local(9,1)
-    stress(ivertex,4) = stress_local(2,1)
-    stress(ivertex,5) = stress_local(6,1)
-    stress(ivertex,6) = stress_local(3,1)
-  enddo
+      dT = local_temp(v)
+      dP = local_press(v)
+      ! thermal: -alpha*dT*(3λ+2μ) I
+      sig(1,1) = sig(1,1) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
+      sig(2,2) = sig(2,2) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
+      sig(3,3) = sig(3,3) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
+      ! biot: -beta*dP I
+      sig(1,1) = sig(1,1) - beta*dP
+      sig(2,2) = sig(2,2) - beta*dP
+      sig(3,3) = sig(3,3) - beta*dP
+    end if
 
-  deallocate(B)
-  deallocate(vec_local_disp)
-  deallocate(Trans)
+    ! Store in your 6-component convention (same as your old mapping)
+    strain(v,1) = eps(1,1)
+    strain(v,2) = eps(2,2)
+    strain(v,3) = eps(3,3)
+    strain(v,4) = eps(1,2)
+    strain(v,5) = eps(2,3)
+    strain(v,6) = eps(3,1)
 
+    stress(v,1) = sig(1,1)
+    stress(v,2) = sig(2,2)
+    stress(v,3) = sig(3,3)
+    stress(v,4) = sig(1,2)
+    stress(v,5) = sig(2,3)
+    stress(v,6) = sig(3,1)
+  end do
+
+  call ShapeFunctionDestroy(shapefunction)
 end subroutine GeomechForceLocalElemStressStrain
 
 ! ************************************************************************** !
