@@ -486,8 +486,8 @@ subroutine GeomechForceUpdateAuxVars(geomech_realization)
   patch => geomech_realization%geomech_patch
   grid => patch%geomech_grid
   geomech_field => geomech_realization%geomech_field
-
   geomech_global_aux_vars => patch%geomech_aux%Global%aux_vars
+
 
   ! Communication -----------------------------------------
   call GeomechDiscretizationGlobalToLocal(geomech_realization% &
@@ -1570,6 +1570,103 @@ end subroutine GeomechForceAssembleCoeffMatrixLocal
 
 ! ************************************************************************** !
 
+subroutine GeomechForceAssembleCoeffMatrixLocalDirect(size_elenodes, &
+                                                      local_coordinates, &
+                                                      local_youngs, &
+                                                      local_poissons, &
+                                                      petsc_ids, &
+                                                      eletype,dim,r,w,Amat,option)
+  use Shape_Function_module
+  use Option_module
+  use Utility_module
+  use Petsc_Utility_module
+
+  implicit none
+
+  type(shapefunction_type) :: shapefunction
+  type(option_type) :: option
+  PetscInt, intent(in) :: size_elenodes, eletype, dim
+  PetscReal, intent(in) :: local_coordinates(:,:)     ! (nen,3)
+  PetscReal, intent(in) :: local_youngs(:), local_poissons(:)
+  PetscInt, intent(in) :: petsc_ids(:)
+  PetscReal, pointer, intent(in) :: r(:,:), w(:)
+  Mat, intent(inout) :: Amat
+
+  PetscInt :: igpt, len_w, ia, ib
+  PetscReal :: J_map(3,3), inv_J_map(3,3), detJ_map
+  PetscReal :: dNdx(size_elenodes,3)
+  PetscReal :: youngs_mod, poissons_ratio, lambda, mu, wdet
+  PetscReal :: gax,gay,gaz, gbx,gby,gbz, gg
+  PetscReal :: Kblock(3,3,size_elenodes,size_elenodes)
+  PetscReal :: Jac_sub_mat(3,3)
+  PetscErrorCode :: ierr
+
+  if (dim /= 3) then
+    call GeomechForceError('GEOMECHANICS: this stiffness routine expects dim=3.', option)
+    return
+  end if
+
+  Kblock = 0.0d0
+  len_w = size(w)
+
+  shapefunction%element_type = eletype
+  call ShapeFunctionInitialize(shapefunction,option)
+
+  do igpt = 1, len_w
+    shapefunction%zeta = r(igpt,:)
+    call ShapeFunctionCalculate(shapefunction,option)
+
+    J_map = matmul(transpose(local_coordinates), shapefunction%DN)
+    call MatInv3WithDet(J_map, inv_J_map, detJ_map)
+    if (detJ_map <= 0.0d0) then
+      call GeomechForceError('GEOMECHANICS: det(J) must be positive!', option)
+      call ShapeFunctionDestroy(shapefunction)
+      return
+    end if
+
+    dNdx = matmul(shapefunction%DN, inv_J_map)
+
+    youngs_mod     = dot_product(shapefunction%N, local_youngs)
+    poissons_ratio = dot_product(shapefunction%N, local_poissons)
+    call GeomechGetLambdaMu(lambda, mu, youngs_mod, poissons_ratio)
+
+    wdet = w(igpt) * detJ_map
+
+    do ia = 1, size_elenodes
+      gax = dNdx(ia,1); gay = dNdx(ia,2); gaz = dNdx(ia,3)
+      do ib = 1, size_elenodes
+        gbx = dNdx(ib,1); gby = dNdx(ib,2); gbz = dNdx(ib,3)
+
+        gg = gax*gbx + gay*gby + gaz*gbz
+
+        Kblock(1,1,ia,ib) = Kblock(1,1,ia,ib) + wdet*( lambda*gax*gbx + mu*gg + mu*gax*gbx )
+        Kblock(1,2,ia,ib) = Kblock(1,2,ia,ib) + wdet*( lambda*gax*gby          + mu*gay*gbx )
+        Kblock(1,3,ia,ib) = Kblock(1,3,ia,ib) + wdet*( lambda*gax*gbz          + mu*gaz*gbx )
+
+        Kblock(2,1,ia,ib) = Kblock(2,1,ia,ib) + wdet*( lambda*gay*gbx          + mu*gax*gby )
+        Kblock(2,2,ia,ib) = Kblock(2,2,ia,ib) + wdet*( lambda*gay*gby + mu*gg + mu*gay*gby )
+        Kblock(2,3,ia,ib) = Kblock(2,3,ia,ib) + wdet*( lambda*gay*gbz          + mu*gaz*gby )
+
+        Kblock(3,1,ia,ib) = Kblock(3,1,ia,ib) + wdet*( lambda*gaz*gbx          + mu*gax*gbz )
+        Kblock(3,2,ia,ib) = Kblock(3,2,ia,ib) + wdet*( lambda*gaz*gby          + mu*gay*gbz )
+        Kblock(3,3,ia,ib) = Kblock(3,3,ia,ib) + wdet*( lambda*gaz*gbz + mu*gg + mu*gaz*gbz )
+      end do
+    end do
+  end do
+
+  call ShapeFunctionDestroy(shapefunction)
+
+  do ia = 1, size_elenodes
+    do ib = 1, size_elenodes
+      Jac_sub_mat = Kblock(:,:,ia,ib)
+      call PUMSetValuesBlocked(Amat,1,petsc_ids(ia)-1,1,petsc_ids(ib)-1, &
+                               Jac_sub_mat,ADD_VALUES,ierr);CHKERRQ(ierr)
+    end do
+  end do
+end subroutine GeomechForceAssembleCoeffMatrixLocalDirect
+
+! ************************************************************************** !
+
 subroutine GeomechGetLambdaMu(lambda,mu,E,nu)
   !
   ! Gets the material properties given the position
@@ -1658,22 +1755,16 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
 
   PetscInt, allocatable :: elenodes(:)
   PetscReal, allocatable :: local_coordinates(:,:)
-  PetscInt, allocatable :: ghosted_ids(:)
-  PetscReal, allocatable :: Jac_full(:,:)
-  ! due to PETSc explicit interface declaring the sub matrix as pointer,
-  ! must be pointer and not allocatable
-  PetscReal, pointer :: Jac_sub_mat(:,:)
+  PetscInt, allocatable :: ghosted_ids(:), petsc_ids(:)
   PetscInt, allocatable :: rows(:)
   PetscReal, allocatable :: youngs_vec(:), poissons_vec(:)
   PetscInt :: ielem,ivertex
   PetscInt :: ghosted_id
   PetscInt :: eletype
   PetscInt :: local_id, petsc_id
-  PetscInt :: ghosted_id1, ghosted_id2
-  PetscInt :: petsc_id1, petsc_id2
-  PetscInt :: id1, id2, vertex_count, count
+  PetscInt :: vertex_count, count
   PetscReal, pointer :: imech_loc_p(:)
-  PetscInt :: size_elenodes, max_elem_nodes, max_elem_dofs
+  PetscInt :: size_elenodes, max_elem_nodes
 
   PetscReal, pointer :: temp_youngs_modulus_p(:)
   PetscReal, pointer :: temp_poissons_ratio_p(:)
@@ -1697,12 +1788,10 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
   endif
 
   max_elem_nodes = maxval(grid%elem_nodes(0,1:grid%nlmax_elem))
-  max_elem_dofs = max_elem_nodes*option%ngeomechdof
   allocate(elenodes(max_elem_nodes))
   allocate(local_coordinates(max_elem_nodes,THREE_INTEGER))
   allocate(ghosted_ids(max_elem_nodes))
-  allocate(Jac_full(max_elem_dofs,max_elem_dofs))
-  allocate(Jac_sub_mat(option%ngeomechdof,option%ngeomechdof))
+  allocate(petsc_ids(max_elem_nodes))
   allocate(youngs_vec(max_elem_nodes))
   allocate(poissons_vec(max_elem_nodes))
 
@@ -1717,6 +1806,7 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
       local_coordinates(ivertex,GEOMECH_DISP_Y_DOF) = grid%nodes(ghosted_id)%y
       local_coordinates(ivertex,GEOMECH_DISP_Z_DOF) = grid%nodes(ghosted_id)%z
       ghosted_ids(ivertex) = ghosted_id
+      petsc_ids(ivertex) = grid%node_ids_ghosted_petsc(ghosted_id)
     enddo
     do ivertex = 1, size_elenodes
       ghosted_id = elenodes(ivertex)
@@ -1733,36 +1823,17 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
           geomech_parameter%poissons_ratio(nint(imech_loc_p(ghosted_id)))
       endif
     enddo
-    call GeomechForceAssembleCoeffMatrixLocal(size_elenodes,local_coordinates(1:size_elenodes,:), &
-       youngs_vec(1:size_elenodes),poissons_vec(1:size_elenodes),eletype, &
-       grid%gauss_node(ielem)%dim,grid%gauss_node(ielem)%r, &
-       grid%gauss_node(ielem)%w,Jac_full(1:size_elenodes*option%ngeomechdof, &
-       1:size_elenodes*option%ngeomechdof),option)
-
-    do id1 = 1, size_elenodes
-      ghosted_id1 = ghosted_ids(id1)
-      petsc_id1 = grid%node_ids_ghosted_petsc(ghosted_id1)
-      do id2 = 1, size_elenodes
-        ghosted_id2 = ghosted_ids(id2)
-        petsc_id2 = grid%node_ids_ghosted_petsc(ghosted_id2)
-        Jac_sub_mat = 0.d0
-        Jac_sub_mat =  &
-          Jac_full(option%ngeomechdof*(id1-1)+GEOMECH_DISP_X_DOF: &
-                   option%ngeomechdof*(id1-1)+GEOMECH_DISP_Z_DOF, &
-                   option%ngeomechdof*(id2-1)+GEOMECH_DISP_X_DOF: &
-                   option%ngeomechdof*(id2-1)+GEOMECH_DISP_Z_DOF)
-
-        call PUMSetValuesBlocked(A,1,petsc_id1-1,1,petsc_id2-1,Jac_sub_mat, &
-                                 ADD_VALUES,ierr);CHKERRQ(ierr)
-      enddo
-    enddo
+    call GeomechForceAssembleCoeffMatrixLocalDirect(size_elenodes, &
+       local_coordinates(1:size_elenodes,:), &
+       youngs_vec(1:size_elenodes),poissons_vec(1:size_elenodes), &
+       petsc_ids(1:size_elenodes),eletype,grid%gauss_node(ielem)%dim, &
+       grid%gauss_node(ielem)%r,grid%gauss_node(ielem)%w,A,option)
   enddo
 
   deallocate(elenodes)
   deallocate(local_coordinates)
   deallocate(ghosted_ids)
-  deallocate(Jac_full)
-  deallocate(Jac_sub_mat)
+  deallocate(petsc_ids)
   deallocate(youngs_vec)
   deallocate(poissons_vec)
 
@@ -2323,15 +2394,8 @@ subroutine GeomechForceStressStrain(geomech_realization)
        local_press(1:size_elenodes),youngs_vec(1:size_elenodes), &
        poissons_vec(1:size_elenodes),alpha_vec(1:size_elenodes), &
        beta_vec(1:size_elenodes),eletype,grid%gauss_node(ielem)%dim, &
-       strain(1:size_elenodes,:),stress(1:size_elenodes,:),PETSC_FALSE,option)
-    call GeomechForceLocalElemStressStrain(size_elenodes, &
-       local_coordinates(1:size_elenodes,:), &
-       local_disp(1:size_elenodes,:),local_temp(1:size_elenodes), &
-       local_press(1:size_elenodes),youngs_vec(1:size_elenodes), &
-       poissons_vec(1:size_elenodes),alpha_vec(1:size_elenodes), &
-       beta_vec(1:size_elenodes),eletype,grid%gauss_node(ielem)%dim, &
-       strain(1:size_elenodes,:),stress_total(1:size_elenodes,:), &
-       PETSC_TRUE,option)
+       strain(1:size_elenodes,:),stress(1:size_elenodes,:), &
+       stress_total(1:size_elenodes,:),option)
 
     do ivertex = 1, size_elenodes
       ghosted_id = elenodes(ivertex)
@@ -2459,7 +2523,7 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
                                              local_youngs,local_poissons, &
                                              local_alpha, local_beta, &
                                              eletype,dim,strain,stress, &
-                                             compute_stress_total,option)
+                                             stress_total,option)
   !
   ! Computes the stress-strain for a local
   ! element
@@ -2484,13 +2548,12 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
   PetscReal, intent(in) :: local_temp(:), local_press(:)
   PetscReal, intent(in) :: local_youngs(:), local_poissons(:)
   PetscReal, intent(in) :: local_alpha(:), local_beta(:)
-  PetscReal, intent(out) :: strain(:,:), stress(:,:)   ! (nen,6)
-  PetscBool, intent(in) :: compute_stress_total
+  PetscReal, intent(out) :: strain(:,:), stress(:,:), stress_total(:,:) ! (nen,6)
 
   PetscInt :: a, v
   PetscReal :: J_map(3,3), inv_J_map(3,3), detJ_map
   PetscReal :: dNdx(size_elenodes,3)
-  PetscReal :: gradU(3,3), eps(3,3), sig(3,3)
+  PetscReal :: gradU(3,3), eps(3,3), sig(3,3), sig_total_mat(3,3)
   PetscReal :: lambda, mu, E, nu, alpha, beta, dT, dP
   PetscReal :: trE
 
@@ -2501,6 +2564,7 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
 
   strain = 0.0d0
   stress = 0.0d0
+  stress_total = 0.0d0
 
   shapefunction%element_type = eletype
   call ShapeFunctionInitialize(shapefunction,option)
@@ -2551,19 +2615,13 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
     sig(2,2) = sig(2,2) + lambda*trE
     sig(3,3) = sig(3,3) + lambda*trE
 
-    if (compute_stress_total) then
-      ! Add thermal and pore-pressure isotropic stress shifts.
-      dT = local_temp(v)
-      dP = local_press(v)
-      ! thermal: -alpha*dT*(3λ+2μ) I
-      sig(1,1) = sig(1,1) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
-      sig(2,2) = sig(2,2) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
-      sig(3,3) = sig(3,3) - alpha*dT*(3.0d0*lambda + 2.0d0*mu)
-      ! biot: -beta*dP I
-      sig(1,1) = sig(1,1) - beta*dP
-      sig(2,2) = sig(2,2) - beta*dP
-      sig(3,3) = sig(3,3) - beta*dP
-    end if
+    ! Total stress = effective stress - thermal term - Biot pore-pressure term.
+    dT = local_temp(v)
+    dP = local_press(v)
+    sig_total_mat = sig
+    sig_total_mat(1,1) = sig_total_mat(1,1) - alpha*dT*(3.0d0*lambda + 2.0d0*mu) - beta*dP
+    sig_total_mat(2,2) = sig_total_mat(2,2) - alpha*dT*(3.0d0*lambda + 2.0d0*mu) - beta*dP
+    sig_total_mat(3,3) = sig_total_mat(3,3) - alpha*dT*(3.0d0*lambda + 2.0d0*mu) - beta*dP
 
     ! Store in your 6-component convention (same as your old mapping)
     strain(v,1) = eps(1,1)
@@ -2579,6 +2637,13 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
     stress(v,4) = sig(1,2)
     stress(v,5) = sig(2,3)
     stress(v,6) = sig(3,1)
+
+    stress_total(v,1) = sig_total_mat(1,1)
+    stress_total(v,2) = sig_total_mat(2,2)
+    stress_total(v,3) = sig_total_mat(3,3)
+    stress_total(v,4) = sig_total_mat(1,2)
+    stress_total(v,5) = sig_total_mat(2,3)
+    stress_total(v,6) = sig_total_mat(3,1)
   end do
 
   call ShapeFunctionDestroy(shapefunction)
