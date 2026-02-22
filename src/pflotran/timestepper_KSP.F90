@@ -794,7 +794,6 @@ subroutine TimestepperKSPPrintInfo(this,aux_string,option)
   type(option_type) :: option
 
   call TimestepperBasePrintInfo(this,'KSP',option)
-  call SolverPrintNewtonInfo(this%solver,this%name,option)
   call SolverPrintLinearInfo(this%solver,this%name,option)
 
 end subroutine TimestepperKSPPrintInfo
