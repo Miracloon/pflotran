@@ -790,11 +790,11 @@ subroutine GeomechForceApplyTractionBCtoRHS(local_coordinates, &
   traction = matmul(boundary_stress, normal_vec)
 
   shapefunction%element_type = eletype
-  call ShapeFunctionInitialize(shapefunction)
+  call ShapeFunctionInitialize(shapefunction,option)
 
   do igpt = 1, len_w
     shapefunction%zeta = r(igpt,:)
-    call ShapeFunctionCalculate(shapefunction)
+    call ShapeFunctionCalculate(shapefunction,option)
 
     J_map = matmul(transpose(local_coordinates), shapefunction%DN)  ! (3×2)
     xp_J  = cross_product(J_map(:,1), J_map(:,2))
@@ -1355,11 +1355,11 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
   end if
 
   shapefunction%element_type = eletype
-  call ShapeFunctionInitialize(shapefunction)
+  call ShapeFunctionInitialize(shapefunction,option)
 
   do igpt = 1, len_w
     shapefunction%zeta = r(igpt,:)
-    call ShapeFunctionCalculate(shapefunction)
+    call ShapeFunctionCalculate(shapefunction,option)
 
     x     = matmul(transpose(local_coordinates), shapefunction%N)
     J_map = matmul(transpose(local_coordinates), shapefunction%DN)
@@ -1449,11 +1449,11 @@ subroutine GeomechForceAssembleCoeffMatrixLocal(size_elenodes,local_coordinates,
   len_w = size(w)
 
   shapefunction%element_type = eletype
-  call ShapeFunctionInitialize(shapefunction)
+  call ShapeFunctionInitialize(shapefunction,option)
 
   do igpt = 1, len_w
     shapefunction%zeta = r(igpt,:)
-    call ShapeFunctionCalculate(shapefunction)
+    call ShapeFunctionCalculate(shapefunction,option)
 
     J_map = matmul(transpose(local_coordinates), shapefunction%DN)
     call MatInv3WithDet(J_map, inv_J_map, detJ_map)
@@ -2445,12 +2445,12 @@ subroutine GeomechForceLocalElemStressStrain(size_elenodes,local_coordinates, &
   stress = 0.0d0
 
   shapefunction%element_type = eletype
-  call ShapeFunctionInitialize(shapefunction)
+  call ShapeFunctionInitialize(shapefunction,option)
 
   do v = 1, size_elenodes
     ! Evaluate at vertex location in reference element
     shapefunction%zeta = shapefunction%coord(v,:)
-    call ShapeFunctionCalculate(shapefunction)
+    call ShapeFunctionCalculate(shapefunction,option)
 
     J_map = matmul(transpose(local_coordinates), shapefunction%DN)
     call MatInv3(J_map, inv_J_map)

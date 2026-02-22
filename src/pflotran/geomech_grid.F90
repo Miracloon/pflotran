@@ -692,7 +692,7 @@ subroutine CopySubsurfaceGridtoGeomechGrid(ugrid,geomech_grid,option)
       geomech_grid%gauss_node(local_id)%num_gauss_pts = FIVE_INTEGER
     if (geomech_grid%gauss_node(local_id)%entity_type == TET_TYPE) &
       geomech_grid%gauss_node(local_id)%num_gauss_pts = FOUR_INTEGER
-    call GaussCalculatePoints(geomech_grid%gauss_node(local_id))
+    call GaussCalculatePoints(geomech_grid%gauss_node(local_id),option)
   enddo
 
   ! from grid_unstructured_cell.F90, we have
@@ -706,7 +706,7 @@ subroutine CopySubsurfaceGridtoGeomechGrid(ugrid,geomech_grid,option)
     geomech_grid%gauss_surf_node(face_type_id)%entity_type = face_type_id
     geomech_grid%gauss_surf_node(face_type_id)%dim = TWO_DIM_GRID
     geomech_grid%gauss_surf_node(face_type_id)%num_gauss_pts = ONE_INTEGER
-    call GaussCalculatePoints(geomech_grid%gauss_surf_node(face_type_id))
+    call GaussCalculatePoints(geomech_grid%gauss_surf_node(face_type_id),option)
   enddo
 
   ! Store petsc ids of the local and ghost nodes in the new re-ordered system on

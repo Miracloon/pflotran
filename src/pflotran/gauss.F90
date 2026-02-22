@@ -5,6 +5,7 @@ module Gauss_module
 
   use Grid_Unstructured_Cell_module
   use PFLOTRAN_Constants_module
+  use Option_module
 
   implicit none
 
@@ -45,7 +46,7 @@ end subroutine GaussInitialize
 
 ! ************************************************************************** !
 
-subroutine GaussCalculatePoints(gauss)
+subroutine GaussCalculatePoints(gauss,option)
   !
   ! Calculates Gauss points
   !
@@ -53,22 +54,20 @@ subroutine GaussCalculatePoints(gauss)
   ! Date: 5/17/2013
   !
 
-  use Utility_module, only: DeallocateArray
-
   type(gauss_type) :: gauss
+  type(option_type), optional, intent(inout) :: option
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
 
   select case(gauss%dim)
     case(ONE_DIM_GRID)
-      call Gauss1D(gauss%entity_type,gauss%num_gauss_pts,r,w)
+      call Gauss1D(gauss%entity_type,gauss%num_gauss_pts,r,w,option)
     case(TWO_DIM_GRID)
-      call Gauss2D(gauss%entity_type,gauss%num_gauss_pts,r,w)
+      call Gauss2D(gauss%entity_type,gauss%num_gauss_pts,r,w,option)
     case(THREE_DIM_GRID)
-      call Gauss3D(gauss%entity_type,gauss%num_gauss_pts,r,w)
+      call Gauss3D(gauss%entity_type,gauss%num_gauss_pts,r,w,option)
     case default
-      print *, 'Error: Invalid dimension for Gauss point calculation'
-      stop
+      call GaussError('Invalid dimension for Gauss point calculation.',option)
   end select
 
   allocate(gauss%r(size(r,1),size(r,2)))
@@ -84,7 +83,7 @@ end subroutine GaussCalculatePoints
 
 ! ************************************************************************** !
 
-subroutine Gauss1D(entity_type,num_gauss_pts,r,w)
+subroutine Gauss1D(entity_type,num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for 1D elements
   !
@@ -96,13 +95,13 @@ subroutine Gauss1D(entity_type,num_gauss_pts,r,w)
   PetscInt :: num_gauss_pts
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts,1))
   allocate(w(num_gauss_pts))
 
   if (entity_type /= LINE_TYPE) then
-    print *, 'Error: in Element type. Only L2 ' // &
-             '(line type) can be used for 1D Gauss quadrature.'
+    call GaussError('Invalid element type. Only LINE_TYPE can be used for 1D Gauss quadrature.',option)
   endif
 
   select case(num_gauss_pts)
@@ -255,7 +254,7 @@ subroutine Gauss1D(entity_type,num_gauss_pts,r,w)
       r(5,1) =  0.000000000000000d0
       r(6,1) =  0.324253423403809d0
       r(7,1) =  0.613371432700590d0
-      r(8,1) =  0.836031107326636d0
+      r(8,1) =  0.836031170326636d0
       r(9,1) =  0.968160239507626d0
 
       w(1) =  0.081274388361574d0
@@ -269,15 +268,14 @@ subroutine Gauss1D(entity_type,num_gauss_pts,r,w)
       w(9) =  0.081274388361574d0
 
    case default
-     print *, 'Error in num_gauss_pts for 1D Gauss quadrature'
-     stop
+     call GaussError('Invalid num_gauss_pts for 1D Gauss quadrature.',option)
    end select
 
 end subroutine Gauss1D
 
 ! ************************************************************************** !
 
-subroutine Gauss2D(entity_type,num_gauss_pts,r,w)
+subroutine Gauss2D(entity_type,num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for 2D elements
   !
@@ -289,22 +287,22 @@ subroutine Gauss2D(entity_type,num_gauss_pts,r,w)
   PetscInt :: num_gauss_pts
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
+  type(option_type), optional, intent(inout) :: option
 
   select case(entity_type)
     case(QUAD_TYPE, QUAD_FACE_TYPE)
-      call GaussSquare(num_gauss_pts,r,w)
+      call GaussSquare(num_gauss_pts,r,w,option)
     case(TRI_TYPE, TRI_FACE_TYPE)
-      call GaussTriangle(num_gauss_pts,r,w)
+      call GaussTriangle(num_gauss_pts,r,w,option)
     case default
-      print *, 'Error: Only T3 and Q4 elements available for 2D.'
-      stop
+      call GaussError('Only TRI_TYPE/TRI_FACE_TYPE and QUAD_TYPE/QUAD_FACE_TYPE are available for 2D quadrature.',option)
   end select
 
 end subroutine Gauss2D
 
 ! ************************************************************************** !
 
-subroutine GaussSquare(num_gauss_pts,r,w)
+subroutine GaussSquare(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for Q4 element
   !
@@ -318,6 +316,7 @@ subroutine GaussSquare(num_gauss_pts,r,w)
   PetscReal, pointer :: l(:,:)
   PetscReal, pointer :: m(:)
   PetscInt :: counter,i,j
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts*num_gauss_pts,2))
   allocate(w(num_gauss_pts*num_gauss_pts))
@@ -326,7 +325,7 @@ subroutine GaussSquare(num_gauss_pts,r,w)
 
   ! 1D Gauss points are stored in l vector and weights are stored in m vector
 
-  call Gauss1D(LINE_TYPE,num_gauss_pts,l,m)
+  call Gauss1D(LINE_TYPE,num_gauss_pts,l,m,option)
 
   ! Generate the Q4 Gauss points and weights using for loops
   counter = 1
@@ -346,7 +345,7 @@ end subroutine GaussSquare
 
 ! ************************************************************************** !
 
-subroutine GaussTriangle(num_gauss_pts,r,w)
+subroutine GaussTriangle(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for T3 elements
   !
@@ -357,6 +356,7 @@ subroutine GaussTriangle(num_gauss_pts,r,w)
   PetscInt :: num_gauss_pts
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts,2))
   allocate(w(num_gauss_pts))
@@ -514,8 +514,7 @@ subroutine GaussTriangle(num_gauss_pts,r,w)
                 0.077113760890257d0/)
 
    case default
-     print *, 'Invalid num_gauss_pts for T3 Gauss quadrature'
-     stop
+     call GaussError('Invalid num_gauss_pts for TRI_TYPE Gauss quadrature.',option)
    end select
 
 
@@ -523,7 +522,7 @@ end subroutine GaussTriangle
 
 ! ************************************************************************** !
 
-subroutine GaussTetrahedra(num_gauss_pts,r,w)
+subroutine GaussTetrahedra(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for tetrahedra elements
   !
@@ -536,6 +535,7 @@ subroutine GaussTetrahedra(num_gauss_pts,r,w)
   PetscReal, pointer :: w(:)
   PetscReal :: p1,p2,p3,p4,p5,p6,p7
   PetscReal :: q1,q2,q3,q4
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts,3))
   allocate(w(num_gauss_pts))
@@ -648,8 +648,7 @@ subroutine GaussTetrahedra(num_gauss_pts,r,w)
       w = (/q1,q2,q2,q2, q2,q3,q3,q3,q3,q4,q4,q4,q4,q4,q4/)
 
     case default
-     print *, 'Invalid num_gauss_pts for Tetrahedra Gauss quadrature'
-     stop
+     call GaussError('Invalid num_gauss_pts for TET_TYPE Gauss quadrature.',option)
    end select
 
 
@@ -657,7 +656,7 @@ end subroutine GaussTetrahedra
 
 ! ************************************************************************** !
 
-subroutine GaussPyramid(num_gauss_pts,r,w)
+subroutine GaussPyramid(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for tetrahedra elements
   ! Reference:
@@ -669,6 +668,7 @@ subroutine GaussPyramid(num_gauss_pts,r,w)
   PetscInt :: num_gauss_pts
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts,3))
   allocate(w(num_gauss_pts))
@@ -719,21 +719,19 @@ subroutine GaussPyramid(num_gauss_pts,r,w)
             0.21000000000000000000d0, &
             0.21000000000000000000d0, &
             0.21000000000000000000d0, &
-            0.21000000000000000000d0, &
             0.06000000000000000000d0, &
             0.10000000000000000000d0/)
 
-     case default
-     print *, 'Invalid num_gauss_pts for Tetrahedra Gauss quadrature'
-     stop
-   end select
+    case default
+      call GaussError('Invalid num_gauss_pts for PYR_TYPE Gauss quadrature.',option)
+  end select
 
 
 end subroutine GaussPyramid
 
 ! ************************************************************************** !
 
-subroutine Gauss3D(entity_type,num_gauss_pts,r,w)
+subroutine Gauss3D(entity_type,num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for 3D element
   !
@@ -745,26 +743,26 @@ subroutine Gauss3D(entity_type,num_gauss_pts,r,w)
   PetscInt :: num_gauss_pts
   PetscReal, pointer :: r(:,:)
   PetscReal, pointer :: w(:)
+  type(option_type), optional, intent(inout) :: option
 
   select case(entity_type)
     case(HEX_TYPE)
-      call GaussBrick(num_gauss_pts,r,w)
+      call GaussBrick(num_gauss_pts,r,w,option)
     case(WEDGE_TYPE)
-      call GaussWedge(num_gauss_pts,r,w)
+      call GaussWedge(num_gauss_pts,r,w,option)
     case(TET_TYPE)
-      call GaussTetrahedra(num_gauss_pts,r,w)
+      call GaussTetrahedra(num_gauss_pts,r,w,option)
     case(PYR_TYPE)
-      call GaussPyramid(num_gauss_pts,r,w)
+      call GaussPyramid(num_gauss_pts,r,w,option)
     case default
-      print *, 'Error: Only B8, W6, P5 and TET4 elements available for 3D.'
-      stop
+      call GaussError('Only HEX_TYPE, WEDGE_TYPE, PYR_TYPE and TET_TYPE are available for 3D quadrature.',option)
   end select
 
 end subroutine Gauss3D
 
 ! ************************************************************************** !
 
-subroutine GaussBrick(num_gauss_pts,r,w)
+subroutine GaussBrick(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for B8 element
   !
@@ -778,11 +776,12 @@ subroutine GaussBrick(num_gauss_pts,r,w)
   PetscReal, pointer :: l(:,:)
   PetscReal, pointer :: m(:)
   PetscInt :: counter, i, j, k
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts*num_gauss_pts*num_gauss_pts,3))
   allocate(w(num_gauss_pts*num_gauss_pts*num_gauss_pts))
 
-  call Gauss1D(LINE_TYPE,num_gauss_pts,l,m)
+  call Gauss1D(LINE_TYPE,num_gauss_pts,l,m,option)
 
   ! Generate the B8 Gauss points and weights using for loops
 
@@ -806,12 +805,12 @@ end subroutine GaussBrick
 
 ! ************************************************************************** !
 
-subroutine GaussWedge(num_gauss_pts,r,w)
+subroutine GaussWedge(num_gauss_pts,r,w,option)
   !
   ! Calculates Gauss points for wedge element
   !
   ! Author: Satish Karra, LANL
-  ! Date: 7/10//2013
+  ! Date: 7/10/2013
   !
 
   PetscInt :: num_gauss_pts
@@ -820,12 +819,13 @@ subroutine GaussWedge(num_gauss_pts,r,w)
   PetscReal, pointer :: rT3(:,:),rL2(:,:)
   PetscReal, pointer :: wT3(:),wL2(:)
   PetscInt :: i, j
+  type(option_type), optional, intent(inout) :: option
 
   allocate(r(num_gauss_pts*num_gauss_pts,3))
   allocate(w(num_gauss_pts*num_gauss_pts))
 
-  call Gauss1D(LINE_TYPE,num_gauss_pts,rL2,wL2)
-  call Gauss2D(TRI_TYPE,num_gauss_pts,rT3,wT3)
+  call Gauss1D(LINE_TYPE,num_gauss_pts,rL2,wL2,option)
+  call Gauss2D(TRI_TYPE,num_gauss_pts,rT3,wT3,option)
 
   ! Generate the wedge Gauss points and weights using for loops
   do i = 1, num_gauss_pts
@@ -856,12 +856,35 @@ subroutine GaussDestroy(gauss)
 
   type(gauss_type) :: gauss
 
-  deallocate(gauss%r)
-  nullify(gauss%r)
-  deallocate(gauss%w)
-  nullify(gauss%w)
+  if (associated(gauss%r)) then
+    deallocate(gauss%r)
+    nullify(gauss%r)
+  endif
+  if (associated(gauss%w)) then
+    deallocate(gauss%w)
+    nullify(gauss%w)
+  endif
 
 end subroutine GaussDestroy
+
+! ************************************************************************** !
+
+subroutine GaussError(message,option)
+
+  implicit none
+
+  character(len=*), intent(in) :: message
+  type(option_type), optional, intent(inout) :: option
+
+  if (present(option)) then
+    option%io_buffer = trim(message)
+    call PrintErrMsg(option)
+  else
+    print *, trim(message)
+    stop
+  endif
+
+end subroutine GaussError
 
 ! ************************************************************************** !
 
