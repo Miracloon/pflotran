@@ -208,7 +208,7 @@ subroutine OutputConservation(realization_base)
 
   select case(option%iflowmode)
     case(NULL_MODE)
-    case(TH_MODE)
+    case(RICHARDS_MODE,TH_MODE)
     case default
       option%io_buffer = 'Mass and energy conservation must be set up &
         &for the "' // trim(option%tranmode) // '" flow mode.'
@@ -287,7 +287,7 @@ subroutine OutputConservation(realization_base)
       class is(realization_subsurface_type)
         select case(option%iflowmode)
           case(RICHARDS_MODE,RICHARDS_TS_MODE,PNF_MODE)
-!            call RichardsComputeMassBalance(realization_base,sum_kg(1,:))
+            call RichardsComputeMassBalance(realization_base,sum_eq(1))
           case(ZFLOW_MODE)
 !            call ZFlowComputeMassBalance(realization_base,sum_kg(1,:))
           case(TH_MODE,TH_TS_MODE)
@@ -320,6 +320,8 @@ subroutine OutputConservation(realization_base)
 
     if (OptionIsIORank(option)) then
       select case(option%iflowmode)
+        case(RICHARDS_MODE,RICHARDS_TS_MODE)
+          write(fid,110,advance="no") sum_eq_global(1:option%nflowdof)
         case(TH_MODE,TH_TS_MODE)
           write(fid,110,advance="no") sum_eq_global(1:option%nflowdof)
         case default
