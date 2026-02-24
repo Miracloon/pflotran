@@ -808,9 +808,9 @@ subroutine GeomechForceApplyTractionBCtoRHS(local_coordinates, &
   boundary_stress(1,1) = stress_bc(1)
   boundary_stress(2,2) = stress_bc(2)
   boundary_stress(3,3) = stress_bc(3)
-  boundary_stress(1,2) = stress_bc(4); boundary_stress(2,1) = stress_bc(4)
-  boundary_stress(2,3) = stress_bc(5); boundary_stress(3,2) = stress_bc(5)
-  boundary_stress(3,1) = stress_bc(6); boundary_stress(1,3) = stress_bc(6)
+  boundary_stress(1,2) = stress_bc(4); boundary_stress(2,1) = stress_bc(4) ! Symmetric shear stress
+  boundary_stress(2,3) = stress_bc(5); boundary_stress(3,2) = stress_bc(5) ! Symmetric shear stress
+  boundary_stress(3,1) = stress_bc(6); boundary_stress(1,3) = stress_bc(6) ! Symmetric shear stress
 
   if (facetype == TRI_FACE_TYPE) then
     normal_vec = face_unitnormal(local_coordinates(1,:), local_coordinates(2,:), local_coordinates(3,:), option)
@@ -1398,10 +1398,26 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
   ! Optional improved tet weighting (unchanged logic)
   if(option%geomechanics%improve_tet_weighting .and. eletype == TET_TYPE .and. len_w == 4) then
     allocate(gauss_tet_vol_weight(len_w))
-    call ComputeTetVolAtVertex(local_coordinates(1,:),local_coordinates(2,:),local_coordinates(3,:),local_coordinates(4,:),gauss_tet_vol_weight(1))
-    call ComputeTetVolAtVertex(local_coordinates(2,:),local_coordinates(3,:),local_coordinates(4,:),local_coordinates(1,:),gauss_tet_vol_weight(2))
-    call ComputeTetVolAtVertex(local_coordinates(3,:),local_coordinates(4,:),local_coordinates(1,:),local_coordinates(2,:),gauss_tet_vol_weight(3))
-    call ComputeTetVolAtVertex(local_coordinates(4,:),local_coordinates(1,:),local_coordinates(2,:),local_coordinates(3,:),gauss_tet_vol_weight(4))
+    call ComputeTetVolAtVertex(local_coordinates(1,:), &
+                               local_coordinates(2,:), &
+                               local_coordinates(3,:), &
+                               local_coordinates(4,:), &
+                               gauss_tet_vol_weight(1))
+    call ComputeTetVolAtVertex(local_coordinates(2,:), &
+                               local_coordinates(3,:), &
+                               local_coordinates(4,:), &
+                               local_coordinates(1,:), &
+                               gauss_tet_vol_weight(2))
+    call ComputeTetVolAtVertex(local_coordinates(3,:), &
+                               local_coordinates(4,:), &
+                               local_coordinates(1,:), &
+                               local_coordinates(2,:), &
+                               gauss_tet_vol_weight(3))
+    call ComputeTetVolAtVertex(local_coordinates(4,:), &
+                               local_coordinates(1,:), &
+                               local_coordinates(2,:), &
+                               local_coordinates(3,:), &
+                               gauss_tet_vol_weight(4))
     gauss_tot_weight = sum(gauss_tet_vol_weight)
     do i=1,4
       gauss_tet_vol_weight(i) = gauss_tet_vol_weight(i)/gauss_tot_weight
@@ -1447,7 +1463,6 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
 
     ! Body force term: rhs += wdet*density*(N ⊗ I)*bf
     if(option%geomechanics%improve_tet_weighting .and. eletype == TET_TYPE .and. len_w == 4) then
-      ! old code: w * 4*weight * density * (N⊗I)bf * detJ
       wdet = wdet * 4.0d0 * gauss_tet_vol_weight(igpt)
     end if
 
@@ -1459,6 +1474,7 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
       rhs_vec(ia+3) = rhs_vec(ia+3) + wdet * density * shapefunction%N(a) * bf(3)
     end do
 
+    wdet = w(igpt) * detJ_map ! reset the wdet for the coupling terms since it may have been modified by the tet weighting
     ! Pressure and thermal coupling terms: old code uses + beta*dp * vecB + alpha*(3λ+2μ)*dT * vecB
     dp    = dot_product(shapefunction%N, local_press)
     dT    = dot_product(shapefunction%N, local_temp)
@@ -1480,102 +1496,22 @@ subroutine GeomechForceLocalElemRHS(size_elenodes,local_coordinates, &
 
 end subroutine GeomechForceLocalElemRHS
 
-! ************************************************************************** !
-
-subroutine GeomechForceAssembleCoeffMatrixLocal(size_elenodes,local_coordinates, &
-                                                local_youngs,local_poissons, &
-                                                eletype,dim,r,w,Kmat,option)
-  use Shape_Function_module
-  use Option_module
-  use Utility_module
-
-  implicit none
-
-  type(shapefunction_type) :: shapefunction
-  type(option_type)        :: option
-  PetscInt,  intent(in)    :: size_elenodes, eletype, dim
-  PetscReal, intent(in)    :: local_coordinates(:,:)     ! (nen,3)
-  PetscReal, intent(in)    :: local_youngs(:), local_poissons(:)
-  PetscReal, pointer, intent(in) :: r(:,:), w(:)
-  PetscReal, intent(inout) :: Kmat(:,:)                  ! (3*nen,3*nen)
-
-  PetscInt  :: igpt, len_w, a, b, ia, ib
-  PetscReal :: J_map(3,3), inv_J_map(3,3), detJ_map
-  PetscReal :: dNdx(size_elenodes,3)
-  PetscReal :: youngs_mod, poissons_ratio, lambda, mu, wdet
-  PetscReal :: gax,gay,gaz, gbx,gby,gbz, gg
-
-  if (dim /= 3) then
-    call GeomechForceError('GEOMECHANICS: this stiffness routine expects dim=3.', option)
-    return
-  end if
-
-  Kmat = 0.0d0
-  len_w = size(w)
-
-  shapefunction%element_type = eletype
-  call ShapeFunctionInitialize(shapefunction,option)
-
-  do igpt = 1, len_w
-    shapefunction%zeta = r(igpt,:)
-    call ShapeFunctionCalculate(shapefunction,option)
-
-    J_map = matmul(transpose(local_coordinates), shapefunction%DN)
-    call MatInv3WithDet(J_map, inv_J_map, detJ_map)
-    if (detJ_map <= 0.0d0) then
-      call GeomechForceError('GEOMECHANICS: det(J) must be positive!', option)
-      call ShapeFunctionDestroy(shapefunction)
-      return
-    end if
-
-    dNdx = matmul(shapefunction%DN, inv_J_map)
-
-    youngs_mod     = dot_product(shapefunction%N, local_youngs)
-    poissons_ratio = dot_product(shapefunction%N, local_poissons)
-    call GeomechGetLambdaMu(lambda, mu, youngs_mod, poissons_ratio)
-
-    wdet = w(igpt) * detJ_map
-
-    do a = 1, size_elenodes
-      ia  = 3*(a-1)
-      gax = dNdx(a,1); gay = dNdx(a,2); gaz = dNdx(a,3)
-
-      do b = 1, size_elenodes
-        ib  = 3*(b-1)
-        gbx = dNdx(b,1); gby = dNdx(b,2); gbz = dNdx(b,3)
-
-        ! gg = grad N_a . grad N_b
-        gg = gax*gbx + gay*gby + gaz*gbz
-
-        ! i=1 row
-        Kmat(ia+1,ib+1) = Kmat(ia+1,ib+1) + wdet*( lambda*gax*gbx + mu*gg + mu*gax*gbx )
-        Kmat(ia+1,ib+2) = Kmat(ia+1,ib+2) + wdet*( lambda*gax*gby          + mu*gay*gbx )
-        Kmat(ia+1,ib+3) = Kmat(ia+1,ib+3) + wdet*( lambda*gax*gbz          + mu*gaz*gbx )
-
-        ! i=2 row
-        Kmat(ia+2,ib+1) = Kmat(ia+2,ib+1) + wdet*( lambda*gay*gbx          + mu*gax*gby )
-        Kmat(ia+2,ib+2) = Kmat(ia+2,ib+2) + wdet*( lambda*gay*gby + mu*gg + mu*gay*gby )
-        Kmat(ia+2,ib+3) = Kmat(ia+2,ib+3) + wdet*( lambda*gay*gbz          + mu*gaz*gby )
-
-        ! i=3 row
-        Kmat(ia+3,ib+1) = Kmat(ia+3,ib+1) + wdet*( lambda*gaz*gbx          + mu*gax*gbz )
-        Kmat(ia+3,ib+2) = Kmat(ia+3,ib+2) + wdet*( lambda*gaz*gby          + mu*gay*gbz )
-        Kmat(ia+3,ib+3) = Kmat(ia+3,ib+3) + wdet*( lambda*gaz*gbz + mu*gg + mu*gaz*gbz )
-      end do
-    end do
-  end do
-
-  call ShapeFunctionDestroy(shapefunction)
-end subroutine GeomechForceAssembleCoeffMatrixLocal
 
 ! ************************************************************************** !
 
-subroutine GeomechForceAssembleCoeffMatrixLocalDirect(size_elenodes, &
-                                                      local_coordinates, &
-                                                      local_youngs, &
-                                                      local_poissons, &
-                                                      petsc_ids, &
-                                                      eletype,dim,r,w,Amat,option)
+subroutine GeomechForceAssembleCoeffMatrixLocal(size_elenodes, &
+                                                local_coordinates, &
+                                                local_youngs, &
+                                                local_poissons, &
+                                                petsc_ids, &
+                                                eletype,dim,r,w,Amat,option)
+  !
+  ! Forms the local element stiffness matrix and adds it to the global matrix.
+  !
+  ! Author: Satish Karra
+  ! Date: 06/24/13
+  ! Updated: 02/24/26
+
   use Shape_Function_module
   use Option_module
   use Utility_module
@@ -1663,7 +1599,7 @@ subroutine GeomechForceAssembleCoeffMatrixLocalDirect(size_elenodes, &
                                Jac_sub_mat,ADD_VALUES,ierr);CHKERRQ(ierr)
     end do
   end do
-end subroutine GeomechForceAssembleCoeffMatrixLocalDirect
+end subroutine GeomechForceAssembleCoeffMatrixLocal
 
 ! ************************************************************************** !
 
@@ -1823,7 +1759,7 @@ subroutine GeomechForceAssembleCoeffMatrix(A,geomech_realization)
           geomech_parameter%poissons_ratio(nint(imech_loc_p(ghosted_id)))
       endif
     enddo
-    call GeomechForceAssembleCoeffMatrixLocalDirect(size_elenodes, &
+    call GeomechForceAssembleCoeffMatrixLocal(size_elenodes, &
        local_coordinates(1:size_elenodes,:), &
        youngs_vec(1:size_elenodes),poissons_vec(1:size_elenodes), &
        petsc_ids(1:size_elenodes),eletype,grid%gauss_node(ielem)%dim, &
