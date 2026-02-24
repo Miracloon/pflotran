@@ -3117,7 +3117,7 @@ subroutine ReactionDBInitBasis(reaction,option)
 
   endif
 
-    call ReactionDBPrint(reaction,'Final Basis',option)
+  call ReactionDBPrint(reaction,'Final Basis',option)
 
   if (allocated(new_basis)) deallocate(new_basis)
   if (allocated(old_basis)) deallocate(old_basis)

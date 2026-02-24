@@ -469,6 +469,7 @@ subroutine FactorySubsurfSetupRealization(simulation)
   use Reaction_Aux_module, only : ACT_COEF_FREQUENCY_OFF
   use Reaction_Database_module
   use Reaction_Setup_module
+  use Reaction_Aux_module
   use EOS_module
   use Dataset_module
   use Patch_module
@@ -554,6 +555,7 @@ subroutine FactorySubsurfSetupRealization(simulation)
       endif
       call ReactionSetupKinetics(realization%reaction,option)
       call ReactionSetupSpecificSpecies(realization%reaction,option)
+      call ReactionAuxTotalCanBeNegative(realization%reaction)
       call ReactionSetupSpeciesSummary(realization%reaction,option)
 
       ! SK 09/30/13, Added to check if Mphase is called with OS

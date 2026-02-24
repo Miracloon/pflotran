@@ -217,6 +217,7 @@ module Reaction_Aux_module
     PetscReal, pointer :: primary_spec_Z(:)
     PetscReal, pointer :: primary_spec_mobility(:)
     PetscReal, pointer :: primary_spec_molar_wt(:)
+    PetscBool, pointer :: primary_total_can_be_negative(:)
 
     ! aqueous complexes
     PetscInt :: neqcplx
@@ -360,6 +361,7 @@ module Reaction_Aux_module
             ReactionAuxInputRecord, &
             ReactionAuxNetworkToStoich, &
             ReactionOutputRequiresDatabase, &
+            ReactionAuxTotalCanBeNegative, &
             ReactionAuxDestroyAux
 
 contains
@@ -474,6 +476,7 @@ function ReactionAuxCreateAux()
   nullify(reaction%primary_spec_Z)
   nullify(reaction%primary_spec_mobility)
   nullify(reaction%primary_spec_molar_wt)
+  nullify(reaction%primary_total_can_be_negative)
 
   reaction%neqcplx = 0
   nullify(reaction%eqcplxspecid)
@@ -1662,6 +1665,38 @@ end subroutine ReactionAuxDestroyAqSpeciesIndex
 
 ! ************************************************************************** !
 
+subroutine ReactionAuxTotalCanBeNegative(reaction)
+  !
+  ! Deallocates a species index object
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/29/10
+  !
+
+  implicit none
+
+  class(reaction_rt_type) :: reaction
+
+  PetscInt :: icplx
+  PetscInt :: i
+  PetscInt :: icomp
+
+  allocate(reaction%primary_total_can_be_negative(reaction%naqcomp))
+  reaction%primary_total_can_be_negative = PETSC_FALSE
+
+  do icplx = 1, reaction%neqcplx
+    do i = 1, reaction%eqcplxspecid(0,icplx)
+      icomp = reaction%eqcplxspecid(i,icplx)
+      if (reaction%eqcplxspecid(i,icplx) < 0) then
+        reaction%primary_total_can_be_negative(icomp) = PETSC_TRUE
+      endif
+    enddo
+  enddo
+
+end subroutine ReactionAuxTotalCanBeNegative
+
+! ************************************************************************** !
+
 function ReactionOutputRequiresDatabase(reaction)
   !
   ! Determines whether prescribed output requires the reading of the database
@@ -2023,7 +2058,9 @@ subroutine ReactionAuxDestroyAux(reaction,option)
 
   call DeallocateArray(reaction%primary_spec_a0)
   call DeallocateArray(reaction%primary_spec_Z)
+  call DeallocateArray(reaction%primary_spec_mobility)
   call DeallocateArray(reaction%primary_spec_molar_wt)
+  call DeallocateArray(reaction%primary_total_can_be_negative)
 
   call DeallocateArray(reaction%eqcplxspecid)
   call DeallocateArray(reaction%eqcplxstoich)
