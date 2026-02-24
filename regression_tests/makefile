@@ -115,6 +115,7 @@ STANDARD_CFG = \
 	geomech/simple_tet_cube/simple_tet_cube.cfg \
 	geomech/spatially_varying/spatially_varying.cfg \
 	geomech/thin_plate/thin_plate.cfg \
+	geomech/traction_bc/traction_bc.cfg \
 	geophys/ert/ert.cfg \
 	geothermal_hpt/1D_Calcite/calcite_hpt.cfg\
 	inversion/inversion.cfg \
@@ -182,6 +183,7 @@ GEOMECHANICS_CFG = \
 	geomech/terzaghi/terzaghi.cfg \
 	geomech/spatially_varying/spatially_varying.cfg \
 	geomech/thin_plate/thin_plate.cfg \
+	geomech/traction_bc/traction_bc.cfg \
 	multiphysics/hm/hm.cfg \
 	multiphysics/thm/thm.cfg
 
@@ -197,7 +199,7 @@ FLOW_CFG = \
 	fracture/fracture.cfg \
 	general/general.cfg \
 	general/cpr_general/cpr_general.cfg \
-        pnf/unit_cube/unit_cube.cfg \
+	pnf/unit_cube/unit_cube.cfg \
 	ntrdc/ntrdc.cfg \
 	shortcourse/1D_variably_saturated_flow/vsat_flow.cfg \
 	shortcourse/copper_leaching/cu_leaching.cfg
@@ -228,7 +230,7 @@ CHECK_CFG = \
 	ascem/1d/1d-calcite/1d-calcite.cfg
 
 TCOND_CFG = \
-    default/tcond/T_dep_tcond.cfg
+	default/tcond/T_dep_tcond.cfg
 
 WIPP_CFG = \
 	wipp/nuts/nuts.cfg \

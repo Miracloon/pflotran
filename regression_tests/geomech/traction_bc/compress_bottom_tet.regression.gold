@@ -1,0 +1,16 @@
+-- DISPLACEMENT: displacement_z --
+      Max:   1.0000000000000E-04
+      Min:   0.0000000000000E+00
+     Mean:   5.0000000000000E-05
+        1:   1.0000000000000E-04
+        5:   1.0000000000000E-04
+        6:   1.0000000000000E-04
+        8:   1.0000000000000E-04
+       11:   1.0000000000000E-04
+       12:   1.0000000000000E-04
+-- SOLUTION: Geomechanics --
+   Time (seconds):   2.0499999982349E-04
+   Time Steps:            1
+   Solver Iterations:            2
+   Time Step Cuts:            0
+   Solution 2-Norm:   2.4494897427832E-04

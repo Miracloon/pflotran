@@ -1,0 +1,89 @@
+SUBSURFACE
+
+#=========================== discretization ===================================
+GRID
+  TYPE UNSTRUCTURED_explicit ../meshes/small_tet/small_tet.uge
+  GRAVITY 0.0 0.0 0.0
+END
+
+#=========================== fluid properties =================================
+EOS WATER
+  DENSITY CONSTANT 990.0
+  VISCOSITY CONSTANT 0.00066
+END
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  TORTUOSITY 1.d0
+  CHARACTERISTIC_CURVES default
+  PERMEABILITY
+    PERM_ISO 1.d-16
+  /
+END
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES default
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    M 0.286
+    ALPHA  1.9401d-4
+    LIQUID_RESIDUAL_SATURATION 0.115
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.286
+    LIQUID_RESIDUAL_SATURATION 0.115
+  /
+END
+
+#=========================== output options ===================================
+skip
+OUTPUT
+  #TIMES d 0.1 1 2 3 4 5 6 7 8 9 10
+  PERIODIC TIMESTEP 1
+  FORMAT VTK
+  ACKNOWLEDGE_VTK_FLAW
+    VARIABLES
+      LIQUID_PRESSURE
+      LIQUID_SATURATION
+      LIQUID_DENSITY
+      POROSITY
+      PERMEABILITY
+    / 
+END
+noskip
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 1.d0 s
+  MAXIMUM_TIMESTEP_SIZE 1.d0 s
+  INITIAL_TIMESTEP_SIZE 1.d0 s
+END
+
+#=========================== regions ==========================================
+REGION All
+  INFINITE
+END
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial
+  TYPE
+     LIQUID_PRESSURE DIRICHLET
+  /
+  LIQUID_PRESSURE 101325.d0
+END
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION All
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION All
+  MATERIAL soil1
+END
+
+END_SUBSURFACE

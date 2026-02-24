@@ -877,12 +877,12 @@ subroutine GeomechGridLocalizeRegFromSideSet(geomech_grid, &
   tet_faces_vert(3,:) = (/ 1, 2, 4 /)! face opposite to v3
   tet_faces_vert(4,:) = (/ 1, 3, 2 /)! face opposite to v4
   ! convension from EXODUS II
-  quad_faces_vert(1,:) = (/ 1, 2, 3, 4 /)! bottom
-  quad_faces_vert(2,:) = (/ 5, 6, 7, 8 /)! top
-  quad_faces_vert(3,:) = (/ 1, 2, 6, 5 /)! front
-  quad_faces_vert(4,:) = (/ 4, 3, 7, 8 /)! back
-  quad_faces_vert(5,:) = (/ 1, 4, 8, 5 /)! left
-  quad_faces_vert(6,:) = (/ 2, 3, 7, 6 /)! right
+  quad_faces_vert(1,:) = (/ 1, 4, 3, 2 /)! zmin (bottom) face
+  quad_faces_vert(2,:) = (/ 5, 6, 7, 8 /)! zmax (top) face
+  quad_faces_vert(3,:) = (/ 1, 2, 6, 5 /)! ymin (south) face
+  quad_faces_vert(4,:) = (/ 3, 4, 8, 7 /)! ymax (north) face
+  quad_faces_vert(5,:) = (/ 4, 1, 5, 8 /)! xmin (west) face
+  quad_faces_vert(6,:) = (/ 2, 3, 7, 6 /)! xmax (east) face
 
   face_type = TRI_FACE_TYPE
   num_faces_per_ele = FOUR_INTEGER
