@@ -3918,7 +3918,8 @@ subroutine RStep(guess,rt_auxvar,global_auxvar,material_auxvar, &
   value_is_initially_small = PETSC_FALSE
   initial_small_value = UNINITIALIZED_DOUBLE
   do i = 1, reaction%naqcomp
-    if (rt_auxvar%total(i,1) <= 1.d-40) then
+    if (rt_auxvar%total(i,1) <= 1.d-40 .and. &
+        .not.reaction%primary_total_can_be_negative(i)) then
       value_is_initially_small(i) = PETSC_TRUE
       initial_small_value(i) = rt_auxvar%total(i,1)
       rt_auxvar%total(i,1) = 1.d-40
