@@ -6303,7 +6303,7 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
   PetscReal :: eq37c_theta_pow_15
   PetscReal :: eq37c_delta_pow_neg5
 
-  theta = T/Tref
+  theta = (T+T273K)/Tref
   delta = rho/rhoref
 
   eq35sum = 0.d0
@@ -6359,7 +6359,11 @@ subroutine EOSWaterThermalConductivityIF97(rho,T,lambda, &
 
     ! Derivative of delta_theta with respect to theta
     !   theta will always be positive
-    ddelta_theta_dtheta = 1.d0
+    if (theta < 1.d0) then
+      ddelta_theta_dtheta = -1.d0
+    else
+      ddelta_theta_dtheta = 1.d0
+    endif
 
     ! Derivatives of A and B with respect to theta
     dA_dtheta = -0.6d0*n37(8)*delta_theta**(-1.6d0)*ddelta_theta_dtheta
