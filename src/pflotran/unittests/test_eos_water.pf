@@ -346,41 +346,41 @@ contains
 
     temperature = 1.d0
     liquid_pressure = 2.d5
-    correct_lambda = 1624921647754263.2d0
-    correct_dlambda_dp = -35136187.568898678d0
-    correct_dlambda_dT = -16252652108745676.d0
+    correct_lambda = 5.5108463730055574d-007
+    correct_dlambda_dp = 6.2188777051159803d-016
+    correct_dlambda_dT = 2.1845907210765649d-009
     call TestLambda(temperature,liquid_pressure,correct_lambda, &
                     correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 35.d0
     liquid_pressure = 5.d6
-    correct_lambda = 0.69176682831649794d0
-    correct_dlambda_dp = -1.2830176838297182d-8
-    correct_dlambda_dT = -0.18744961978361080d0
+    correct_lambda = 6.1382745408029005d-007
+    correct_dlambda_dp = 5.4248702394014398d-016
+    correct_dlambda_dT = 1.4087584609173883d-009
     call TestLambda(temperature,liquid_pressure,correct_lambda, &
                     correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 75.d0
     liquid_pressure = 1.d6
-    correct_lambda = 8.1048570161946836d-4
-    correct_dlambda_dp = -1.4633614223695007d-11
-    correct_dlambda_dT = -8.8312678348831443d-5
+    correct_lambda = 6.5483123857959583d-007
+    correct_dlambda_dp = 5.4823707725112537d-016
+    correct_dlambda_dT = 7.7449202817122260d-010
     call TestLambda(temperature,liquid_pressure,correct_lambda, &
                     correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 150.d0
     liquid_pressure = 7.d7
-    correct_lambda = 2.1633307322100089d-6
-    correct_dlambda_dp = -3.4438915694097937d-14
-    correct_dlambda_dT = -6.9064437703829282d-8
+    correct_lambda = 7.1956837322934805d-007
+    correct_dlambda_dp = 5.5184664978488887d-016
+    correct_dlambda_dT = 1.7641677067122949d-011
     call TestLambda(temperature,liquid_pressure,correct_lambda, &
                     correct_dlambda_dp,correct_dlambda_dT)
 
     temperature = 15.d0
     liquid_pressure = 5.d7
-    correct_lambda = 1112.2485011408173d0
-    correct_dlambda_dp = -2.0877824704577555d-5
-    correct_dlambda_dT = -729.55458582700680d0
+    correct_lambda = 6.0652403927047784d-007
+    correct_dlambda_dp = 5.2646893703377536d-016
+    correct_dlambda_dT = 1.7124590721884491d-009
     call TestLambda(temperature,liquid_pressure,correct_lambda, &
                     correct_dlambda_dp,correct_dlambda_dT)
 
