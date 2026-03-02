@@ -35,10 +35,14 @@ module Field_module
     Vec :: tran_r
 
     ! Solution vectors (yy = previous solution, xx = current iterate)
-    Vec :: flow_xx, flow_xx_loc, flow_dxx, flow_yy, flow_accum, flow_accum2
-    Vec :: tran_xx, tran_xx_loc, tran_dxx, tran_yy, tran_accum
+    Vec :: flow_xx, flow_xx_loc, flow_dxx, flow_yy
+    Vec :: tran_xx, tran_xx_loc, tran_dxx, tran_yy
     Vec :: flow_xxdot, flow_xxdot_loc
     Vec :: flow_rhs
+
+    ! Accumulation terms (t = old time level, tpdt = new time level)
+    Vec :: flow_accum_t, flow_accum_tpdt
+    Vec :: tran_accum_t
 
     ! vectors for advanced nonlinear solvers other than Newton - Heeho
     Vec :: flow_scaled_xx, flow_work_loc
@@ -123,8 +127,8 @@ function FieldCreate()
   PetscObjectNullify(field%flow_work_loc)
   PetscObjectNullify(field%flow_dxx)
   PetscObjectNullify(field%flow_yy)
-  PetscObjectNullify(field%flow_accum)
-  PetscObjectNullify(field%flow_accum2)
+  PetscObjectNullify(field%flow_accum_t)
+  PetscObjectNullify(field%flow_accum_tpdt)
   PetscObjectNullify(field%flow_xxdot)
   PetscObjectNullify(field%flow_xxdot_loc)
   PetscObjectNullify(field%flow_rhs)
@@ -135,7 +139,7 @@ function FieldCreate()
   PetscObjectNullify(field%tran_xx_loc)
   PetscObjectNullify(field%tran_dxx)
   PetscObjectNullify(field%tran_yy)
-  PetscObjectNullify(field%tran_accum)
+  PetscObjectNullify(field%tran_accum_t)
   PetscObjectNullify(field%tran_work_loc)
 
   PetscObjectNullify(field%tvd_ghosts)
@@ -209,8 +213,8 @@ subroutine FieldDestroy(field)
   call PUVecDestroy(field%flow_work_loc)
   call PUVecDestroy(field%flow_dxx)
   call PUVecDestroy(field%flow_yy)
-  call PUVecDestroy(field%flow_accum)
-  call PUVecDestroy(field%flow_accum2)
+  call PUVecDestroy(field%flow_accum_t)
+  call PUVecDestroy(field%flow_accum_tpdt)
   call PUVecDestroy(field%flow_xxdot)
   call PUVecDestroy(field%flow_xxdot_loc)
   call PUVecDestroy(field%flow_rhs)
@@ -220,7 +224,7 @@ subroutine FieldDestroy(field)
   call PUVecDestroy(field%tran_xx_loc)
   call PUVecDestroy(field%tran_dxx)
   call PUVecDestroy(field%tran_yy)
-  call PUVecDestroy(field%tran_accum)
+  call PUVecDestroy(field%tran_accum_t)
   call PUVecDestroy(field%tran_work_loc)
   call PUVecDestroy(field%flow_mass_transfer)
   call PUVecDestroy(field%tran_mass_transfer)

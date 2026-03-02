@@ -1883,7 +1883,7 @@ subroutine PMWIPPFloCheckConvergence(this,snes,it,xnorm,unorm, &
 
   Vec :: residual_vec
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscReal, pointer :: X1_p(:)
   PetscReal :: residual
   PetscReal :: accumulation
@@ -1965,7 +1965,7 @@ subroutine PMWIPPFloCheckConvergence(this,snes,it,xnorm,unorm, &
     enddo
     close(IUNIT_TEMP)
   endif
-  call VecGetArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecGetArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   call VecGetArrayRead(field%flow_xx,X1_p,ierr);CHKERRQ(ierr)
   converged_liquid_equation = PETSC_TRUE
   converged_gas_equation = PETSC_TRUE
@@ -1984,7 +1984,7 @@ subroutine PMWIPPFloCheckConvergence(this,snes,it,xnorm,unorm, &
 
 
     bragflo_residual = r_p(liquid_equation_index:gas_equation_index)
-    bragflo_accum = accum2_p(liquid_equation_index:gas_equation_index)
+    bragflo_accum = accum_tpdt_p(liquid_equation_index:gas_equation_index)
     if (.not.wippflo_use_bragflo_units) then
       pflotran_to_bragflo = fmw_comp * option%flow_dt / &
                             material_auxvars(ghosted_id)%volume
@@ -2323,7 +2323,7 @@ subroutine PMWIPPFloCheckConvergence(this,snes,it,xnorm,unorm, &
   option%convergence = converged_flag
 
   call VecRestoreArrayRead(residual_vec,r_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   call VecRestoreArrayRead(field%flow_xx,X1_p,ierr);CHKERRQ(ierr)
 
   call PMSubsurfaceFlowCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &

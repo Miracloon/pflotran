@@ -1154,7 +1154,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   PetscInt :: ghosted_id, local_id, istart
   PetscInt :: region_id
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: Res(1)
   PetscErrorCode :: ierr
 
@@ -1169,8 +1169,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   geomech_parameter => patch%aux%Material%geomech_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 !  numfaces = 6     ! hex only
 !  allocate(sq_faces(numfaces))
@@ -1196,7 +1195,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
                               global_auxvars(ghosted_id), &
                               material_auxvars(ghosted_id), &
                               geomech_parameter, &
-                              option,accum_p(istart:istart))
+                              option,accum_t_p(istart:istart))
   enddo
 
 
@@ -1214,12 +1213,12 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
       call InlineSurfaceAccumulation(patch%aux%InlineSurface% &
                                        auxvars(region_id), &
                                      material_auxvars(ghosted_id),option,Res)
-      accum_p(istart:istart) = accum_p(istart:istart) + Res(1)
+      accum_t_p(istart:istart) = accum_t_p(istart:istart) + Res(1)
     enddo
   endif
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine RichardsUpdateFixedAccumPatch
 
@@ -2161,7 +2160,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
   PetscInt :: local_id, ghosted_id, region_id, ghosted_end
   PetscInt :: istart
 
-  PetscReal, pointer :: r_p(:), accum_p(:), accum2_p(:)
+  PetscReal, pointer :: r_p(:), accum_t_p(:), accum_tpdt_p(:)
   PetscReal :: Res(realization%option%nflowdof)
 
   PetscErrorCode :: ierr
@@ -2183,13 +2182,14 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
 
   ! now assign access pointer to local variables
   call VecGetArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
 
   ! Accumulation terms ------------------------------------
   if (.not.option%flow%steady_state) then
+    call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
     r_p(1:grid%nlmax*option%nflowdof) = r_p(1:grid%nlmax*option%nflowdof) - &
-                                        accum_p(1:grid%nlmax*option%nflowdof)
+                                        accum_t_p(1:grid%nlmax*option%nflowdof)
+    call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
     do local_id = 1, grid%nlmax  ! For each local node do...
       ghosted_id = grid%nL2G(local_id)
@@ -2202,7 +2202,7 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
            option,Res)
       istart = (local_id-1)*option%nflowdof + 1
       r_p(istart) = r_p(istart) + Res(1)
-      accum2_p(istart) = Res(1)
+      accum_tpdt_p(istart) = Res(1)
 
       ! This is for the convergence check.
       if (richards_well_coupling == RICHARDS_FULLY_IMPLICIT_WELL) then
@@ -2216,9 +2216,9 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
                                   cur_well%well_grid%bottom_seg_index)
               ghosted_end = ghosted_id * option%nflowdof
               if (dabs(cur_well%well%th_ql) > 0.d0) then
-                accum2_p(ghosted_end) = cur_well%well%th_ql
+                accum_tpdt_p(ghosted_end) = cur_well%well%th_ql
               else
-                accum2_p(ghosted_end) = 0.d0
+                accum_tpdt_p(ghosted_end) = 0.d0
               endif
               r_p(ghosted_end) = 0.d0
             endif
@@ -2238,15 +2238,14 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
              material_auxvars(ghosted_id),option,Res)
         istart = (local_id-1)*option%nflowdof + 1
         r_p(istart) = r_p(istart) + Res(1)
-        accum2_p(istart) = accum2_p(istart) + Res(1)
+        accum_tpdt_p(istart) = accum_tpdt_p(istart) + Res(1)
       enddo
     endif
 
   endif
 
   call VecRestoreArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
 
 end subroutine RichardsResidualAccumulation
 

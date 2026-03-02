@@ -1212,7 +1212,7 @@ subroutine GeneralUpdateFixedAccum(realization)
   PetscInt :: ghosted_id, local_id, local_start, local_end, natural_id
   PetscInt :: imat
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: Jac_dummy(realization%option%nflowdof, &
                          realization%option%nflowdof)
   PetscBool :: material_is_soluble
@@ -1231,7 +1231,7 @@ subroutine GeneralUpdateFixedAccum(realization)
   material_property_array => patch%material_property_array
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
@@ -1268,14 +1268,14 @@ subroutine GeneralUpdateFixedAccum(realization)
                              global_auxvars(ghosted_id), &
                              material_auxvars(ghosted_id), &
                              material_parameter%soil_heat_capacity(imat), &
-                             option,accum_p(local_start:local_end), &
+                             option,accum_t_p(local_start:local_end), &
                              Jac_dummy,PETSC_FALSE,material_is_soluble, &
                              PUCast(local_id == general_debug_cell_id))
   enddo
 
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine GeneralUpdateFixedAccum
 
@@ -1350,7 +1350,7 @@ subroutine GeneralResidual(snes,xx,r,realization,debug,ierr)
   PetscInt :: flow_src_sink_type
 
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum_p(:), accum_p2(:)
+  PetscReal, pointer :: accum_t_p(:), accum_tpdt_p(:)
 
   PetscReal :: qsrc(realization%option%nflowdof)
 
@@ -1437,12 +1437,12 @@ subroutine GeneralResidual(snes,xx,r,realization,debug,ierr)
 
   ! Accumulation terms ------------------------------------
   ! accumulation at t(k) (doesn't change during Newton iteration)
-  call VecGetArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  r_p = -accum_p
-  call VecRestoreArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+  r_p = -accum_t_p
+  call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   ! accumulation at t(k+1)
-  call VecGetArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   do local_id = 1, grid%nlmax  ! For each local node do...
     ghosted_id = grid%nL2G(local_id)
     !geh - Ignore inactive cells with inactive materials
@@ -1460,9 +1460,9 @@ subroutine GeneralResidual(snes,xx,r,realization,debug,ierr)
                                material_is_soluble(patch%imat(ghosted_id)), &
                              PUCast(local_id == general_debug_cell_id))
     r_p(local_start:local_end) =  r_p(local_start:local_end) + Res(:)
-    accum_p2(local_start:local_end) = Res(:)
+    accum_tpdt_p(local_start:local_end) = Res(:)
   enddo
-  call VecRestoreArray(field%flow_accum2, accum_p2, ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_tpdt, accum_tpdt_p, ierr);CHKERRQ(ierr)
 
   ! Interior Flux Terms -----------------------------------
   connection_set_list => grid%internal_connection_set_list

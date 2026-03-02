@@ -627,7 +627,7 @@ subroutine WIPPFloUpdateFixedAccum(realization)
   PetscInt :: ghosted_id, local_id, local_start, local_end, natural_id
   PetscInt :: imat
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
 
   PetscErrorCode :: ierr
 
@@ -642,7 +642,7 @@ subroutine WIPPFloUpdateFixedAccum(realization)
   material_parameter => patch%aux%Material%material_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
@@ -665,14 +665,14 @@ subroutine WIPPFloUpdateFixedAccum(realization)
     call WIPPFloAccumulation(wippflo_auxvars(ZERO_INTEGER,ghosted_id), &
                              global_auxvars(ghosted_id), &
                              material_auxvars(ghosted_id), &
-                             option,accum_p(local_start:local_end), &
+                             option,accum_t_p(local_start:local_end), &
                              PETSC_FALSE)
-    call WIPPFloConvertUnitsToBRAGFlo(accum_p(local_start:local_end), &
+    call WIPPFloConvertUnitsToBRAGFlo(accum_t_p(local_start:local_end), &
                                       material_auxvars(ghosted_id),option)
   enddo
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine WIPPFloUpdateFixedAccum
 
@@ -906,7 +906,7 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
   PetscInt :: imat, imat_up, imat_dn
 
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum_p(:), accum_p2(:)
+  PetscReal, pointer :: accum_t_p(:), accum_t_p2(:)
   PetscReal, pointer :: xx_p(:), scaled_xx_p(:)
   PetscReal, pointer :: vec_p(:)
   PetscBool :: debug_connection
@@ -982,8 +982,9 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
   ! Accumulation terms ------------------------------------
   ! accumulation at t(k) (doesn't change during Newton iteration)
   if (wippflo_calc_accum) then
-  call VecGetArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  r_p = -accum_p
+  call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+  r_p = -accum_t_p
+  call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
   if (wippflo_residual_test .and. &
       wippflo_residual_test_cell  > 0) then
     local_end = wippflo_residual_test_cell * option%nflowdof
@@ -992,10 +993,9 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
       -1.d0*r_p(local_start:local_end)/option%flow_dt, &
       wippflo_residual_test_cell
   endif
-  call VecRestoreArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
 
   ! accumulation at t(k+1)
-  call VecGetArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_tpdt,accum_t_p2,ierr);CHKERRQ(ierr)
   do local_id = 1, grid%nlmax  ! For each local node do...
     ghosted_id = grid%nL2G(local_id)
     !geh - Ignore inactive cells with inactive materials
@@ -1009,7 +1009,7 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
                              option,Res,PETSC_FALSE)
     call WIPPFloConvertUnitsToBRAGFlo(Res,material_auxvars(ghosted_id),option)
     r_p(local_start:local_end) =  r_p(local_start:local_end) + Res(:)
-    accum_p2(local_start:local_end) = Res(:)
+    accum_t_p2(local_start:local_end) = Res(:)
     if (wippflo_residual_test .and. &
         wippflo_residual_test_cell == local_id) then
       write(*,'(" DT[y]: ",es12.4)') option%flow_dt/3600.d0/24.d0/365.d0
@@ -1024,7 +1024,7 @@ subroutine WIPPFloResidual(snes,xx,r,realization,pmwss_ptr,pmwell_ptr, &
         Res(:)/option%flow_dt, wippflo_residual_test_cell
     endif
   enddo
-  call VecRestoreArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_tpdt,accum_t_p2,ierr);CHKERRQ(ierr)
   else
     r_p = 0.d0
   endif

@@ -1260,7 +1260,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
   PetscReal, pointer :: C0_p(:)
   PetscReal, pointer :: dC_p(:)
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: original_concentration
   PetscReal :: change
   PetscReal :: absolute_change
@@ -1289,7 +1289,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
     call VecGetArrayRead(dX,dC_p,ierr);CHKERRQ(ierr)
     call VecGetArrayRead(X0,C0_p,ierr);CHKERRQ(ierr)
     call VecGetArrayRead(field%tran_r,r_p,ierr);CHKERRQ(ierr)
-    call VecGetArrayRead(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
     do local_id = 1, grid%nlmax
       offset = (local_id-1)*option%ntrandof
       natural_id = grid%nG2A(grid%nL2G(local_id))
@@ -1326,7 +1326,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
           this%converged_cell(idof,ABS_REL_UPDATE_INDEX) = natural_id
         endif
         ! scaled residual
-        scaled_residual = dabs(r_p(index)/accum_p(index))
+        scaled_residual = dabs(r_p(index)/accum_t_p(index))
         if (scaled_residual > &
             this%converged_real(idof,ABS_SCALED_RESIDUAL_INDEX)) then
           this%converged_real(idof,ABS_SCALED_RESIDUAL_INDEX) = scaled_residual
@@ -1337,7 +1337,7 @@ subroutine PMRTCheckUpdatePost(this,snes,X0,dX,X1,dX_changed, &
     call VecRestoreArrayRead(dX,dC_p,ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(X0,C0_p,ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(field%tran_r,r_p,ierr);CHKERRQ(ierr)
-    call VecRestoreArrayRead(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
+    call VecRestoreArrayRead(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
     i = NEG_UPDATE_INDEX
     this%converged_real(:,i) = -this%converged_real(:,i)
     i = NEG_REL_UPDATE_INDEX

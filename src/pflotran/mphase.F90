@@ -1174,7 +1174,7 @@ subroutine MphaseUpdateFixedAccumPatch(realization)
 
   PetscInt :: ghosted_id, local_id, istart, iend !, iphase
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
 
   PetscErrorCode :: ierr
   PetscReal :: vol_frac_prim
@@ -1193,7 +1193,7 @@ subroutine MphaseUpdateFixedAccumPatch(realization)
   material_auxvars => patch%aux%Material%auxvars
 
   call VecGetArray(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   vol_frac_prim = 1.d0
 
@@ -1218,12 +1218,12 @@ subroutine MphaseUpdateFixedAccumPatch(realization)
                               material_auxvars(ghosted_id)%volume, &
                               mphase_parameter%dencpr(patch%cct_id(ghosted_id)), &
                               option,ZERO_INTEGER,vol_frac_prim, &
-                              accum_p(istart:iend))
+                              accum_t_p(istart:iend))
   enddo
 
   call VecRestoreArray(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
 
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 #if 0
 !  call MphaseNumericalJacobianTest(field%flow_xx,realization)
@@ -2352,7 +2352,7 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
   PetscErrorCode :: ierr
   PetscInt :: local_id, ghosted_id, local_id_up, local_id_dn, ghosted_id_up, ghosted_id_dn
 
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
 
   PetscReal, pointer :: r_p(:), xx_loc_p(:)
 
@@ -2430,7 +2430,6 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
 ! now assign access pointer to local variables
   call VecGetArray(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)
   call VecGetArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
 
 ! call VecGetArrayF90(field%flow_yy,yy_p,ierr)
 
@@ -2526,7 +2525,9 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
 
 #if 1
   ! Accumulation terms ------------------------------------
-  r_p = - accum_p
+  call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+  r_p = - accum_t_p
+  call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax  ! For each local node do...
     ghosted_id = grid%nL2G(local_id)
@@ -2932,7 +2933,6 @@ subroutine MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
   call VecRestoreArray(r,r_p,ierr);CHKERRQ(ierr)
 ! call VecRestoreArrayF90(field%flow_yy, yy_p, ierr)
   call VecRestoreArray(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
 
   call MatrixZeroingZeroVecEntries(mphase%matrix_zeroing,r)
 

@@ -1297,7 +1297,7 @@ subroutine RTUpdateFixedAccumulation(realization)
   type(field_type), pointer :: field
   class(reaction_rt_type), pointer :: reaction
   type(sec_transport_type), pointer :: rt_sec_transport_vars(:)
-  PetscReal, pointer :: xx_p(:), accum_p(:)
+  PetscReal, pointer :: xx_p(:), accum_t_p(:)
   PetscInt :: local_id, ghosted_id
   PetscInt :: dof_offset, istart, iendaq, iendall
   PetscInt :: istartim, iendim
@@ -1319,7 +1319,7 @@ subroutine RTUpdateFixedAccumulation(realization)
   ! cannot use tran_xx_loc vector here as it has not yet been updated.
   call VecGetArrayRead(field%tran_xx,xx_p,ierr);CHKERRQ(ierr)
 
-  call VecGetArray(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 ! Do not use RTUpdateAuxVars() as it loops over ghosted ids
 
@@ -1360,7 +1360,7 @@ subroutine RTUpdateFixedAccumulation(realization)
                         global_auxvars(ghosted_id), &
                         material_auxvars(ghosted_id), &
                         reaction,option, &
-                        accum_p(istart:iendall))
+                        accum_t_p(istart:iendall))
 
 #if defined(DEBUG_RT_RES_ACCUMULATION)
       if (grid%nG2A(ghosted_id) == rt_debug_cell_id) then
@@ -1370,19 +1370,33 @@ subroutine RTUpdateFixedAccumulation(realization)
         print *, ' por: ', material_auxvars(ghosted_id)%porosity
         print *, ' lsat: ', global_auxvars(ghosted_id)%sat(LIQUID_PHASE)
 #endif
-        print *, ' Res: ', accum_p(istart:iendall)
+        print *, ' Res: ', accum_t_p(istart:iendall)
       endif
 #endif
 
     if (option%use_sc) then
-      accum_p(istart:iendall) = accum_p(istart:iendall)* &
+      accum_t_p(istart:iendall) = accum_t_p(istart:iendall)* &
         rt_sec_transport_vars(ghosted_id)%epsilon
     endif
+
+#if 0
+if (minval(dabs(accum_t_p(istart:iendall))) < 1.d-200) then
+  print *, 'Cell: ', grid%nG2A(ghosted_id)
+  print *, 'Material ID: ', patch%imat(ghosted_id)
+  print *, 'Volume: ', material_auxvars(ghosted_id)%volume
+  print *, 'Porosity: ', material_auxvars(ghosted_id)%porosity
+  print *, 'Saturation(liquid): ', global_auxvars(ghosted_id)%sat(1)
+  print *, 'Saturation(gas): ', global_auxvars(ghosted_id)%sat(2)
+  print *, 'Total Conc(liquid): ', rt_auxvars(ghosted_id)%total(:,1)
+  print *, 'Total Conc(gas): ', rt_auxvars(ghosted_id)%total(:,2)
+  print *, 'Accumulation term: ', accum_t_p(istart:iendall)
+endif
+#endif
 
   enddo
 
   call VecRestoreArrayRead(field%tran_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine RTUpdateFixedAccumulation
 
@@ -2685,7 +2699,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
   class(realization_subsurface_type) :: realization
   PetscErrorCode :: ierr
 
-  PetscReal, pointer :: r_p(:), accum_p(:), vec_p(:)
+  PetscReal, pointer :: r_p(:), accum_t_p(:), vec_p(:)
   PetscInt :: local_id, ghosted_id
   PetscInt :: istartaq, iendaq
   PetscInt :: istartall, iendall
@@ -2747,9 +2761,9 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
 
   if (.not.option%transport%steady_state) then
 #if 1
-    call VecGetArray(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
-    r_p = r_p - accum_p / option%tran_dt
-    call VecRestoreArray(field%tran_accum,accum_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+    r_p = r_p - accum_t_p / option%tran_dt
+    call VecRestoreArrayRead(field%tran_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
     ! Accumulation terms ------------------------------------
     do local_id = 1, grid%nlmax  ! For each local node do...
       ghosted_id = grid%nL2G(local_id)

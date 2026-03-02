@@ -920,7 +920,7 @@ subroutine THInitializeTimestep(realization,pm_well)
   Mat :: Jdum
 
   call THUpdateFixedAccumulation(realization)
-  call THWellAccumulationTerms(realization%field%flow_accum,Jdum, &
+  call THWellAccumulationTerms(realization%field%flow_accum_t,Jdum, &
                                pm_well,PETSC_FALSE)
 
 end subroutine THInitializeTimestep
@@ -1037,7 +1037,7 @@ subroutine THUpdateFixedAccumulation(realization)
 
   PetscInt :: ghosted_id, local_id, istart, iend, iphase
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: vol_frac_prim
   PetscInt :: icct
 
@@ -1056,7 +1056,7 @@ subroutine THUpdateFixedAccumulation(realization)
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
 
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   vol_frac_prim = 1.d0
 
@@ -1100,12 +1100,12 @@ subroutine THUpdateFixedAccumulation(realization)
                         material_auxvars(ghosted_id), &
                         th_parameter,geomech_parameter, &
                         th_parameter%dencpr(patch%cct_id(ghosted_id)), &
-                        option,vol_frac_prim,accum_p(istart:iend))
+                        option,vol_frac_prim,accum_t_p(istart:iend))
   enddo
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
 
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 #if 0
    call THNumericalJacobianTest(field%flow_xx,J,realization,pm_well)
@@ -4282,8 +4282,8 @@ subroutine THResidualAccumulation(r,realization,ierr)
   PetscErrorCode :: ierr
   PetscInt :: local_id, ghosted_id
 
-  PetscReal, pointer :: accum_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_t_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscReal, pointer :: r_p(:)
 
   PetscReal :: Res(realization%option%nflowdof)
@@ -4321,8 +4321,7 @@ subroutine THResidualAccumulation(r,realization,ierr)
 
 ! now assign access pointer to local variables
   call VecGetArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   !print *,' Finished scattering non deriv'
 
   ! Calculating volume fractions for primary and secondary continua
@@ -4330,7 +4329,9 @@ subroutine THResidualAccumulation(r,realization,ierr)
   vol_frac_prim = 1.d0
 
   ! Accumulation terms ------------------------------------
-  r_p = r_p - accum_p
+  call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+  r_p = r_p - accum_t_p
+  call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax  ! For each local node do...
     ghosted_id = grid%nL2G(local_id)
@@ -4350,7 +4351,7 @@ subroutine THResidualAccumulation(r,realization,ierr)
                         th_parameter%dencpr(patch%cct_id(ghosted_id)), &
                         option,vol_frac_prim,Res)
     r_p(istart:iend) = r_p(istart:iend) + Res
-    accum2_p(istart:iend) = Res
+    accum_tpdt_p(istart:iend) = Res
   enddo
 
   ! ================== Secondary continuum heat source terms ==================
@@ -4378,9 +4379,7 @@ subroutine THResidualAccumulation(r,realization,ierr)
   endif
 
   call VecRestoreArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-
+  call VecRestoreArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
 
 end subroutine THResidualAccumulation
 

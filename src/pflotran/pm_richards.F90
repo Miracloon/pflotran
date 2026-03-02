@@ -909,7 +909,7 @@ subroutine PMRichardsCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
   type(field_type), pointer :: field
   type(patch_type), pointer :: patch
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscInt :: local_id, ghosted_id, natural_id
   PetscInt :: itol
   PetscReal :: R, A, R_A
@@ -934,7 +934,7 @@ subroutine PMRichardsCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
 
   if (this%check_post_convergence) then
     call VecGetArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecGetArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
     converged_abs_residual_flag = PETSC_TRUE
     converged_abs_residual_real = 0.d0
     converged_abs_residual_cell = ZERO_INTEGER
@@ -949,7 +949,7 @@ subroutine PMRichardsCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
       converged_scaled = PETSC_TRUE
       ! infinity norms on residual
       R = dabs(r_p(local_id))
-      A = dabs(accum2_p(local_id))
+      A = dabs(accum_tpdt_p(local_id))
       R_A = R/A
       if (R > this%residual_abs_inf_tol) then
         converged_absolute = PETSC_FALSE
@@ -980,7 +980,7 @@ subroutine PMRichardsCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
       endif
     enddo
     call VecRestoreArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecRestoreArrayRead(field%flow_accum2,accum2_p, &
+    call VecRestoreArrayRead(field%flow_accum_tpdt,accum_tpdt_p, &
                                 ierr);CHKERRQ(ierr)
 
     this%converged_flag(RESIDUAL_INDEX) = converged_abs_residual_flag

@@ -906,7 +906,7 @@ subroutine PMZFlowCheckConvergence(this,snes,it,xnorm,unorm, &
 
   Vec :: residual_vec
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscReal, pointer :: X1_p(:)
   character(len=10) :: reason_string
 
@@ -941,7 +941,7 @@ subroutine PMZFlowCheckConvergence(this,snes,it,xnorm,unorm, &
   residual_vec = field%flow_r
   ! check residual terms
   call VecGetArrayRead(residual_vec,r_p,ierr);CHKERRQ(ierr)
-  call VecGetArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecGetArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   call VecGetArrayRead(field%flow_xx,X1_p,ierr);CHKERRQ(ierr)
   do local_id = 1, grid%nlmax
     offset = (local_id-1)*option%nflowdof
@@ -949,7 +949,7 @@ subroutine PMZFlowCheckConvergence(this,snes,it,xnorm,unorm, &
     if (patch%imat(ghosted_id) <= 0) cycle
     if (zflow_liq_flow_eq > 0) then
       residual = r_p(offset+zflow_liq_flow_eq)
-      accumulation = accum2_p(offset+zflow_liq_flow_eq)
+      accumulation = accum_tpdt_p(offset+zflow_liq_flow_eq)
       ! residual
       tempreal = dabs(residual)
       if (tempreal > max_abs_res_liq_) then
@@ -959,7 +959,7 @@ subroutine PMZFlowCheckConvergence(this,snes,it,xnorm,unorm, &
     endif
     if (zflow_sol_tran_eq > 0) then
       residual = r_p(offset+zflow_sol_tran_eq)
-      accumulation = accum2_p(offset+zflow_sol_tran_eq)
+      accumulation = accum_tpdt_p(offset+zflow_sol_tran_eq)
       ! residual
       tempreal = dabs(residual)
       if (tempreal > max_abs_res_sol_) then
@@ -1035,7 +1035,7 @@ subroutine PMZFlowCheckConvergence(this,snes,it,xnorm,unorm, &
   endif
 
   call VecRestoreArrayRead(residual_vec,r_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   call VecRestoreArrayRead(field%flow_xx,X1_p,ierr);CHKERRQ(ierr)
 
   call PMSubsurfaceFlowCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &

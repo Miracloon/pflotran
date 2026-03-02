@@ -724,7 +724,6 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
 
   ! Get pointer to residual Vector data
   call VecGetArray(r,r_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%tran_accum,fixed_accum_p,ierr);CHKERRQ(ierr)
 
   ! Zero out the residual pointer
   r_p(:) = 0.d0
@@ -734,6 +733,7 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
 
 #if 1
   !== Accumulation Terms ======================================
+  call VecGetArrayRead(field%tran_accum_t,fixed_accum_p,ierr);CHKERRQ(ierr)
   if (.not.option%transport%steady_state) then
     do local_id = 1, grid%nlmax
       ghosted_id = grid%nL2G(local_id)
@@ -755,6 +755,7 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
 
     enddo
   endif
+  call VecRestoreArrayRead(field%tran_accum_t,fixed_accum_p,ierr);CHKERRQ(ierr)
 #endif
 
   !WRITE(*,*)  '     ResAccum = ', Res(:)
@@ -1034,7 +1035,6 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
   !WRITE(*,*)  '       r_p(6) = ', r_p(:)
 
   ! Restore residual Vector data
-  call VecRestoreArray(field%tran_accum,fixed_accum_p,ierr);CHKERRQ(ierr)
   call VecRestoreArray(r,r_p,ierr);CHKERRQ(ierr)
 
   ! Mass Transfer (Adds mass from the waste form process model)
@@ -1098,7 +1098,7 @@ subroutine NWTUpdateFixedAccumulation(realization)
   ! cannot use tran_xx_loc vector here as it has not yet been updated.
   call VecGetArrayRead(field%tran_xx,xx_p,ierr);CHKERRQ(ierr)
 
-  call VecGetArray(field%tran_accum,fixed_accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%tran_accum_t,fixed_accum_p,ierr);CHKERRQ(ierr)
 
 ! Do not use NWTUpdateAuxVars() as it loops over ghosted ids
 
@@ -1128,7 +1128,7 @@ subroutine NWTUpdateFixedAccumulation(realization)
   enddo
 
   call VecRestoreArrayRead(field%tran_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%tran_accum,fixed_accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%tran_accum_t,fixed_accum_p,ierr);CHKERRQ(ierr)
 
 end subroutine NWTUpdateFixedAccumulation
 

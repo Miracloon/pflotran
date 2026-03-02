@@ -2111,7 +2111,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
   type(material_auxvar_type) :: material_auxvar
   class(pm_well_type), pointer :: cur_well
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscReal, pointer :: dX_p(:)
   PetscInt :: local_id, ghosted_id, natural_id
   PetscInt :: offset, ival, idof, itol
@@ -2211,7 +2211,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
 
   if (this%check_post_convergence) then
     call VecGetArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecGetArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
     call VecGetArrayRead(field%flow_dxx,dX_p,ierr);CHKERRQ(ierr)
     converged_abs_residual_flag = PETSC_TRUE
     converged_abs_residual_real = 0.d0
@@ -2233,7 +2233,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
           if (idof == FIVE_INTEGER) then
             ! Well DOF
             residual = r_p(ival)
-            accumulation = accum2_p(ival)
+            accumulation = accum_tpdt_p(ival)
             update = dX_p(ival)
             if (dabs(update) > 0.d0) then
               update = update - hyd_auxvar%well%pressure_bump
@@ -2332,7 +2332,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
               converged_scaled = PETSC_TRUE
               ! infinity norms on residual
               R = dabs(r_p(ival))
-              A = dabs(accum2_p(ival))
+              A = dabs(accum_tpdt_p(ival))
 
               if (A > 1.d0) then
                 R_A = R/A
@@ -2393,7 +2393,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
           converged_scaled = PETSC_TRUE
 
           residual = r_p(ival)
-          accumulation = accum2_p(ival)
+          accumulation = accum_tpdt_p(ival)
           update = dX_p(ival)
 
           if (idof == FIVE_INTEGER) then
@@ -2920,7 +2920,7 @@ subroutine PMHydrateCheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
     endif
 
     call VecRestoreArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecRestoreArrayRead(field%flow_accum2,accum2_p, &
+    call VecRestoreArrayRead(field%flow_accum_tpdt,accum_tpdt_p, &
                                 ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(field%flow_dxx,dX_p,ierr);CHKERRQ(ierr)
 

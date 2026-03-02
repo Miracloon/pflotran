@@ -1752,7 +1752,7 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
   type(sco2_auxvar_type) :: sco2_auxvar
   class(pm_well_type), pointer :: cur_well
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum2_p(:)
+  PetscReal, pointer :: accum_tpdt_p(:)
   PetscReal, pointer :: dX_p(:)
   PetscInt :: local_id, ghosted_id, natural_id
   PetscInt :: offset, ival, idof, itol
@@ -1832,7 +1832,7 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
   endif
   if (this%check_post_convergence) then
     call VecGetArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecGetArrayRead(field%flow_accum2,accum2_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
     call VecGetArrayRead(field%flow_dxx,dX_p,ierr);CHKERRQ(ierr)
     converged_abs_residual_flag = PETSC_TRUE
     converged_abs_residual_real = 0.d0
@@ -1859,7 +1859,7 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
           converged_scaled = PETSC_TRUE
 
           residual = r_p(ival)
-          accumulation = accum2_p(ival)
+          accumulation = accum_tpdt_p(ival)
           update = dX_p(ival)
 
           if (sco2_thermal .and. sco2_fixed_temp_gradient) then
@@ -2143,7 +2143,7 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
 
         ! ! infinity norms on residual
          R = dabs(r_p(ival))
-         A = dabs(accum2_p(ival))
+         A = dabs(accum_tpdt_p(ival))
 
          if (A > 1.d0) then
            R_A = R/A
@@ -2179,7 +2179,7 @@ subroutine PMSCO2CheckConvergence(this,snes,it,xnorm,unorm,fnorm, &
       enddo
     endif
     call VecRestoreArrayRead(field%flow_r,r_p,ierr);CHKERRQ(ierr)
-    call VecRestoreArrayRead(field%flow_accum2,accum2_p, &
+    call VecRestoreArrayRead(field%flow_accum_tpdt,accum_tpdt_p, &
                                 ierr);CHKERRQ(ierr)
     call VecRestoreArrayRead(field%flow_dxx,dX_p,ierr);CHKERRQ(ierr)
 

@@ -1137,7 +1137,7 @@ subroutine HydrateUpdateFixedAccum(realization)
   PetscInt :: ghosted_id, local_id, local_start, local_end, natural_id
   PetscInt :: imat
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: Jac_dummy(realization%option%nflowdof, &
                          realization%option%nflowdof)
 
@@ -1155,7 +1155,7 @@ subroutine HydrateUpdateFixedAccum(realization)
   hydrate_parameter => patch%aux%Hydrate%hydrate_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
@@ -1182,14 +1182,14 @@ subroutine HydrateUpdateFixedAccum(realization)
                              z(ghosted_id),grid%z_max_global, &
                              hydrate_parameter,&
                              material_parameter%soil_heat_capacity(imat), &
-                             option,accum_p(local_start:local_end), &
+                             option,accum_t_p(local_start:local_end), &
                              Jac_dummy,PETSC_FALSE, &
                              PUCast(local_id == hydrate_debug_cell_id))
   enddo
 
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine HydrateUpdateFixedAccum
 
@@ -1262,7 +1262,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
   PetscInt :: flow_src_sink_type
 
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum_p(:), accum_p2(:)
+  PetscReal, pointer :: accum_t_p(:), accum_tpdt_p(:)
 
   PetscReal :: qsrc(realization%option%nflowdof)
 
@@ -1340,12 +1340,12 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
 
   ! Accumulation terms ------------------------------------
   ! accumulation at t(k) (doesn't change during Newton iteration)
-  call VecGetArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-  r_p = -accum_p
-  call VecRestoreArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+  r_p = -accum_t_p
+  call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   ! accumulation at t(k+1)
-  call VecGetArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
   do local_id = 1, grid%nlmax  ! For each local node do...
     ghosted_id = grid%nL2G(local_id)
     !geh - Ignore inactive cells with inactive materials
@@ -1363,7 +1363,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
                              hydrate_analytical_derivatives, &
                              PUcast(local_id == hydrate_debug_cell_id))
     r_p(local_start:local_end) =  r_p(local_start:local_end) + Res(:)
-    accum_p2(local_start:local_end) = Res(:)
+    accum_tpdt_p(local_start:local_end) = Res(:)
   enddo
   ! This is for the convergence check.
   if (hydrate_well_coupling == HYDRATE_FULLY_IMPLICIT_WELL) then
@@ -1377,11 +1377,11 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
                         cur_well%well_grid%bottom_seg_index)
           ghosted_end = ghosted_id * option%nflowdof
           if (dabs(cur_well%well%th_qg) > 0.d0) then
-            accum_p2(ghosted_end) = cur_well%well%th_qg
+            accum_tpdt_p(ghosted_end) = cur_well%well%th_qg
           elseif (dabs(cur_well%well%th_ql) > 0.d0) then
-            accum_p2(ghosted_end) = cur_well%well%th_ql
+            accum_tpdt_p(ghosted_end) = cur_well%well%th_ql
           else
-            accum_p2(ghosted_end) = 0.d0
+            accum_tpdt_p(ghosted_end) = 0.d0
           endif
           r_p(ghosted_end) = 0.d0
         endif
@@ -1389,7 +1389,7 @@ subroutine HydrateResidual(snes,xx,r,realization,pm_well,debug,ierr)
       enddo
     endif
   endif
-  call VecRestoreArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_tpdt,accum_tpdt_p,ierr);CHKERRQ(ierr)
 
   ! Interior Flux Terms -----------------------------------
   connection_set_list => grid%internal_connection_set_list

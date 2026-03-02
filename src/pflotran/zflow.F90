@@ -699,7 +699,7 @@ subroutine ZFlowUpdateFixedAccum(realization)
   PetscInt :: ghosted_id, local_id, local_start, local_end, natural_id
   PetscInt :: imat
   PetscReal, pointer :: xx_p(:)
-  PetscReal, pointer :: accum_p(:)
+  PetscReal, pointer :: accum_t_p(:)
   PetscReal :: Res(ZFLOW_MAX_DOF)
   PetscReal :: Jdum(ZFLOW_MAX_DOF,ZFLOW_MAX_DOF)
   PetscReal :: dResdparam(ZFLOW_MAX_DOF,ZFLOW_MAX_DOF)
@@ -722,7 +722,7 @@ subroutine ZFlowUpdateFixedAccum(realization)
   material_parameter => patch%aux%Material%material_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecGetArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
@@ -747,7 +747,7 @@ subroutine ZFlowUpdateFixedAccum(realization)
                            material_auxvars(ghosted_id), &
                            option,Res, &
                            Jdum,dResdparam,zflow_calc_adjoint)
-    call PetUtilVecSVBL(accum_p,local_id,Res,ndof,PETSC_TRUE)
+    call PetUtilVecSVBL(accum_t_p,local_id,Res,ndof,PETSC_TRUE)
     if (zflow_calc_adjoint) then
       ! negative because the value is subtracted in residual
       patch%aux%inversion_aux%last_forward_ts_aux%dRes_du_k(:,:,local_id) = &
@@ -756,7 +756,7 @@ subroutine ZFlowUpdateFixedAccum(realization)
   enddo
 
   call VecRestoreArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
-  call VecRestoreArray(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+  call VecRestoreArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
 end subroutine ZFlowUpdateFixedAccum
 
@@ -821,7 +821,7 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,debug,ierr)
   PetscInt :: imat, imat_up, imat_dn
 
   PetscReal, pointer :: r_p(:)
-  PetscReal, pointer :: accum_p(:), accum_p2(:)
+  PetscReal, pointer :: accum_t_p(:), accum_t_p2(:)
   PetscReal, pointer :: xx_loc_p(:)
   PetscReal, pointer :: vec_p(:)
 
@@ -913,12 +913,12 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,debug,ierr)
   ! Accumulation terms ------------------------------------
   ! accumulation at t(k) (doesn't change during Newton iteration)
   if (zflow_calc_accum) then
-    call VecGetArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
-    r_p = -accum_p
-    call VecRestoreArrayRead(field%flow_accum,accum_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
+    r_p = -accum_t_p
+    call VecRestoreArrayRead(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
 
     ! accumulation at t(k+1)
-    call VecGetArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+    call VecGetArray(field%flow_accum_tpdt,accum_t_p2,ierr);CHKERRQ(ierr)
     do local_id = 1, grid%nlmax  ! For each local node do...
       ghosted_id = grid%nL2G(local_id)
       !geh - Ignore inactive cells with inactive materials
@@ -930,14 +930,14 @@ subroutine ZFlowResidual(snes,xx,r,A,realization,debug,ierr)
                                 material_auxvars_pert(:,ghosted_id), &
                                 option,Res,Jup,dResdparam)
       call PetUtilVecSVBL(r_p,local_id,Res,ndof,PETSC_FALSE)
-      call PetUtilVecSVBL(accum_p2,local_id,Res,ndof,PETSC_TRUE)
+      call PetUtilVecSVBL(accum_t_p2,local_id,Res,ndof,PETSC_TRUE)
       call PetUtilMatSVBL(A,ghosted_id,ghosted_id,Jup,ndof)
       if (store_adjoint) then
         call PetUtilMatSVBL(MatdResdparam,ghosted_id,ghosted_id, &
                             dResdparam,ndof)
       endif
     enddo
-    call VecRestoreArray(field%flow_accum2,accum_p2,ierr);CHKERRQ(ierr)
+    call VecRestoreArray(field%flow_accum_tpdt,accum_t_p2,ierr);CHKERRQ(ierr)
   else
     r_p = 0.d0
   endif
