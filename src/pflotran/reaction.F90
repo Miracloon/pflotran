@@ -5806,7 +5806,8 @@ subroutine RTAccumulation(rt_auxvar,global_auxvar,material_auxvar, &
   iphase = 1
   Res = 0.d0
 
-  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation) return
+  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation .and. &
+      reaction%gas%nactive_gas == 0) return
 
   ! units = (mol solute/L water)*(m^3 por/m^3 bulk)*(m^3 water/m^3 por)*
   !         (m^3 bulk)*(1000L water/m^3 water)/(sec) = mol/sec
@@ -5876,7 +5877,8 @@ subroutine RTAccumulationDerivative(rt_auxvar,global_auxvar, &
 
   J = 0.d0
 
-  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation) then
+  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation .and. &
+      reaction%gas%nactive_gas == 0) then
     ! set diagonal to 1 and return as this cell is dry and inert
     do idof = 1, reaction%ncomp
       J(idof,idof) = 1.d0

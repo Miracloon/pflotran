@@ -187,7 +187,7 @@ subroutine RTSetup(realization)
   rt_parameter%ncomp = reaction%ncomp
   rt_parameter%offset_aqueous = reaction%offset_aqueous
   rt_parameter%nimcomp = reaction%immobile%nimmobile
-  rt_parameter%ngas = reaction%gas%nactive_gas
+  rt_parameter%nactive_gas = reaction%gas%nactive_gas
   rt_parameter%offset_immobile = reaction%offset_immobile
 
   if (reaction%gas%nactive_gas > 0) then

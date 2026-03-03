@@ -442,7 +442,7 @@ subroutine TFlux(rt_parameter, &
     coef_dn(1:ndof,iphase)*rt_auxvar_dn%total(1:ndof,iphase)
   Res(1:ndof) = Flux(1:ndof,iphase)
 
-  if (rt_parameter%ngas > 0) then
+  if (rt_parameter%nactive_gas > 0) then
     iphase = 2
     Flux(1:ndof,iphase) = Flux(1:ndof,iphase) + &
                   coef_up(1:ndof,iphase)*rt_auxvar_up%total(1:ndof,iphase) + &
@@ -559,14 +559,16 @@ subroutine TFluxCoef(rt_parameter, &
   T_up(:,:) = 0.d0
   T_dn(:,:) = 0.d0
 
-  ! as long as gas phase chemistry is a function of aqueous, skip both phases
-  if (global_auxvar_dn%sat(LIQUID_PHASE) < rt_min_saturation) then
-    return
-  else if (check_upwind_saturation) then
-    ! for boundary conditions, we can have a zero aqueous saturation upwind
-    ! and it does not matter
-    if (global_auxvar_up%sat(LIQUID_PHASE) < rt_min_saturation) then
+  if (rt_parameter%nactive_gas == 0) then
+    ! as long as gas phase chemistry is a function of aqueous, skip both phases
+    if (global_auxvar_dn%sat(LIQUID_PHASE) < rt_min_saturation) then
       return
+    else if (check_upwind_saturation) then
+      ! for boundary conditions, we can have a zero aqueous saturation upwind
+      ! and it does not matter
+      if (global_auxvar_up%sat(LIQUID_PHASE) < rt_min_saturation) then
+        return
+      endif
     endif
   endif
 
@@ -673,7 +675,8 @@ subroutine TSrcSinkCoef(rt_parameter,global_auxvar,qsrc, &
   T_in = 0.d0
   T_out = 0.d0
 
-  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation) return
+  if (global_auxvar%sat(LIQUID_PHASE) < rt_min_saturation .and. &
+      rt_parameter%nactive_gas == 0) return
 
   select case(tran_src_sink_type)
     case(EQUILIBRIUM_SS)
