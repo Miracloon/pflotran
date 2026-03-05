@@ -97,6 +97,7 @@ subroutine PMRichardsTSUpdateAuxVarsPatch(realization)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(richards_parameter_type), pointer :: richards_parameter
   PetscInt :: ghosted_id
   PetscReal, pointer :: xx_loc_p(:),xxdot_loc_p(:)
   PetscErrorCode :: ierr
@@ -108,6 +109,7 @@ subroutine PMRichardsTSUpdateAuxVarsPatch(realization)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  richards_parameter => patch%aux%Richards%richards_parameter
 
   ! 1. Update auxvars based on new values of pressure
   call RichardsUpdateAuxVars(realization,null())
@@ -126,6 +128,7 @@ subroutine PMRichardsTSUpdateAuxVarsPatch(realization)
     call RichardsAuxVarCompute2ndOrderDeriv(rich_auxvars(ghosted_id), &
                                        global_auxvars(ghosted_id), &
                                        material_auxvars(ghosted_id), &
+                                       richards_parameter, &
                                        patch%characteristic_curves_array( &
                                          patch%cc_id(ghosted_id))%ptr, &
                                        option)

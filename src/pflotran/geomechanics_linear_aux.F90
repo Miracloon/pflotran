@@ -1,7 +1,7 @@
 module Geomechanics_Linear_Aux_module
 
-#include "petsc/finclude/petscvec.h"
-  use petscvec
+#include "petsc/finclude/petscsys.h"
+  use petscsys
 
   use PFLOTRAN_Constants_module
 

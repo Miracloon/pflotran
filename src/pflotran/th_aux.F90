@@ -5,6 +5,7 @@ module TH_Aux_module
 
   use PFLOTRAN_Constants_module
   use Matrix_Zeroing_module
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -37,6 +38,7 @@ module TH_Aux_module
   PetscInt, parameter, public :: TH_UPDATE_FOR_FIXED_ACCUM = 0
   PetscInt, parameter, public :: TH_UPDATE_FOR_ACCUM = 1
   PetscInt, parameter, public :: TH_UPDATE_FOR_BOUNDARY = 2
+  PetscInt, parameter, public :: TH_UPDATE_FOR_PERTURBATION = 3
 
   type, public :: th_auxvar_type
     PetscReal :: pres
@@ -163,6 +165,7 @@ module TH_Aux_module
     PetscReal, pointer :: ckfrozen(:) ! Thermal conductivity (frozen soil)
     PetscReal, pointer :: alpha_fr(:) ! exponent frozen
     PetscReal, pointer :: sir(:,:)
+    type(geomech_linear_parameter_type), pointer :: geomech_parameter
   end type th_parameter_type
 
   type, public :: TH_type
@@ -246,6 +249,8 @@ function THAuxCreate(option)
   nullify(aux%th_parameter%ckfrozen)
   nullify(aux%th_parameter%alpha_fr)
   nullify(aux%th_parameter%sir)
+
+  nullify(aux%th_parameter%geomech_parameter)
 
   THAuxCreate => aux
 
@@ -439,7 +444,8 @@ end subroutine THAuxVarCopy
 
 ! ************************************************************************** !
 
-subroutine THAuxPorosity(th_auxvar,material_auxvar,update_porosity,option)
+subroutine THAuxPorosity(th_auxvar,material_auxvar,global_auxvar, &
+                         update_porosity,th_parameter,option)
   !
   ! Calculates the update to porosity for TH
   !
@@ -447,16 +453,37 @@ subroutine THAuxPorosity(th_auxvar,material_auxvar,update_porosity,option)
   ! Date: 03/04/26
   !
   use Material_Aux_module
+  use Global_Aux_module
   use Option_module
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
   type(th_auxvar_type) :: th_auxvar
   type(material_auxvar_type) :: material_auxvar
+  type(global_auxvar_type) :: global_auxvar
   PetscBool :: update_porosity
+  type(th_parameter_type) :: th_parameter
   type(option_type) :: option
 
+  type(geomech_linear_parameter_type), pointer :: geomech_param
+
   PetscReal :: cell_pressure
+
+  PetscReal :: biot_coeff
+  PetscReal :: youngs_mod, poissons_ratio
+  PetscReal :: dr_bulk_modulus
+  PetscReal :: por
+
+  PetscInt :: id_press_0, id_temp_0
+  PetscInt :: id_vstrain_0, id_vstrain, id_press_mech
+  PetscInt :: id_porosity_mech, id_porosity_flow
+  PetscInt :: mat_id
+  PetscReal :: porosity_0, C1, C2, press_0, temp_0
+  PetscReal :: vstrain_0, vstrain, del_vstrain, alpha
+  PetscReal :: press_mech
+
+  geomech_param => th_parameter%geomech_parameter
 
   if (option%iflag /= TH_UPDATE_FOR_BOUNDARY) then
     if (update_porosity) then
@@ -467,14 +494,79 @@ subroutine THAuxPorosity(th_auxvar,material_auxvar,update_porosity,option)
                                   th_auxvar%dpor_dp)
       else
         th_auxvar%effective_porosity = material_auxvar%porosity_base
-        th_auxvar%dpor_dp = 0.d0
+        th_auxvar%dpor_dp =  0.d0
+        th_auxvar%dpor_dT = 0.d0
       endif
     else
       th_auxvar%effective_porosity = material_auxvar%porosity_base
       th_auxvar%dpor_dp = 0.d0
+      th_auxvar%dpor_dT = 0.d0
     endif
-    material_auxvar%porosity = th_auxvar%effective_porosity
-    material_auxvar%dporosity_dp = th_auxvar%dpor_dp
+
+    if (associated(geomech_param)) then
+      select case(option%geomechanics%flow_coupling)
+        case(GEOMECH_TWO_WAY_COUPLED)
+          select case(option%geomechanics%split_scheme)
+            case(GEOMECH_FIXED_STRESS_SPLIT)
+              mat_id = material_auxvar%id
+              ! get geomech and flow material properties
+              youngs_mod = geomech_param%youngs_modulus(mat_id)
+              poissons_ratio = geomech_param%poissons_ratio(mat_id)
+              biot_coeff = geomech_param%biot_coeff(mat_id)
+              alpha = geomech_param%thermal_exp_coeff(mat_id)
+              porosity_0 = material_auxvar%porosity_0
+              ! 3D bulk modulus
+              dr_bulk_modulus = youngs_mod / &
+                                (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+              ! C1 constant
+              C1 = (biot_coeff-porosity_0)*(1.d0 - biot_coeff)/dr_bulk_modulus
+              ! C2 constant
+              C2 = biot_coeff**2/dr_bulk_modulus
+              ! get stored values
+              id_press_0 = geomech_param%press_0_id
+              id_temp_0 = geomech_param%temp_0_id
+              id_vstrain_0 = geomech_param%vol_strain_0_id
+              id_vstrain = geomech_param%vol_strain_id
+              id_press_mech = geomech_param%stored_pressure_id
+              id_porosity_mech = geomech_param%stored_porosity_id
+              id_porosity_flow = geomech_param%flow_porosity_id
+              alpha = geomech_param%thermal_exp_coeff(mat_id)
+
+              press_0 = global_auxvar%parameters(id_press_0)
+              press_mech = global_auxvar%parameters(id_press_mech)
+              temp_0 = global_auxvar%parameters(id_temp_0)
+              vstrain_0 = global_auxvar%parameters(id_vstrain_0)
+              vstrain = global_auxvar%parameters(id_vstrain)
+              if (option%iflag == TH_UPDATE_FOR_FIXED_ACCUM) then
+                por = global_auxvar%parameters(id_porosity_mech)
+                th_auxvar%effective_porosity = por
+              elseif (option%iflag == TH_UPDATE_FOR_ACCUM) then
+                ! delta vstrain
+                del_vstrain = vstrain - vstrain_0
+                ! Burghardt 2017 paper
+                por = porosity_0 + (biot_coeff * del_vstrain) + &
+                      ( C1 * ( press_mech - press_0 )) + &
+                      ( (C2 + C1) * ( th_auxvar%pres - press_mech )) + &
+                      ( alpha * (th_auxvar%temp - temp_0 ))
+                ! store new (mass conserved) flow porosity for threshold check
+                global_auxvar%parameters(id_porosity_flow) = por
+
+                th_auxvar%effective_porosity = por
+                ! Burghardt 2017 paper
+                th_auxvar%dpor_dp = (biot_coeff**2)/dr_bulk_modulus + &
+                    ((biot_coeff-porosity_0)*(1.d0-biot_coeff)) / &
+                    dr_bulk_modulus
+                th_auxvar%dpor_dT = alpha
+              endif
+          end select
+      end select
+    else
+      material_auxvar%dporosity_dp = UNINITIALIZED_DOUBLE
+    endif
+
+    if (option%iflag /= TH_UPDATE_FOR_PERTURBATION) then
+      material_auxvar%porosity = th_auxvar%effective_porosity
+    endif
   endif
 
 end subroutine THAuxPorosity
@@ -552,7 +644,8 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
   global_auxvar%den_kg = UNINITIALIZED_DOUBLE
   global_auxvar%sat = UNINITIALIZED_DOUBLE
 
-  call THAuxPorosity(auxvar,material_auxvar,update_porosity,option)
+  call THAuxPorosity(auxvar,material_auxvar,global_auxvar,update_porosity, &
+                     th_parameter,option)
 
   auxvar%pc = min(option%flow%reference_pressure - auxvar%pres, &
                   characteristic_curves%saturation_function%pcmax)
@@ -826,7 +919,8 @@ subroutine THAuxVarComputeFreezing(x, auxvar, global_auxvar, &
     auxvar%pres = -1.d8 + option%flow%reference_pressure + 1.d0
   endif
 
-  call THAuxPorosity(auxvar,material_auxvar,update_porosity,option)
+  call THAuxPorosity(auxvar,material_auxvar,global_auxvar, &
+                     update_porosity,th_parameter,option)
 
   auxvar%pc = option%flow%reference_pressure - auxvar%pres
 
@@ -1222,6 +1316,7 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
   PetscReal :: x_pert(option%nflowdof)
   PetscReal :: pert
 
+  option%iflag = TH_UPDATE_FOR_PERTURBATION
   x(TH_PRESSURE_DOF) = th_auxvar%pres
   x(TH_TEMPERATURE_DOF) = th_auxvar%temp
   do idof = 1, option%nflowdof
@@ -1236,6 +1331,7 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
                                    thermal_cc,th_parameter,icct, &
                                    natural_id,update_porosity,option)
   enddo
+  option%iflag = UNINITIALIZED_INTEGER
 
 end subroutine THAuxVarPerturb
 
@@ -1614,6 +1710,9 @@ subroutine THAuxDestroy(aux)
 
     if (associated(aux%th_parameter%sir)) deallocate(aux%th_parameter%sir)
     nullify(aux%th_parameter%sir)
+
+    ! solely nullify geomech_parameter as it is destroyed elsewhere
+    nullify(aux%th_parameter%geomech_parameter)
   endif
   nullify(aux%th_parameter)
 

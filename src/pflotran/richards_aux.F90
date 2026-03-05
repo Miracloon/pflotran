@@ -9,6 +9,7 @@ module Richards_Aux_module
 
   use PFLOTRAN_Constants_module
   use Matrix_Zeroing_module
+  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -27,6 +28,8 @@ module Richards_Aux_module
 
   PetscInt, parameter, public :: RICHARDS_UPDATE_FOR_FIXED_ACCUM = 0
   PetscInt, parameter, public :: RICHARDS_UPDATE_FOR_ACCUM = 1
+  PetscInt, parameter, public :: RICHARDS_UPDATE_FOR_BOUNDARY = 2
+  PetscInt, parameter, public :: RICHARDS_UPDATE_FOR_PERTURBATION = 3
 
   ! Well
   PetscInt, public :: richards_well_coupling = UNINITIALIZED_INTEGER
@@ -61,8 +64,15 @@ module Richards_Aux_module
     PetscReal :: dpres_dtime
     PetscReal :: dmass_dtime
 
+    PetscReal :: effective_porosity
+    PetscReal :: dpor_dp
+
     type(richards_well_aux_type), pointer :: well
   end type richards_auxvar_type
+
+  type, public :: richards_parameter_type
+    type(geomech_linear_parameter_type), pointer :: geomech_parameter
+  end type richards_parameter_type
 
   type, public :: richards_type
     PetscBool :: auxvars_up_to_date
@@ -75,6 +85,7 @@ module Richards_Aux_module
     type(matrix_buffer_type), pointer :: matrix_buffer
 #endif
     type(matrix_zeroing_type), pointer :: matrix_zeroing
+    type(richards_parameter_type), pointer :: richards_parameter
   end type richards_type
 
   PetscReal, parameter :: perturbation_tolerance = 1.d-6
@@ -117,6 +128,8 @@ function RichardsAuxCreate()
   nullify(aux%matrix_buffer)
 #endif
   nullify(aux%matrix_zeroing)
+  allocate(aux%richards_parameter)
+  nullify(aux%richards_parameter%geomech_parameter)
 
   RichardsAuxCreate => aux
 
@@ -160,6 +173,8 @@ subroutine RichardsAuxVarInit(auxvar,option)
   auxvar%bc_lambda  = 0.0d0
 #endif
 
+  auxvar%effective_porosity = 0.0d0
+  auxvar%dpor_dp = 0.0d0
 
   if (richards_well_coupling > ZERO_INTEGER) then
     allocate(auxvar%well)
@@ -220,6 +235,7 @@ end subroutine RichardsAuxVarCopy
 ! ************************************************************************** !
 
 subroutine RichardsAuxVarCompute(x,auxvar,global_auxvar,material_auxvar, &
+                                 richards_parameter, &
                                  characteristic_curves,natural_id, &
                                  update_porosity,option)
   !
@@ -258,6 +274,8 @@ subroutine RichardsAuxVarCompute(x,auxvar,global_auxvar,material_auxvar, &
   PetscReal :: dkr_sat
   PetscReal :: aux(1)
 
+  type(richards_parameter_type), pointer :: richards_parameter
+
   ierr = 0
   global_auxvar%sat = 0.d0
   global_auxvar%den = 0.d0
@@ -272,9 +290,8 @@ subroutine RichardsAuxVarCompute(x,auxvar,global_auxvar,material_auxvar, &
   global_auxvar%pres = x(1)
   global_auxvar%temp = option%flow%reference_temperature
 
-  if (update_porosity) then
-    call MaterialAuxVarCompute(material_auxvar,global_auxvar%pres(1))
-  endif
+  call RichardsAuxPorosity(auxvar,material_auxvar,global_auxvar, &
+                       update_porosity,richards_parameter,option)
 
   if (richards_well_coupling == RICHARDS_FULLY_IMPLICIT_WELL) then
     ! This is an initialization hack:
@@ -421,6 +438,7 @@ end subroutine RichardsAuxVarCompute
 ! ************************************************************************** !
 subroutine RichardsAuxVarCompute2ndOrderDeriv(rich_auxvar,global_auxvar, &
                                               material_auxvar, &
+                                              richards_parameter, &
                                               characteristic_curves, &
                                               option)
 
@@ -446,6 +464,8 @@ subroutine RichardsAuxVarCompute2ndOrderDeriv(rich_auxvar,global_auxvar, &
   type(global_auxvar_type) :: global_auxvar, global_auxvar_pert
   type(material_auxvar_type) :: material_auxvar
   type(material_auxvar_type) :: material_auxvar_pert
+  type(richards_parameter_type), pointer :: richards_parameter
+
   PetscReal :: x(option%nflowdof), x_pert(option%nflowdof), pert
   PetscInt :: ideriv
 
@@ -465,8 +485,10 @@ subroutine RichardsAuxVarCompute2ndOrderDeriv(rich_auxvar,global_auxvar, &
   if (x_pert(ideriv) < option%flow%reference_pressure) pert = -1.d0*pert
   x_pert(ideriv) = x_pert(ideriv) + pert
 
+  option%iflag = RICHARDS_UPDATE_FOR_PERTURBATION
   call RichardsAuxVarCompute(x_pert(1),rich_auxvar_pert,global_auxvar_pert, &
                        material_auxvar_pert, &
+                       richards_parameter, &
                        characteristic_curves, &
                        -999, PETSC_TRUE, &
                        option)
@@ -477,12 +499,134 @@ subroutine RichardsAuxVarCompute2ndOrderDeriv(rich_auxvar,global_auxvar, &
                                D2SatDP2(rich_auxvar%pc, &
                                           rich_auxvar%d2sat_dp2,option)
   endif
-
+  option%iflag = UNINITIALIZED_INTEGER
 
   call GlobalAuxVarStrip(global_auxvar_pert)
   call MaterialAuxVarStrip(material_auxvar_pert)
 
 end subroutine RichardsAuxVarCompute2ndOrderDeriv
+
+! ************************************************************************** !
+
+subroutine RichardsAuxPorosity(auxvar,material_auxvar,global_auxvar, &
+                         update_porosity,richards_parameter,option)
+  !
+  ! Calculates the update to porosity for RICHARDS
+  !
+  ! Author: Jumanah Al Kubaisy
+  ! Date: 03/16/26
+  !
+
+  use Material_Aux_module
+  use Global_Aux_module
+  use Option_module
+  use Geomechanics_Linear_Aux_module
+
+  implicit none
+
+  type(richards_auxvar_type) :: auxvar
+  type(material_auxvar_type) :: material_auxvar
+  type(global_auxvar_type) :: global_auxvar
+  PetscBool :: update_porosity
+  type(richards_parameter_type) :: richards_parameter
+  type(option_type) :: option
+
+  type(geomech_linear_parameter_type), pointer :: geomech_param
+
+  PetscReal :: cell_pressure
+  PetscReal :: biot_coeff
+  PetscReal :: youngs_mod, poissons_ratio
+  PetscReal :: dr_bulk_modulus
+  PetscReal :: por
+
+  PetscInt :: id_press_0
+  PetscInt :: id_vstrain_0, id_vstrain, id_press_mech
+  PetscInt :: id_porosity_mech, id_porosity_flow
+  PetscInt :: mat_id
+  PetscReal :: porosity_0, C1, C2, press_0
+  PetscReal :: vstrain_0, vstrain, del_vstrain
+  PetscReal :: press_mech
+
+  geomech_param => richards_parameter%geomech_parameter
+
+  if (option%iflag /= RICHARDS_UPDATE_FOR_BOUNDARY) then
+    if (update_porosity) then
+      material_auxvar%porosity = material_auxvar%porosity_base
+      material_auxvar%dporosity_dp = 0.d0
+      if (soil_compressibility_index > 0) then
+        cell_pressure = global_auxvar%pres(1)
+        call MaterialCompressSoil(material_auxvar,cell_pressure, &
+                                  auxvar%effective_porosity, &
+                                  auxvar%dpor_dp)
+      else
+        auxvar%effective_porosity = material_auxvar%porosity_base
+        auxvar%dpor_dp =  0.d0
+      endif
+    else
+      auxvar%effective_porosity = material_auxvar%porosity_base
+      auxvar%dpor_dp = 0.d0
+    endif
+
+    if (associated(geomech_param)) then
+      select case(option%geomechanics%flow_coupling)
+        case(GEOMECH_TWO_WAY_COUPLED)
+          select case(option%geomechanics%split_scheme)
+            case(GEOMECH_FIXED_STRESS_SPLIT)
+              mat_id = material_auxvar%id
+              ! get geomech and flow material properties
+              youngs_mod = geomech_param%youngs_modulus(mat_id)
+              poissons_ratio = geomech_param%poissons_ratio(mat_id)
+              biot_coeff = geomech_param%biot_coeff(mat_id)
+              porosity_0 = material_auxvar%porosity_0
+              ! 3D bulk modulus
+              dr_bulk_modulus = youngs_mod / &
+                                (3.d0 * (1.d0 - (2.d0 * poissons_ratio)))
+              ! C1 constant
+              C1 = (biot_coeff-porosity_0)*(1.d0 - biot_coeff)/dr_bulk_modulus
+              ! C2 constant
+              C2 = biot_coeff**2/dr_bulk_modulus
+              ! get stored values
+              id_press_0 = geomech_param%press_0_id
+              id_vstrain_0 = geomech_param%vol_strain_0_id
+              id_vstrain = geomech_param%vol_strain_id
+              id_press_mech = geomech_param%stored_pressure_id
+              id_porosity_mech = geomech_param%stored_porosity_id
+              id_porosity_flow = geomech_param%flow_porosity_id
+
+              press_0 = global_auxvar%parameters(id_press_0)
+              press_mech = global_auxvar%parameters(id_press_mech)
+              vstrain_0 = global_auxvar%parameters(id_vstrain_0)
+              vstrain = global_auxvar%parameters(id_vstrain)
+              if (option%iflag == RICHARDS_UPDATE_FOR_FIXED_ACCUM) then
+                por = global_auxvar%parameters(id_porosity_mech)
+                auxvar%effective_porosity = por
+              elseif (option%iflag == RICHARDS_UPDATE_FOR_ACCUM) then
+                ! delta vstrain
+                del_vstrain = vstrain - vstrain_0
+                ! Burghardt 2017 paper
+                por = porosity_0 + (biot_coeff * del_vstrain) + &
+                      ( C1 * ( press_mech - press_0 )) + &
+                      ( (C2 + C1) * ( global_auxvar%pres(1) - press_mech ))
+                ! store new (mass conserved) flow porosity for threshold check
+                global_auxvar%parameters(id_porosity_flow) = por
+
+                auxvar%effective_porosity = por
+                ! Burghardt 2017 paper
+                auxvar%dpor_dp = (biot_coeff**2)/dr_bulk_modulus + &
+                    ((biot_coeff-porosity_0)*(1.d0-biot_coeff))/dr_bulk_modulus
+              endif
+          end select
+      end select
+    else
+      material_auxvar%dporosity_dp = UNINITIALIZED_DOUBLE
+    endif
+
+    if (option%iflag /= RICHARDS_UPDATE_FOR_PERTURBATION) then
+      material_auxvar%porosity = auxvar%effective_porosity
+    endif
+  endif
+
+end subroutine RichardsAuxPorosity
 
 ! ************************************************************************** !
 
@@ -544,6 +688,12 @@ subroutine RichardsAuxDestroy(aux)
     deallocate(aux%auxvars_ss)
   endif
   nullify(aux%auxvars_ss)
+
+  if (associated(aux%richards_parameter)) then
+    ! solely nullify geomech_parameter as it is destroyed elsewhere
+    nullify(aux%richards_parameter%geomech_parameter)
+  endif
+  nullify(aux%richards_parameter)
 
   call MatrixZeroingDestroy(aux%matrix_zeroing)
 

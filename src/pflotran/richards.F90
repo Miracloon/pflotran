@@ -773,6 +773,7 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
   PetscReal :: xxbc(realization%option%nflowdof), Pl
   PetscErrorCode :: ierr
 
+  type(richards_parameter_type), pointer :: richards_parameter
 
   call PetscLogEventBegin(logging%event_r_auxvars,ierr);CHKERRQ(ierr)
 
@@ -788,6 +789,7 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
   global_auxvars_bc => patch%aux%Global%auxvars_bc
   global_auxvars_ss => patch%aux%Global%auxvars_ss
   material_auxvars => patch%aux%Material%auxvars
+  richards_parameter => patch%aux%Richards%richards_parameter
 
   call VecGetArrayRead(field%flow_xx_loc,xx_loc_p,ierr);CHKERRQ(ierr)
 
@@ -808,6 +810,7 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
                                rich_auxvars(ghosted_id), &
                                global_auxvars(ghosted_id), &
                                material_auxvars(ghosted_id), &
+                               richards_parameter, &
                                patch%characteristic_curves_array( &
                                  patch%cc_id(ghosted_id))%ptr, &
                                grid%nG2A(ghosted_id), &
@@ -868,13 +871,18 @@ subroutine RichardsUpdateAuxVarsPatch(realization,pm_well)
           xxbc(1) = xx_loc_p(istart)
       end select
 
+      option%iflag = RICHARDS_UPDATE_FOR_BOUNDARY
+
       call RichardsAuxVarCompute(xxbc(1),rich_auxvars_bc(sum_connection), &
                                  global_auxvars_bc(sum_connection), &
                                  material_auxvars(ghosted_id), &
+                                 richards_parameter, &
                                  patch%characteristic_curves_array( &
                                    patch%cc_id(ghosted_id))%ptr, &
                                  -grid%nG2A(ghosted_id), &
                                  PETSC_FALSE,option)
+
+      option%iflag = UNINITIALIZED_INTEGER
     enddo
     boundary_condition => boundary_condition%next
   enddo
@@ -1135,7 +1143,6 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   use Grid_module
   use Connection_module
   use Region_module
-  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -1149,7 +1156,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
-  type(geomech_linear_parameter_type), pointer :: geomech_parameter
+  type(richards_parameter_type), pointer :: richards_parameter
 
   PetscInt :: ghosted_id, local_id, istart
   PetscInt :: region_id
@@ -1166,7 +1173,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
-  geomech_parameter => patch%aux%Material%geomech_parameter
+  richards_parameter => patch%aux%Richards%richards_parameter
 
   call VecGetArrayRead(field%flow_xx,xx_p,ierr);CHKERRQ(ierr)
   call VecGetArray(field%flow_accum_t,accum_t_p,ierr);CHKERRQ(ierr)
@@ -1187,6 +1194,7 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
     call RichardsAuxVarCompute(xx_p(istart:istart), &
                    rich_auxvars(ghosted_id),global_auxvars(ghosted_id), &
                    material_auxvars(ghosted_id), &
+                   richards_parameter, &
                    patch%characteristic_curves_array( &
                          patch%cc_id(ghosted_id))%ptr, &
                    grid%nG2A(ghosted_id), &
@@ -1194,7 +1202,6 @@ subroutine RichardsUpdateFixedAccumPatch(realization)
     call RichardsAccumulation(rich_auxvars(ghosted_id), &
                               global_auxvars(ghosted_id), &
                               material_auxvars(ghosted_id), &
-                              geomech_parameter, &
                               option,accum_t_p(istart:istart))
   enddo
 
@@ -2172,7 +2179,8 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
-  geomech_parameter => patch%aux%Material%geomech_parameter
+  geomech_parameter => patch%aux%richards%richards_parameter% &
+                       geomech_parameter
 
   if (option%flow%inline_surface_flow) then
     region => RegionGetPtrFromList(option%flow%inline_surface_region_name, &
@@ -2198,7 +2206,6 @@ subroutine RichardsResidualAccumulation(r,realization,pm_well,ierr)
       call RichardsAccumulation(rich_auxvars(ghosted_id), &
            global_auxvars(ghosted_id), &
            material_auxvars(ghosted_id), &
-           geomech_parameter, &
            option,Res)
       istart = (local_id-1)*option%nflowdof + 1
       r_p(istart) = r_p(istart) + Res(1)
@@ -2456,6 +2463,7 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   type(richards_auxvar_type), pointer :: rich_auxvars(:)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(richards_parameter_type), pointer :: richards_parameter
   type(inlinesurface_auxvar_type), pointer :: insurf_auxvars(:)
 
   patch => realization%patch
@@ -2466,6 +2474,7 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  richards_parameter =>patch%aux%richards%richards_parameter
   if (option%flow%inline_surface_flow) then
     insurf_auxvars => patch%aux%InlineSurface%auxvars
   endif
@@ -2515,6 +2524,7 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
                      rich_auxvars(ghosted_id_dn), &
                      global_auxvars(ghosted_id_dn), &
                      material_auxvars(ghosted_id_dn), &
+                     richards_parameter, &
                      cur_connection_set%area(iconn), &
                      cur_connection_set%dist(-1:3,iconn),&
                      option,&
@@ -2686,6 +2696,7 @@ subroutine RichardsJacobianBoundaryConn(A,realization,debug,ierr)
   type(richards_auxvar_type), pointer :: rich_auxvars(:), rich_auxvars_bc(:)
   type(global_auxvar_type), pointer :: global_auxvars(:), global_auxvars_bc(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(richards_parameter_type), pointer :: richards_parameter
 
   patch => realization%patch
   grid => patch%grid
@@ -2697,6 +2708,7 @@ subroutine RichardsJacobianBoundaryConn(A,realization,debug,ierr)
   global_auxvars => patch%aux%Global%auxvars
   global_auxvars_bc => patch%aux%Global%auxvars_bc
   material_auxvars => patch%aux%Material%auxvars
+  richards_parameter => patch%aux%Richards%richards_parameter
 
   ! Boundary Flux Terms -----------------------------------
   boundary_condition => patch%boundary_condition_list%first
@@ -2728,6 +2740,7 @@ subroutine RichardsJacobianBoundaryConn(A,realization,debug,ierr)
                      rich_auxvars(ghosted_id), &
                      global_auxvars(ghosted_id), &
                      material_auxvars(ghosted_id), &
+                     richards_parameter, &
                      cur_connection_set%area(iconn), &
                      cur_connection_set%dist(:,iconn), &
                      option, &
@@ -2832,7 +2845,6 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   use Region_module
   use Petsc_Utility_module
   use Debug_module
-  use Geomechanics_Linear_Aux_module
 
   implicit none
 
@@ -2855,7 +2867,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   type(global_auxvar_type), pointer :: global_auxvars(:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(inlinesurface_auxvar_type), pointer :: inlinesurface_auxvars(:)
-  type(geomech_linear_parameter_type), pointer :: geomech_parameter
+  type(richards_parameter_type), pointer :: richards_parameter
 
   patch => realization%patch
   grid => patch%grid
@@ -2863,7 +2875,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
   rich_auxvars => patch%aux%Richards%auxvars
   global_auxvars => patch%aux%Global%auxvars
   material_auxvars => patch%aux%Material%auxvars
-  geomech_parameter => patch%aux%Material%geomech_parameter
+  richards_parameter => patch%aux%richards%richards_parameter
 
   if (option%flow%inline_surface_flow) then
     region => &
@@ -2882,7 +2894,7 @@ subroutine RichardsJacobianAccumulation(A,realization,debug,ierr)
       call RichardsAccumDerivative(rich_auxvars(ghosted_id), &
            global_auxvars(ghosted_id), &
            material_auxvars(ghosted_id), &
-           geomech_parameter, &
+           richards_parameter, &
            option, &
            patch%characteristic_curves_array( &
            patch%cc_id(ghosted_id))%ptr, &

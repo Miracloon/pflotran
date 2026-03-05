@@ -1342,6 +1342,8 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   use Logging_module
   use Output_Aux_module
   use Waypoint_module
+  use PM_Richards_class
+  use PM_TH_class
 
   implicit none
 
@@ -1358,7 +1360,6 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   class(timestepper_ksp_type), pointer :: timestepper
   type(geomechanics_regression_type), pointer :: geomech_regression
   PetscErrorCode :: ierr
-  PetscInt :: ghosted_id
 
   if (.not. associated(pm_geomech)) return
 
@@ -1448,12 +1449,26 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   call simulation%geomech%process_model_coupler%GetAuxData()
   call simulation%geomech%process_model_coupler%SetAuxData()
 
-  ! used for fixed-stress coupling flow (TH and RICHARDS) routines
-  do ghosted_id = 1, subsurf_realization%patch%grid%ngmax
-    pm_geomech%subsurf_realization%patch%aux%Material%geomech_parameter => &
-      pm_geomech%geomech_realization%geomech_patch%geomech_aux% &
-        Linear%linear_parameter
-  enddo
+  ! Set the flow pointer to the geomech_parameter
+  select type(pm => simulation%process_model_list)
+    class is(pm_th_type)
+      pm_geomech%subsurf_realization%patch%aux%th%th_parameter% &
+        geomech_parameter => pm_geomech%geomech_realization% &
+        geomech_patch%geomech_aux%Linear%linear_parameter
+
+    class is(pm_richards_type)
+      pm_geomech%subsurf_realization%patch%aux%richards% &
+        richards_parameter%geomech_parameter => &
+        pm_geomech%geomech_realization%geomech_patch% &
+        geomech_aux%Linear%linear_parameter
+
+    class default
+      option%io_buffer = 'Only RICHARDS and TH modes can be coupled'// &
+                      'to geomechanics InitSubsurfGeomechInitSimulation'
+      call PrintErrMsg(option)
+  end select
+  ! update auxvars once pointer is set
+  call simulation%process_model_list%UpdateAuxVars()
 
   ! this is solely for casting to pmc geomech
   select type(pmc => simulation%geomech%process_model_coupler)

@@ -686,6 +686,7 @@ subroutine PMCGeomechanicsSetAuxData(this)
                  pmc%subsurf_realization%patch%aux%Material% &
                   auxvars(local_id)%porosity_0
                 global_auxvar%parameters(strainv_0_id) = 0.d0
+                global_auxvar%parameters(strainv_id) = 0.d0
                 global_auxvar%parameters(id_porosity_mech) = &
                   pmc%subsurf_realization%patch%aux%Material% &
                   auxvars(local_id)%porosity_0

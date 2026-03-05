@@ -102,7 +102,6 @@ module Material_Aux_module
     PetscInt, pointer :: soil_properties_ivar(:)
     character(len=MAXWORDLENGTH), pointer :: soil_properties_name(:)
     type(material_parameter_type), pointer :: material_parameter
-    type(geomech_linear_parameter_type), pointer :: geomech_parameter
     type(material_auxvar_type), pointer :: auxvars(:)
   end type material_type
 

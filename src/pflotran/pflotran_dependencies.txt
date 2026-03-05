@@ -1347,6 +1347,8 @@ init_subsurface_geomechanics.o : \
   pm_base_pointer.o \
   pm_ert.o \
   pm_geomechanics_force.o \
+  pm_richards.o \
+  pm_th.o \
   pmc_base.o \
   pmc_geomechanics.o \
   realization_base.o \
@@ -3590,6 +3592,7 @@ richards_aux.o : \
   characteristic_curves.o \
   characteristic_curves_common.o \
   eos_water.o \
+  geomechanics_linear_aux.o \
   global_aux.o \
   material_aux.o \
   matrix_buffer.o \
@@ -3601,7 +3604,6 @@ richards_common.o : \
   characteristic_curves.o \
   connection.o \
   eos_water.o \
-  geomechanics_linear_aux.o \
   global_aux.o \
   material_aux.o \
   option.o \
@@ -3989,6 +3991,7 @@ th_aux.o : \
   characteristic_curves_common.o \
   characteristic_curves_thermal.o \
   eos_water.o \
+  geomechanics_linear_aux.o \
   global_aux.o \
   material_aux.o \
   matrix_zeroing.o \
