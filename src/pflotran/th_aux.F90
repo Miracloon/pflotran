@@ -36,6 +36,7 @@ module TH_Aux_module
 
   PetscInt, parameter, public :: TH_UPDATE_FOR_FIXED_ACCUM = 0
   PetscInt, parameter, public :: TH_UPDATE_FOR_ACCUM = 1
+  PetscInt, parameter, public :: TH_UPDATE_FOR_BOUNDARY = 2
 
   type, public :: th_auxvar_type
     PetscReal :: pres
@@ -48,10 +49,9 @@ module TH_Aux_module
     PetscReal :: u
     PetscReal :: pc
     PetscReal :: vis
-!    PetscReal :: dvis_dp
     PetscReal :: kr
-!    PetscReal :: dkr_dp
     PetscReal :: mobility
+    PetscReal :: effective_porosity
     PetscReal :: dsat_dp
     PetscReal :: dsat_dT
     PetscReal :: dden_dp
@@ -66,6 +66,8 @@ module TH_Aux_module
     PetscReal :: Ke
     PetscReal :: dKe_dp
     PetscReal :: dKe_dT
+    PetscReal :: dpor_dp
+    PetscReal :: dpor_dT
     PetscReal :: dpres_dtime ! for TS
     PetscReal :: dtemp_dtime  ! for TS
     PetscReal :: d2sat_dp2
@@ -273,7 +275,8 @@ recursive subroutine THAuxVarInit(auxvar,option,allocate_perturbation)
   !auxvar%dkr_dp   = uninit_value
   auxvar%vis       = uninit_value
   !auxvar%dvis_dp  = uninit_value
-  auxvar%mobility       = uninit_value
+  auxvar%mobility  = uninit_value
+  auxvar%effective_porosity  = uninit_value
   auxvar%dsat_dp   = uninit_value
   auxvar%dsat_dT   = uninit_value
   auxvar%dden_dp   = uninit_value
@@ -288,6 +291,8 @@ recursive subroutine THAuxVarInit(auxvar,option,allocate_perturbation)
   auxvar%Ke        = uninit_value
   auxvar%dKe_dp    = uninit_value
   auxvar%dKe_dT    = uninit_value
+  auxvar%dpor_dp   = uninit_value
+  auxvar%dpor_dT   = uninit_value
  if (option%flow%th_freezing) then
     allocate(auxvar%ice)
     auxvar%ice%Ke_fr     = uninit_value
@@ -421,6 +426,48 @@ end subroutine THAuxVarCopy
 
 ! ************************************************************************** !
 
+subroutine THAuxPorosity(th_auxvar,material_auxvar,update_porosity,option)
+  !
+  ! Calculates the update to porosity for TH
+  !
+  ! Author: Glenn Hammond
+  ! Date: 03/04/26
+  !
+  use Material_Aux_module
+  use Option_module
+
+  implicit none
+
+  type(th_auxvar_type) :: th_auxvar
+  type(material_auxvar_type) :: material_auxvar
+  PetscBool :: update_porosity
+  type(option_type) :: option
+
+  PetscReal :: cell_pressure
+
+  if (option%iflag /= TH_UPDATE_FOR_BOUNDARY) then
+    if (update_porosity) then
+      if (soil_compressibility_index > 0) then
+        cell_pressure = th_auxvar%pres
+        call MaterialCompressSoil(material_auxvar,cell_pressure, &
+                                  th_auxvar%effective_porosity, &
+                                  th_auxvar%dpor_dp)
+      else
+        th_auxvar%effective_porosity = material_auxvar%porosity_base
+        th_auxvar%dpor_dp = 0.d0
+      endif
+    else
+      th_auxvar%effective_porosity = material_auxvar%porosity_base
+      th_auxvar%dpor_dp = 0.d0
+    endif
+    material_auxvar%porosity = th_auxvar%effective_porosity
+    material_auxvar%dporosity_dp = th_auxvar%dpor_dp
+  endif
+
+end subroutine THAuxPorosity
+
+! ************************************************************************** !
+
 subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
                                      material_auxvar, &
                                      iphase,characteristic_curves, &
@@ -492,9 +539,7 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
   global_auxvar%den_kg = UNINITIALIZED_DOUBLE
   global_auxvar%sat = UNINITIALIZED_DOUBLE
 
-  if (update_porosity) then
-    call MaterialAuxVarCompute(material_auxvar,auxvar%pres)
-  endif
+  call THAuxPorosity(auxvar,material_auxvar,update_porosity,option)
 
   auxvar%pc = min(option%flow%reference_pressure - auxvar%pres, &
                   characteristic_curves%saturation_function%pcmax)
@@ -768,9 +813,7 @@ subroutine THAuxVarComputeFreezing(x, auxvar, global_auxvar, &
     auxvar%pres = -1.d8 + option%flow%reference_pressure + 1.d0
   endif
 
-  if (update_porosity) then
-    call MaterialAuxVarCompute(material_auxvar,auxvar%pres)
-  endif
+  call THAuxPorosity(auxvar,material_auxvar,update_porosity,option)
 
   auxvar%pc = option%flow%reference_pressure - auxvar%pres
 
@@ -967,7 +1010,7 @@ subroutine THAuxVarComputeFreezing(x, auxvar, global_auxvar, &
   ! Effective thermal conductivity
   call thermal_cc%thermal_conductivity_function%CalculateFTCond( &
        auxvar%sat,auxvar%ice%sat_ice,auxvar%temp, &
-       material_auxvar%porosity,auxvar%Dk_eff,dk_ds,dK_di,dk_dT,option)
+       auxvar%effective_porosity,auxvar%Dk_eff,dk_ds,dK_di,dk_dT,option)
 
   ! Derivative of Kersten number
   auxvar%dKe_dp = alpha*(auxvar%sat + epsilon)**(alpha - 1.d0)* &
@@ -1166,12 +1209,6 @@ subroutine THAuxVarPerturb(th_auxvar,global_auxvar, &
   PetscReal :: x_pert(option%nflowdof)
   PetscReal :: pert
 
-  if (update_porosity) then
-    option%io_buffer = 'Update of porosity not supported for numerical &
-      &derivatives in THAuxVarPerturb'
-    call PrintErrMsg(option)
-  endif
-
   x(TH_PRESSURE_DOF) = th_auxvar%pres
   x(TH_TEMPERATURE_DOF) = th_auxvar%temp
   do idof = 1, option%nflowdof
@@ -1368,7 +1405,7 @@ subroutine THPrintAuxVars(file_unit,th_auxvar,global_auxvar, &
 
   PetscReal ::  liquid_mass
 
-  liquid_mass = material_auxvar%volume*material_auxvar%porosity* &
+  liquid_mass = material_auxvar%volume*th_auxvar%effective_porosity* &
                 th_auxvar%sat*th_auxvar%den
 
   write(file_unit,*) '--------------------------------------------------------'
@@ -1387,7 +1424,7 @@ subroutine THPrintAuxVars(file_unit,th_auxvar,global_auxvar, &
   write(file_unit,*) '    liquid_density [kmol]: ', th_auxvar%den
   write(file_unit,*) '      liquid_density [kg]: ', th_auxvar%den_kg
   write(file_unit,*) 'eff. thermal conductivity: ', th_auxvar%Dk_eff
-  write(file_unit,*) '                porosity : ', material_auxvar%porosity
+  write(file_unit,*) '      effective porosity : ', th_auxvar%effective_porosity
   write(file_unit,*) '             volume [m^3]: ', material_auxvar%volume
   write(file_unit,*) '--------------------------------------------------------'
 
