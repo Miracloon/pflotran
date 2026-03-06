@@ -131,6 +131,7 @@ STANDARD_CFG = \
 	shortcourse/regional_doublet/regional_doublet.cfg \
 	shortcourse/electron_tower/electron_tower.cfg \
 	surfaceflow/inlinesurface/inlinesurface.cfg \
+	templates/templates.cfg \
 	ufd/ufd.cfg \
 	well_model/richards/richards.cfg \
 	wipp/nuts/nuts.cfg \
