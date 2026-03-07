@@ -19,6 +19,19 @@ module Geomechanics_Patch_module
 
   private
 
+  type, public :: geomech_observation_type
+    character(len=MAXWORDLENGTH) :: name
+    character(len=MAXWORDLENGTH) :: region_name
+    type(gm_region_type), pointer :: region
+    type(geomech_observation_type), pointer :: next
+  end type geomech_observation_type
+
+  type, public :: geomech_observation_list_type
+    PetscInt :: num_observations
+    type(geomech_observation_type), pointer :: first
+    type(geomech_observation_type), pointer :: last
+  end type geomech_observation_list_type
+
   type, public :: geomech_patch_type
     PetscInt :: id
     PetscInt, pointer :: imat(:)
@@ -35,6 +48,7 @@ module Geomechanics_Patch_module
     type(geomech_field_type), pointer :: geomech_field
     class(dataset_base_type), pointer :: geomech_datasets
     type(geomech_auxiliary_type) :: geomech_aux
+    type(geomech_observation_list_type), pointer :: geomech_observation_list
   end type geomech_patch_type
 
 
@@ -44,7 +58,11 @@ module Geomechanics_Patch_module
             GeomechPatchInitAllCouplerAuxVars, &
             GeomechPatchGetDataset, &
             GeomechanicsPatchDestroy, &
-            GeomechPatchUpdateAllCouplerAuxVars
+            GeomechPatchUpdateAllCouplerAuxVars, &
+            GeomechObservationCreate, &
+            GeomechObservationInitList, &
+            GeomechObservationAddToList, &
+            GeomechObservationDestroyList
 
 contains
 
@@ -88,6 +106,9 @@ function GeomechanicsPatchCreate()
 
   nullify(patch%geomech_field)
   nullify(patch%geomech_datasets)
+
+  allocate(patch%geomech_observation_list)
+  call GeomechObservationInitList(patch%geomech_observation_list)
 
   GeomechanicsPatchCreate => patch
 
@@ -153,8 +174,9 @@ subroutine GeomechPatchProcessGeomechCouplers(patch,conditions,option)
 
   type(geomech_coupler_type), pointer :: coupler
   type(geomech_strata_type), pointer :: strata
- ! type(geomech_observation_type), pointer :: observation, &
- !                                                     next_observation
+  type(geomech_observation_type), pointer :: observation
+  type(geomech_observation_type), pointer :: next_observation
+  type(geomech_observation_type), pointer :: prev_observation
 
   ! boundary conditions
   coupler => patch%geomech_boundary_condition_list%first
@@ -274,52 +296,44 @@ subroutine GeomechPatchProcessGeomechCouplers(patch,conditions,option)
     strata => strata%next
   enddo
 
-  ! linkage of observation to regions and couplers must take place after
-  ! connection list have been created.
+  ! linkage of observation to regions must take place after
+  ! region localization.
   ! observation
-#if 0
-  observation => patch%observation_list%first
+  nullify(prev_observation)
+  observation => patch%geomech_observation_list%first
   do
     if (.not.associated(observation)) exit
     next_observation => observation%next
-    select case(observation%itype)
-      case(OBSERVATION_SCALAR,OBSERVATION_AGGREGATE)
-        ! pointer to region
-        observation%region => RegionGetPtrFromList(observation%linkage_name, &
-                                                    patch%region_list)
-        if (.not.associated(observation%region)) then
-          option%io_buffer = 'Region "' // &
-                   trim(observation%linkage_name) // &
-                 '" in observation point "' // &
-                 trim(observation%name) // &
-                 '" not found in region list'
-          call PrintErrMsg(option)
-        endif
-        if (observation%region%num_cells == 0) then
-          ! remove the observation object
-          call ObservationRemoveFromList(observation,patch%observation)
-        endif
-      case(OBSERVATION_FLUX)
-        coupler => CouplerGetPtrFromList(observation%linkage_name, &
-                                         patch%boundary_condition_list)
-        if (associated(coupler)) then
-          observation%connection_set => coupler%connection_set
-        else
-          option%io_buffer = 'Boundary Condition "' // &
-                   trim(observation%linkage_name) // &
-                   '" not found in Boundary Condition list'
-          call PrintErrMsg(option)
-        endif
-        if (observation%connection_set%num_connections == 0) then
-          ! cannot remove from list, since there must be a global reduction
-          ! across all procs
-          ! therefore, just nullify connection set
-          nullify(observation%connection_set)
-        endif
-    end select
+    ! pointer to region
+    observation%region => GeomechRegionGetPtrFromList( &
+                            observation%region_name, &
+                            patch%geomech_region_list)
+    if (.not.associated(observation%region)) then
+      option%io_buffer = 'Geomech Region "' // &
+               trim(observation%region_name) // &
+             '" in geomech observation "' // &
+             trim(observation%name) // &
+             '" not found in geomech region list'
+      call PrintErrMsg(option)
+    endif
+    if (observation%region%num_verts == 0) then
+      ! remove observations with no local vertices on this rank
+      if (associated(prev_observation)) then
+        prev_observation%next => next_observation
+      else
+        patch%geomech_observation_list%first => next_observation
+      endif
+      if (.not.associated(next_observation)) then
+        patch%geomech_observation_list%last => prev_observation
+      endif
+      patch%geomech_observation_list%num_observations = &
+        patch%geomech_observation_list%num_observations - 1
+      deallocate(observation)
+    else
+      prev_observation => observation
+    endif
     observation => next_observation
   enddo
-#endif
 
 end subroutine GeomechPatchProcessGeomechCouplers
 
@@ -511,6 +525,11 @@ subroutine GeomechPatchUpdateCouplerAuxVars(patch,coupler_list, &
               coupler%geomech_aux_real_var(GEOMECH_DISP_X_DOF, &
                                            1:num_verts) = &
               geomech_condition%force_x%dataset%rarray(1)
+            case default
+              option%io_buffer = 'FORCE_X sub-condition must use ' // &
+                'DIRICHLET type in geomechanics condition "' // &
+                trim(geomech_condition%name) // '".'
+              call PrintErrMsg(option)
             end select
         endif
         if (associated(geomech_condition%force_y)) then
@@ -519,6 +538,11 @@ subroutine GeomechPatchUpdateCouplerAuxVars(patch,coupler_list, &
               coupler%geomech_aux_real_var(GEOMECH_DISP_Y_DOF, &
                                            1:num_verts) = &
               geomech_condition%force_y%dataset%rarray(1)
+            case default
+              option%io_buffer = 'FORCE_Y sub-condition must use ' // &
+                'DIRICHLET type in geomechanics condition "' // &
+                trim(geomech_condition%name) // '".'
+              call PrintErrMsg(option)
              end select
         endif
         if (associated(geomech_condition%force_z)) then
@@ -527,6 +551,11 @@ subroutine GeomechPatchUpdateCouplerAuxVars(patch,coupler_list, &
               coupler%geomech_aux_real_var(GEOMECH_DISP_Z_DOF, &
                                            1:num_verts) = &
               geomech_condition%force_z%dataset%rarray(1)
+            case default
+              option%io_buffer = 'FORCE_Z sub-condition must use ' // &
+                'DIRICHLET type in geomechanics condition "' // &
+                trim(geomech_condition%name) // '".'
+              call PrintErrMsg(option)
           end select
         endif
       endif
@@ -759,6 +788,8 @@ subroutine GeomechanicsPatchDestroy(geomech_patch)
   call GeomechCouplerDestroyList(geomech_patch%geomech_boundary_condition_list)
   call GeomechCouplerDestroyList(geomech_patch%geomech_source_sink_list)
 
+  call GeomechObservationDestroyList(geomech_patch%geomech_observation_list)
+
   nullify(geomech_patch%geomech_field)
   nullify(geomech_patch%geomech_datasets)
 
@@ -768,5 +799,108 @@ subroutine GeomechanicsPatchDestroy(geomech_patch)
   nullify(geomech_patch)
 
 end subroutine GeomechanicsPatchDestroy
+
+! ************************************************************************** !
+
+function GeomechObservationCreate()
+  !
+  ! Creates a geomechanics observation object
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  implicit none
+
+  type(geomech_observation_type), pointer :: GeomechObservationCreate
+  type(geomech_observation_type), pointer :: observation
+
+  allocate(observation)
+
+  observation%name = ''
+  observation%region_name = ''
+  nullify(observation%region)
+  nullify(observation%next)
+
+  GeomechObservationCreate => observation
+
+end function GeomechObservationCreate
+
+! ************************************************************************** !
+
+subroutine GeomechObservationInitList(list)
+  !
+  ! Initializes a geomechanics observation list
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  implicit none
+
+  type(geomech_observation_list_type) :: list
+
+  list%num_observations = 0
+  nullify(list%first)
+  nullify(list%last)
+
+end subroutine GeomechObservationInitList
+
+! ************************************************************************** !
+
+subroutine GeomechObservationAddToList(observation,list)
+  !
+  ! Adds a geomechanics observation to a list
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  implicit none
+
+  type(geomech_observation_type), pointer :: observation
+  type(geomech_observation_list_type) :: list
+
+  if (associated(list%last)) then
+    list%last%next => observation
+  else
+    list%first => observation
+  endif
+  list%last => observation
+  list%num_observations = list%num_observations + 1
+
+end subroutine GeomechObservationAddToList
+
+! ************************************************************************** !
+
+subroutine GeomechObservationDestroyList(list)
+  !
+  ! Destroys a geomechanics observation list
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  implicit none
+
+  type(geomech_observation_list_type), pointer :: list
+  type(geomech_observation_type), pointer :: observation
+  type(geomech_observation_type), pointer :: next_observation
+
+  if (.not.associated(list)) return
+
+  observation => list%first
+  do
+    if (.not.associated(observation)) exit
+    next_observation => observation%next
+    nullify(observation%region)
+    deallocate(observation)
+    observation => next_observation
+  enddo
+
+  deallocate(list)
+  nullify(list)
+
+end subroutine GeomechObservationDestroyList
 
 end module Geomechanics_Patch_module

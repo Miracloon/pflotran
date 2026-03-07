@@ -10,6 +10,9 @@ module Option_Geomechanics_module
 
   private
 
+  PetscInt, parameter, public :: GEOMECH_FLOW_INTERP_ORDER_0TH = 0
+  PetscInt, parameter, public :: GEOMECH_FLOW_INTERP_ORDER_1ST = 1
+
   type, public :: geomechanics_option_type
 
     PetscBool :: initial_flag
@@ -25,6 +28,7 @@ module Option_Geomechanics_module
     PetscBool :: skip_stepdt_flag
     PetscBool :: use_porosity_update
     PetscReal :: del_poro_tol
+    PetscInt :: flow_interp_order
 
   end type geomechanics_option_type
 
@@ -114,6 +118,7 @@ subroutine OptionGeomechanicsInitRealization(option)
   option%skip_stepdt_flag = PETSC_FALSE
   option%use_porosity_update = PETSC_FALSE
   option%del_poro_tol = UNINITIALIZED_DOUBLE
+  option%flow_interp_order = GEOMECH_FLOW_INTERP_ORDER_0TH
 
 end subroutine OptionGeomechanicsInitRealization
 

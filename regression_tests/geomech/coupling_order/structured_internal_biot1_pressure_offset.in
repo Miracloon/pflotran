@@ -1,0 +1,27 @@
+SIMULATION
+  SIMULATION_TYPE GEOMECHANICS_SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE richards
+    /
+    GEOMECHANICS_SUBSURFACE geomech
+      OPTIONS
+        FLOW_COUPLING ONE_WAY_COUPLED
+      /
+    /
+  /
+END
+
+EXTERNAL_FILE subsurface_pressure_offset.txt
+
+GEOMECHANICS
+
+EXTERNAL_FILE geomechanics_common.txt
+
+GEOMECHANICS_FLOW_INTERPOLATION
+  ORDER 1
+/
+
+EXTERNAL_FILE geomechanics_regression_common.txt
+
+END_GEOMECHANICS

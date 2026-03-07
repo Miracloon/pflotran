@@ -62,6 +62,7 @@ module Simulation_Subsurface_class
             SimSubsurfInit, &
             SimSubsurfCast, &
             SimSubsurfInitializeRun, &
+            SimSubsurfExecuteRun, &
             SimSubsurfWriteRegression, &
             SimSubsurfFinalizeRun, &
             SimSubsurfStrip, &

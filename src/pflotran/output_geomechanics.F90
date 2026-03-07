@@ -15,6 +15,7 @@ module Output_Geomechanics_module
 
   PetscInt, save, public :: max_local_node_size_saved = -1
   PetscBool :: geomech_hdf5_first
+  PetscBool, save :: geomech_observation_first = PETSC_TRUE
 
   public :: OutputGeomechanics, &
             OutputGeomechInit, &
@@ -104,10 +105,17 @@ subroutine OutputGeomechanics(geomech_realization,snapshot_plot_flag, &
       call PetscTime(tend,ierr);CHKERRQ(ierr)
     endif
 
+    if (geomech_realization%output_option%print_vtk) then
+      option%io_buffer = 'VTK output is not yet supported for ' // &
+        'geomechanics. Use TECPLOT or HDF5 format instead.'
+      call PrintWrnMsg(option)
+    endif
+
   endif
 
 !......................................
   if (observation_plot_flag) then
+    call OutputGeomechObservationTecplotTXT(geomech_realization)
   endif
 
 !......................................
@@ -1708,5 +1716,224 @@ subroutine WriteHDF5CoordinatesXDMFGeomech(geomech_realization, &
   call GMDMDestroy(gmdm_element)
 
 end subroutine WriteHDF5CoordinatesXDMFGeomech
+
+! ************************************************************************** !
+
+subroutine OutputGeomechObservationTecplotTXT(geomech_realization)
+  !
+  ! Outputs geomechanics observation data to Tecplot-style text file
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  use Geomechanics_Realization_class
+  use Geomechanics_Patch_module
+  use Geomechanics_Grid_module
+  use Geomechanics_Grid_Aux_module
+  use Geomechanics_Global_Aux_module
+  use Option_module
+  use Variables_module
+  use Utility_module, only : FileExists
+
+  implicit none
+
+  type(realization_geomech_type) :: geomech_realization
+
+  PetscInt :: fid
+  character(len=MAXSTRINGLENGTH) :: filename
+  character(len=MAXSTRINGLENGTH) :: string
+  character(len=MAXSTRINGLENGTH) :: cell_string
+  type(option_type), pointer :: option
+  type(output_option_type), pointer :: output_option
+  type(geomech_patch_type), pointer :: patch
+  type(geomech_grid_type), pointer :: grid
+  type(geomech_global_auxvar_type), pointer :: geom_gl_auxvars(:)
+  type(geomech_observation_type), pointer :: observation
+  type(output_variable_type), pointer :: cur_variable
+  PetscInt :: ivert, local_id, ghosted_id, icolumn, variable_count
+  PetscReal :: temp_real
+  PetscBool :: open_file
+
+  option => geomech_realization%option
+  output_option => geomech_realization%output_option
+  patch => geomech_realization%geomech_patch
+  grid => patch%geomech_grid
+  geom_gl_auxvars => patch%geomech_aux%Global%aux_vars
+
+  ! check if there are any observation points on this rank
+  open_file = PETSC_FALSE
+  observation => patch%geomech_observation_list%first
+  do
+    if (.not.associated(observation)) exit
+    if (observation%region%num_verts > 0) then
+      open_file = PETSC_TRUE
+      exit
+    endif
+    observation => observation%next
+  enddo
+
+  if (.not.open_file) return
+
+  write(string,'(i6)') option%myrank
+  filename = trim(option%global_prefix) // trim(option%group_prefix) // &
+             '-geomech-obs-' // trim(adjustl(string)) // '.pft'
+
+  fid = 86
+
+  if (geomech_observation_first .or. .not.FileExists(filename)) then
+    open(unit=fid,file=filename,action="write",status="replace")
+    ! write header
+    write(fid,'(a)',advance="no") ' "Time [' // &
+      trim(output_option%tunit) // ']"'
+
+    if (output_option%print_column_ids) then
+      icolumn = 1
+    else
+      icolumn = -1
+    endif
+
+    observation => patch%geomech_observation_list%first
+    do
+      if (.not.associated(observation)) exit
+      do ivert=1,observation%region%num_verts
+        local_id = observation%region%vertex_ids(ivert)
+        ghosted_id = grid%nL2G(local_id)
+        write(cell_string,*) grid%nG2A(ghosted_id)
+        cell_string = trim(observation%name) // ' (' // &
+                      trim(adjustl(cell_string)) // ')'
+        call OutputWriteVariableListToHeader(fid, &
+               output_option%output_obs_variable_list, &
+               cell_string,icolumn,PETSC_FALSE, &
+               variable_count)
+      enddo
+      observation => observation%next
+    enddo
+    write(fid,'(a)',advance="yes") ""
+  else
+    open(unit=fid,file=filename,action="write",status="old", &
+         position="append")
+  endif
+
+  ! write data
+  write(fid,'(1es14.6)',advance="no") option%time/output_option%tconv
+
+110 format(es14.6)
+111 format(i2)
+
+  observation => patch%geomech_observation_list%first
+  do
+    if (.not.associated(observation)) exit
+    do ivert=1,observation%region%num_verts
+      local_id = observation%region%vertex_ids(ivert)
+      ghosted_id = grid%nL2G(local_id)
+      cur_variable => output_option%output_obs_variable_list%first
+      do
+        if (.not.associated(cur_variable)) exit
+        if (cur_variable%plot_only) then
+          cur_variable => cur_variable%next
+          cycle
+        endif
+        temp_real = GeomechGetVariableAtNode( &
+                      geom_gl_auxvars(ghosted_id), &
+                      patch%imat(ghosted_id), &
+                      cur_variable%ivar)
+        if (cur_variable%iformat == 0) then ! real
+          write(fid,110,advance="no") temp_real
+        else ! integer
+          write(fid,111,advance="no") nint(temp_real)
+        endif
+        cur_variable => cur_variable%next
+      enddo
+    enddo
+    observation => observation%next
+  enddo
+  write(fid,'(a)',advance="yes") ""
+  close(fid)
+
+  geomech_observation_first = PETSC_FALSE
+
+end subroutine OutputGeomechObservationTecplotTXT
+
+! ************************************************************************** !
+
+function GeomechGetVariableAtNode(auxvar,imat_val,ivar)
+  !
+  ! Returns a geomechanics variable value at a single node
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 03/10/26
+  !
+
+  use Geomechanics_Global_Aux_module
+  use Variables_module
+
+  implicit none
+
+  type(geomech_global_auxvar_type) :: auxvar
+  PetscInt :: imat_val
+  PetscInt :: ivar
+  PetscReal :: GeomechGetVariableAtNode
+
+  select case(ivar)
+    case(GEOMECH_DISP_X)
+      GeomechGetVariableAtNode = auxvar%disp_vector(1)
+    case(GEOMECH_DISP_Y)
+      GeomechGetVariableAtNode = auxvar%disp_vector(2)
+    case(GEOMECH_DISP_Z)
+      GeomechGetVariableAtNode = auxvar%disp_vector(3)
+    case(GEOMECH_VOLUMETRIC_STRAIN)
+      GeomechGetVariableAtNode = auxvar%strain(1) + &
+                                  auxvar%strain(2) + &
+                                  auxvar%strain(3)
+    case(STRAIN_XX)
+      GeomechGetVariableAtNode = auxvar%strain(1)
+    case(STRAIN_YY)
+      GeomechGetVariableAtNode = auxvar%strain(2)
+    case(STRAIN_ZZ)
+      GeomechGetVariableAtNode = auxvar%strain(3)
+    case(STRAIN_XY)
+      GeomechGetVariableAtNode = auxvar%strain(4)
+    case(STRAIN_YZ)
+      GeomechGetVariableAtNode = auxvar%strain(5)
+    case(STRAIN_ZX)
+      GeomechGetVariableAtNode = auxvar%strain(6)
+    case(STRESS_XX)
+      GeomechGetVariableAtNode = auxvar%stress(1)
+    case(STRESS_YY)
+      GeomechGetVariableAtNode = auxvar%stress(2)
+    case(STRESS_ZZ)
+      GeomechGetVariableAtNode = auxvar%stress(3)
+    case(STRESS_XY)
+      GeomechGetVariableAtNode = auxvar%stress(4)
+    case(STRESS_YZ)
+      GeomechGetVariableAtNode = auxvar%stress(5)
+    case(STRESS_ZX)
+      GeomechGetVariableAtNode = auxvar%stress(6)
+    case(STRESS_TOTAL_XX)
+      GeomechGetVariableAtNode = auxvar%stress_total(1)
+    case(STRESS_TOTAL_YY)
+      GeomechGetVariableAtNode = auxvar%stress_total(2)
+    case(STRESS_TOTAL_ZZ)
+      GeomechGetVariableAtNode = auxvar%stress_total(3)
+    case(STRESS_TOTAL_XY)
+      GeomechGetVariableAtNode = auxvar%stress_total(4)
+    case(STRESS_TOTAL_YZ)
+      GeomechGetVariableAtNode = auxvar%stress_total(5)
+    case(STRESS_TOTAL_ZX)
+      GeomechGetVariableAtNode = auxvar%stress_total(6)
+    case(GEOMECH_MATERIAL_ID)
+      GeomechGetVariableAtNode = dble(imat_val)
+    case(GEOMECH_REL_DISP_X)
+      GeomechGetVariableAtNode = auxvar%rel_disp_vector(1)
+    case(GEOMECH_REL_DISP_Y)
+      GeomechGetVariableAtNode = auxvar%rel_disp_vector(2)
+    case(GEOMECH_REL_DISP_Z)
+      GeomechGetVariableAtNode = auxvar%rel_disp_vector(3)
+    case default
+      GeomechGetVariableAtNode = 0.d0
+  end select
+
+end function GeomechGetVariableAtNode
 
 end module Output_Geomechanics_module

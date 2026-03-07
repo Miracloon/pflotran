@@ -106,25 +106,27 @@ STANDARD_CFG = \
 	default/zflow/zflow.cfg \
 	fracture/fracture.cfg \
 	general/general.cfg \
-	hydrate/hydrate.cfg \
-	geomech/uniaxial_strain/uniaxial_strain.cfg \
-	geomech/uniaxial_strain_tets/uniaxial_strain_tets.cfg \
-	geomech/uniaxial_loading/uniaxial_loading.cfg \
-	geomech/uniaxial_loading_biot/uniaxial_loading_biot.cfg \
-	geomech/terzaghi/terzaghi.cfg \
+	geomech/coupling_order/coupling_order.cfg \
+	geomech/mms/mms.cfg \
 	geomech/simple_tet_cube/simple_tet_cube.cfg \
 	geomech/spatially_varying/spatially_varying.cfg \
+	geomech/terzaghi/terzaghi.cfg \
 	geomech/thin_plate/thin_plate.cfg \
 	geomech/traction_bc/traction_bc.cfg \
+	geomech/uniaxial_loading/uniaxial_loading.cfg \
+	geomech/uniaxial_loading_biot/uniaxial_loading_biot.cfg \
+	geomech/uniaxial_strain/uniaxial_strain.cfg \
+	geomech/uniaxial_strain_tets/uniaxial_strain_tets.cfg \
 	geophys/ert/ert.cfg \
 	geothermal_hpt/1D_Calcite/calcite_hpt.cfg\
+	hydrate/hydrate.cfg \
 	inversion/inversion.cfg \
 	ngee/ngee.cfg \
-	pnf/unit_cube/unit_cube.cfg \
-	ntrdc/ntrdc.cfg \
 	multiphysics/hm/hm.cfg \
 	multiphysics/thm/thm.cfg \
 	multiphysics/thmce/thmce.cfg \
+	ntrdc/ntrdc.cfg \
+	pnf/unit_cube/unit_cube.cfg \
 	shortcourse/1D_Calcite/calcite.cfg \
 	shortcourse/1D_variably_saturated_flow/vsat_flow.cfg \
 	shortcourse/copper_leaching/cu_leaching.cfg \
@@ -177,14 +179,17 @@ GEOCHEMISTRY_CFG = \
 	wipp/nuts/nuts.cfg
 
 GEOMECHANICS_CFG = \
+	geomech/coupling_order/coupling_order.cfg \
+	geomech/mms/mms.cfg \
+	geomech/simple_tet_cube/simple_tet_cube.cfg \
+	geomech/spatially_varying/spatially_varying.cfg \
+	geomech/terzaghi/terzaghi.cfg \
+	geomech/thin_plate/thin_plate.cfg \
+	geomech/traction_bc/traction_bc.cfg \
 	geomech/uniaxial_loading/uniaxial_loading.cfg \
 	geomech/uniaxial_loading_biot/uniaxial_loading_biot.cfg \
 	geomech/uniaxial_strain/uniaxial_strain.cfg \
 	geomech/uniaxial_strain_tets/uniaxial_strain_tets.cfg \
-	geomech/terzaghi/terzaghi.cfg \
-	geomech/spatially_varying/spatially_varying.cfg \
-	geomech/thin_plate/thin_plate.cfg \
-	geomech/traction_bc/traction_bc.cfg \
 	multiphysics/hm/hm.cfg \
 	multiphysics/thm/thm.cfg
 

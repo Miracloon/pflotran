@@ -1,0 +1,243 @@
+#============================================
+# MMS verification for coupled flow-geomechanics (one-way coupling).
+#
+# Manufactured solution on [0,1]^3 (steady state):
+#   Pressure:     p = p0 + Ap * sin(pi*x)*sin(pi*y)*sin(pi*z)
+#   Displacement: u = Au * [f, f, f]  where f = sin(pi*x)*sin(pi*y)*sin(pi*z)
+#
+# p0 = 200000 Pa, Ap = 1000 Pa, Au = 1.0 m
+# Biot coefficient = 1.0 (tests actual Biot coupling code path)
+# Zero gravity, constant water density, fully saturated.
+#
+# Flow source: HETEROGENEOUS_MASS_RATE from HDF5
+# Geomech body force: (-div(sigma) + beta*grad(dp)) / rho_bulk
+#   where dp = p - p_init = Ap * sin(...) since p_init = p0.
+#   The Biot term is needed because PFLOTRAN's internal coupling
+#   adds integral(beta*dp*dN/dx) to the RHS, which in strong form
+#   subtracts beta*grad(dp). The body force must compensate.
+#
+# All displacement components vanish on all six faces (sin(0)=sin(pi)=0),
+# so zero Dirichlet BCs are exact.
+#============================================
+SIMULATION
+  SIMULATION_TYPE GEOMECHANICS_SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+      OPTIONS
+      END
+    END
+    GEOMECHANICS_SUBSURFACE
+      OPTIONS
+        FLOW_COUPLING ONE_WAY_COUPLED
+      END
+    END
+  END
+END
+
+SUBSURFACE
+
+  EXTERNAL_FILE ./common/subsurface_common.txt
+
+  GRID
+    TYPE STRUCTURED
+    BOUNDS
+      0.0 0.0 0.0
+      1.0 1.0 1.0
+    /
+    NXYZ 4 4 4
+    GRAVITY 0.0 0.0 0.0
+  END
+
+  EOS WATER
+    DENSITY CONSTANT 997.16d0
+    VISCOSITY CONSTANT 1.0d-3
+  END
+
+  TIME
+    INITIAL_TIMESTEP_SIZE 1.d10 s
+    MAXIMUM_TIMESTEP_SIZE 1.d10 s
+    FINAL_TIME 1.d10 s
+  END
+
+  OUTPUT
+    SNAPSHOT_FILE
+      FORMAT HDF5
+      NO_PRINT_INITIAL
+      VARIABLES
+        LIQUID_PRESSURE
+        X_COORDINATE
+        Y_COORDINATE
+        Z_COORDINATE
+      END
+    END
+  END
+
+  #=========================== datasets ======================================
+  DATASET MAPPED mms_source_rate
+    FILENAME mms_flow_source_coupled.h5
+    HDF5_DATASET_NAME Flow_Source
+    MAP_HDF5_DATASET_NAME Flow_Source_Map
+  END
+
+  #=========================== flow conditions ================================
+  # Initial condition: uniform pressure p0 (so dp = p - p_init is non-trivial)
+  FLOW_CONDITION initial
+    UNITS Pa
+    TYPE
+      LIQUID_PRESSURE DIRICHLET
+    END
+    LIQUID_PRESSURE 200000.d0
+  END
+
+  # Boundary condition: p = p0 on all faces (sin(pi*x)=0 at x=0,1)
+  FLOW_CONDITION bc_pressure
+    UNITS Pa
+    TYPE
+      LIQUID_PRESSURE DIRICHLET
+    END
+    LIQUID_PRESSURE 200000.d0
+  END
+
+  # MMS source term (spatially varying, kg/s per cell)
+  FLOW_CONDITION mms_source
+    TYPE
+      RATE HETEROGENEOUS_MASS_RATE
+    END
+    RATE DATASET mms_source_rate
+  END
+
+  #=========================== initial / boundary / source ====================
+  INITIAL_CONDITION initial
+    FLOW_CONDITION initial
+    REGION All
+  END
+
+  BOUNDARY_CONDITION west
+    FLOW_CONDITION bc_pressure
+    REGION west
+  END
+
+  BOUNDARY_CONDITION east
+    FLOW_CONDITION bc_pressure
+    REGION east
+  END
+
+  BOUNDARY_CONDITION south
+    FLOW_CONDITION bc_pressure
+    REGION south
+  END
+
+  BOUNDARY_CONDITION north
+    FLOW_CONDITION bc_pressure
+    REGION north
+  END
+
+  BOUNDARY_CONDITION bottom
+    FLOW_CONDITION bc_pressure
+    REGION bottom
+  END
+
+  BOUNDARY_CONDITION top
+    FLOW_CONDITION bc_pressure
+    REGION top
+  END
+
+  SOURCE_SINK mms_source
+    FLOW_CONDITION mms_source
+    REGION All
+  END
+
+  STRATA
+    REGION All
+    MATERIAL soil
+  END
+
+  NUMERICAL_METHODS FLOW
+    LINEAR_SOLVER
+      SOLVER BCGS
+      PC_TYPE ILU
+      ATOL 1.0d-50
+      RTOL 1.0d-12
+      DTOL 10000
+      MAXIMUM_NUMBER_OF_ITERATIONS 10000
+    END
+    TIMESTEPPER
+      PRESSURE_CHANGE_GOVERNOR 1.0d20
+      TIMESTEP_OVERSTEP_REL_TOLERANCE 0.5
+    END
+    NEWTON_SOLVER FLOW
+      ATOL 1.0d-50
+      RTOL 1.0d-10
+      STOL 1.0d-10
+      DTOL 10000
+      MAXIMUM_NUMBER_OF_ITERATIONS 25
+    END
+  END
+END_SUBSURFACE
+
+GEOMECHANICS
+
+EXTERNAL_FILE ./common/geomechanics_common.txt
+
+  GEOMECHANICS_FLOW_INTERPOLATION
+    ORDER 1
+  /
+
+  GEOMECHANICS_REGRESSION
+    VARIABLES
+      DISPLACEMENT_X
+      DISPLACEMENT_Y
+      DISPLACEMENT_Z
+    END
+    VERTICES
+      32
+      33
+      34
+      37
+      38
+      39
+      42
+      43
+      44
+      57
+      58
+      59
+      62
+      63
+      64
+      67
+      68
+      69
+      82
+      83
+      84
+      87
+      88
+      89
+      92
+      93
+      94
+    END
+  END
+
+  GEOMECHANICS_TIME
+    COUPLING_TIMESTEP_SIZE 1.d10 s
+  END
+
+  GEOMECHANICS_DATASET Body_force_x
+    FILENAME mms_body_force_coupled.h5
+  END
+  GEOMECHANICS_DATASET Body_force_y
+    FILENAME mms_body_force_coupled.h5
+  END
+  GEOMECHANICS_DATASET Body_force_z
+    FILENAME mms_body_force_coupled.h5
+  END
+
+  GEOMECHANICS_STRATA
+    GEOMECHANICS_REGION all_geomech
+    GEOMECHANICS_MATERIAL soil_B1
+  END
+
+END_GEOMECHANICS

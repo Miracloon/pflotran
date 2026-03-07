@@ -37,3 +37,7 @@ END
 GEOMECHANICS_REGION top_internal
   FILE ./top_internal.vset
 END
+
+GEOMECHANICS_REGION obs_point
+  FILE ./obs_point.vset
+END

@@ -1,0 +1,165 @@
+#============================================
+SIMULATION
+  SIMULATION_TYPE GEOMECHANICS_SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+      OPTIONS
+      END
+    END
+    GEOMECHANICS_SUBSURFACE
+      OPTIONS
+        FLOW_COUPLING ONE_WAY_COUPLED
+      END
+    END
+  END
+END
+
+SUBSURFACE
+
+  EOS WATER
+    DENSITY DEFAULT
+    VISCOSITY CONSTANT 1.e-003
+  END
+
+
+  GRID
+    TYPE STRUCTURED
+    BOUNDS
+      0.0 0.0 0.0
+      1.0 1.0 1.0
+    /
+    NXYZ 4 4 4
+    GRAVITY 0.0 0.0 -9.80665
+  END
+
+EXTERNAL_FILE ./common/subsurface_common.txt
+
+  NUMERICAL_METHODS FLOW
+    LINEAR_SOLVER
+      SOLVER BCGS
+      PC_TYPE ILU
+      ATOL 1.e-050
+      RTOL 1.e-010
+      DTOL 10000
+      MAXIMUM_NUMBER_OF_ITERATIONS 10000
+    END
+    TIMESTEPPER
+      PRESSURE_CHANGE_GOVERNOR 100
+      TIMESTEP_OVERSTEP_REL_TOLERANCE 0.5
+    END
+    NEWTON_SOLVER FLOW
+      ATOL 1.e-050
+      RTOL 1.e-008
+      STOL 1.e-008
+      DTOL 10000
+      MAXIMUM_NUMBER_OF_ITERATIONS 12
+    END
+  END
+
+  OUTPUT
+    SNAPSHOT_FILE
+      FORMAT HDF5
+      NO_PRINT_INITIAL
+      VARIABLES
+        LIQUID_PRESSURE
+        X_COORDINATE
+        Y_COORDINATE
+        Z_COORDINATE
+      END
+    END
+  END
+
+  TIME
+    INITIAL_TIMESTEP_SIZE 1 s
+    MAXIMUM_TIMESTEP_SIZE 1 s
+    FINAL_TIME 1 s
+  END
+
+INITIAL_CONDITION initial
+  FLOW_CONDITION initial_hydrostatic
+  REGION All
+END
+
+BOUNDARY_CONDITION top
+  FLOW_CONDITION hydro_bc
+  REGION top
+END
+
+BOUNDARY_CONDITION bottom
+  FLOW_CONDITION hydro_bc
+  REGION bottom
+END
+
+STRATA
+  REGION All
+  MATERIAL RockMatrix3D
+END
+
+END_SUBSURFACE
+
+GEOMECHANICS
+
+  GEOMECHANICS_FLOW_INTERPOLATION
+    ORDER 1
+  /
+
+EXTERNAL_FILE ./common/geomechanics_common.txt
+
+  GEOMECHANICS_REGRESSION
+    VARIABLES
+      DISPLACEMENT_X
+      DISPLACEMENT_Y
+      DISPLACEMENT_Z
+    END
+    VERTICES
+      1
+      2
+      3
+      4
+      5
+      6
+      7
+      8
+      9
+      10
+      11
+      12
+      13
+      14
+      15
+      16
+      17
+      18
+      19
+      20
+      21
+      22
+      23
+      24
+      25
+      26
+      27
+    END
+  END
+
+  GEOMECHANICS_TIME
+    COUPLING_TIMESTEP_SIZE 1 s
+  END
+
+  GEOMECHANICS_DATASET Body_force_x
+    FILENAME mms_body_force_biot.h5
+  END
+  GEOMECHANICS_DATASET Body_force_y
+    FILENAME mms_body_force_biot.h5
+  END
+  GEOMECHANICS_DATASET Body_force_z
+    FILENAME mms_body_force_biot.h5
+  END
+
+  GEOMECHANICS_STRATA
+    GEOMECHANICS_REGION all_geomech
+    GEOMECHANICS_MATERIAL RockMatrix3D_B1
+  END
+
+END_GEOMECHANICS

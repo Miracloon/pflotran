@@ -39,6 +39,8 @@ subroutine CopySubsurfaceGridtoGeomechGrid(ugrid,geomech_grid,option)
 
 #include "petsc/finclude/petscao.h"
   use petscao
+#include "petsc/finclude/petscis.h"
+  use petscis
 
   use Grid_Unstructured_Aux_module
   use Geomechanics_Grid_Aux_module
@@ -74,6 +76,8 @@ subroutine CopySubsurfaceGridtoGeomechGrid(ugrid,geomech_grid,option)
   IS :: is_rank
   IS :: is_rank_new
   IS :: is_natural
+  IS :: is_ao_elem_natural
+  IS :: is_ao_elem_petsc
   IS :: is_ghost_petsc
   PetscReal :: max_val
   PetscInt :: row
@@ -108,7 +112,20 @@ subroutine CopySubsurfaceGridtoGeomechGrid(ugrid,geomech_grid,option)
 
   allocate(geomech_grid%elem_ids_petsc(size(ugrid%cell_ids_petsc)))
   geomech_grid%elem_ids_petsc = ugrid%cell_ids_petsc
-  geomech_grid%ao_natural_to_petsc = ugrid%ao_natural_to_petsc
+  allocate(int_array(geomech_grid%nlmax_elem))
+  allocate(int_array2(geomech_grid%nlmax_elem))
+  int_array = geomech_grid%elem_ids_natural - 1
+  int_array2 = geomech_grid%elem_ids_petsc - 1
+  call ISCreateGeneral(option%mycomm,geomech_grid%nlmax_elem,int_array, &
+                       PETSC_COPY_VALUES,is_ao_elem_natural,ierr);CHKERRQ(ierr)
+  call ISCreateGeneral(option%mycomm,geomech_grid%nlmax_elem,int_array2, &
+                       PETSC_COPY_VALUES,is_ao_elem_petsc,ierr);CHKERRQ(ierr)
+  call AOCreateMappingIS(is_ao_elem_natural,is_ao_elem_petsc, &
+                         geomech_grid%ao_natural_to_petsc,ierr);CHKERRQ(ierr)
+  call ISDestroy(is_ao_elem_natural,ierr);CHKERRQ(ierr)
+  call ISDestroy(is_ao_elem_petsc,ierr);CHKERRQ(ierr)
+  deallocate(int_array)
+  deallocate(int_array2)
   geomech_grid%max_ndual_per_elem = ugrid%max_ndual_per_cell
   geomech_grid%max_nnode_per_elem = ugrid%max_nvert_per_cell
   geomech_grid%max_elem_sharing_a_node = ugrid%max_cells_sharing_a_vertex
@@ -786,15 +803,23 @@ subroutine GeomechGridLocalizeRegions(grid,region_list,option)
     if (.not.(associated(region))) exit
 
     if (.not.(associated(region%vertex_ids)) .and. &
-        .not.(associated(region%sideset))) then
+        .not.(associated(region%sideset)) .and. &
+        .not.(associated(region%coordinates)) .and. &
+        region%iface == GM_FACE_NONE) then
       option%io_buffer = 'GeomechGridLocalizeRegions: define region ' // &
-                         'by list of vertices or sideset are currently ' // &
-                         'implemented: ' //  &
+                         'by COORDINATES, FACE+COORDINATES, FACE, ' // &
+                         'list of vertices, or sideset: ' // &
                           trim(region%name)
       call PrintErrMsg(option)
     else
       if (associated(region%sideset)) then
         call GeomechGridLocalizeRegFromSideSet(grid,region,option)
+      else if (associated(region%coordinates)) then
+        ! COORDINATES (possibly combined with FACE)
+        call GeomechGridLocalizeRegFromCoordinates(grid,region,option)
+      else if (region%iface /= GM_FACE_NONE) then
+        ! FACE alone (no COORDINATES)
+        call GeomechGridLocalizeRegFromFace(grid,region,option)
       else
         call GeomechGridLocalizeRegFromVertIDs(grid,region,option)
       endif
@@ -810,6 +835,288 @@ subroutine GeomechGridLocalizeRegions(grid,region_list,option)
   enddo
 
 end subroutine GeomechGridLocalizeRegions
+
+! ************************************************************************** !
+!
+! GeomechGridLocalizeRegFromFace: localizes a boundary region defined by
+! FACE (WEST/EAST/SOUTH/NORTH/BOTTOM/TOP) using vertex coordinates.
+!
+! author: Satish Karra
+! date: 02/23/26
+!
+! ************************************************************************** !
+subroutine GeomechGridLocalizeRegFromFace(geomech_grid, &
+                                          geomech_region, &
+                                          option)
+
+  use Option_module
+  use Geomechanics_Region_module
+
+  implicit none
+
+  type(geomech_grid_type) :: geomech_grid
+  type(gm_region_type) :: geomech_region
+  type(option_type) :: option
+
+  PetscReal :: xmin_local, xmax_local, ymin_local, ymax_local
+  PetscReal :: zmin_local, zmax_local
+  PetscReal :: xmin, xmax, ymin, ymax, zmin, zmax
+  PetscReal :: xrange, yrange, zrange, scale, tol
+  PetscReal :: x, y, z
+  PetscInt :: ghosted_id, local_id
+  PetscInt :: count
+  PetscInt, allocatable :: tmp_int_array(:)
+  PetscBool :: on_face
+  PetscErrorCode :: ierr
+
+  xmin_local = huge(1.d0)
+  ymin_local = huge(1.d0)
+  zmin_local = huge(1.d0)
+  xmax_local = -huge(1.d0)
+  ymax_local = -huge(1.d0)
+  zmax_local = -huge(1.d0)
+
+  do ghosted_id = 1, geomech_grid%ngmax_node
+    x = geomech_grid%nodes(ghosted_id)%x
+    y = geomech_grid%nodes(ghosted_id)%y
+    z = geomech_grid%nodes(ghosted_id)%z
+    xmin_local = min(xmin_local,x)
+    xmax_local = max(xmax_local,x)
+    ymin_local = min(ymin_local,y)
+    ymax_local = max(ymax_local,y)
+    zmin_local = min(zmin_local,z)
+    zmax_local = max(zmax_local,z)
+  enddo
+
+  call MPI_Allreduce(xmin_local,xmin,ONE_INTEGER_MPI,MPIU_REAL,MPI_MIN, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(xmax_local,xmax,ONE_INTEGER_MPI,MPIU_REAL,MPI_MAX, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(ymin_local,ymin,ONE_INTEGER_MPI,MPIU_REAL,MPI_MIN, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(ymax_local,ymax,ONE_INTEGER_MPI,MPIU_REAL,MPI_MAX, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(zmin_local,zmin,ONE_INTEGER_MPI,MPIU_REAL,MPI_MIN, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(zmax_local,zmax,ONE_INTEGER_MPI,MPIU_REAL,MPI_MAX, &
+                     option%mycomm,ierr);CHKERRQ(ierr)
+
+  xrange = xmax - xmin
+  yrange = ymax - ymin
+  zrange = zmax - zmin
+  scale = max(1.d0,max(xrange,max(yrange,zrange)))
+  tol = 1.d-10*scale
+
+  allocate(tmp_int_array(geomech_grid%nlmax_node))
+  count = 0
+  do ghosted_id = 1, geomech_grid%ngmax_node
+    local_id = geomech_grid%nG2L(ghosted_id)
+    if (local_id < 1) cycle
+
+    x = geomech_grid%nodes(ghosted_id)%x
+    y = geomech_grid%nodes(ghosted_id)%y
+    z = geomech_grid%nodes(ghosted_id)%z
+
+    on_face = PETSC_FALSE
+    select case(geomech_region%iface)
+      case(GM_FACE_WEST)
+        on_face = abs(x - xmin) <= tol
+      case(GM_FACE_EAST)
+        on_face = abs(x - xmax) <= tol
+      case(GM_FACE_SOUTH)
+        on_face = abs(y - ymin) <= tol
+      case(GM_FACE_NORTH)
+        on_face = abs(y - ymax) <= tol
+      case(GM_FACE_BOTTOM)
+        on_face = abs(z - zmin) <= tol
+      case(GM_FACE_TOP)
+        on_face = abs(z - zmax) <= tol
+      case default
+        option%io_buffer = 'Unsupported FACE in GEOMECHANICS_REGION: ' // &
+                           trim(geomech_region%name)
+        call PrintErrMsg(option)
+    end select
+
+    if (on_face) then
+      count = count + 1
+      tmp_int_array(count) = local_id
+    endif
+  enddo
+
+  geomech_region%num_verts = count
+  if (associated(geomech_region%vertex_ids)) deallocate(geomech_region%vertex_ids)
+  if (count > 0) then
+    allocate(geomech_region%vertex_ids(count))
+    geomech_region%vertex_ids(1:count) = tmp_int_array(1:count)
+  else
+    nullify(geomech_region%vertex_ids)
+  endif
+  deallocate(tmp_int_array)
+
+end subroutine GeomechGridLocalizeRegFromFace
+
+! ************************************************************************** !
+!
+! GeomechGridLocalizeRegFromCoordinates: Localizes a geomechanics region
+!                                        defined by a coordinate bounding box.
+!                                        Consistent with the flow-side
+!                                        COORDINATES-based region approach.
+!
+! author: OpenCode
+! date: 03/06/26
+!
+! ************************************************************************** !
+subroutine GeomechGridLocalizeRegFromCoordinates(geomech_grid, &
+                                                  geomech_region, &
+                                                  option)
+
+  use Option_module
+  use Geomechanics_Region_module
+
+  implicit none
+
+  type(geomech_grid_type) :: geomech_grid
+  type(gm_region_type) :: geomech_region
+  type(option_type) :: option
+
+  PetscReal :: x_min, x_max, y_min, y_max, z_min, z_max
+  PetscReal :: x, y, z
+  PetscReal :: tol
+  PetscReal :: xrange, yrange, zrange, scale
+  PetscReal :: xmin_global, xmax_global, ymin_global, ymax_global
+  PetscReal :: zmin_global, zmax_global
+  PetscReal :: xmin_local, xmax_local, ymin_local, ymax_local
+  PetscReal :: zmin_local, zmax_local
+  PetscInt :: ghosted_id, local_id
+  PetscInt :: count
+  PetscInt, allocatable :: tmp_int_array(:)
+  PetscBool :: in_region
+  PetscErrorCode :: ierr
+
+  ! Extract bounding box from region coordinates
+  x_min = min(geomech_region%coordinates(1)%x, &
+              geomech_region%coordinates(2)%x)
+  x_max = max(geomech_region%coordinates(1)%x, &
+              geomech_region%coordinates(2)%x)
+  y_min = min(geomech_region%coordinates(1)%y, &
+              geomech_region%coordinates(2)%y)
+  y_max = max(geomech_region%coordinates(1)%y, &
+              geomech_region%coordinates(2)%y)
+  z_min = min(geomech_region%coordinates(1)%z, &
+              geomech_region%coordinates(2)%z)
+  z_max = max(geomech_region%coordinates(1)%z, &
+              geomech_region%coordinates(2)%z)
+
+  ! Compute global domain bounding box for tolerance scaling
+  xmin_local = huge(1.d0)
+  ymin_local = huge(1.d0)
+  zmin_local = huge(1.d0)
+  xmax_local = -huge(1.d0)
+  ymax_local = -huge(1.d0)
+  zmax_local = -huge(1.d0)
+
+  do ghosted_id = 1, geomech_grid%ngmax_node
+    x = geomech_grid%nodes(ghosted_id)%x
+    y = geomech_grid%nodes(ghosted_id)%y
+    z = geomech_grid%nodes(ghosted_id)%z
+    xmin_local = min(xmin_local,x)
+    xmax_local = max(xmax_local,x)
+    ymin_local = min(ymin_local,y)
+    ymax_local = max(ymax_local,y)
+    zmin_local = min(zmin_local,z)
+    zmax_local = max(zmax_local,z)
+  enddo
+
+  call MPI_Allreduce(xmin_local,xmin_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MIN,option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(xmax_local,xmax_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(ymin_local,ymin_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MIN,option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(ymax_local,ymax_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(zmin_local,zmin_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MIN,option%mycomm,ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(zmax_local,zmax_global,ONE_INTEGER_MPI,MPIU_REAL, &
+                     MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
+
+  ! Tolerance scaled by domain size (same as structured boundary approach)
+  xrange = xmax_global - xmin_global
+  yrange = ymax_global - ymin_global
+  zrange = zmax_global - zmin_global
+  scale = max(1.d0,max(xrange,max(yrange,zrange)))
+  tol = 1.d-10*scale
+
+  ! Widen the bounding box by tol so that vertices exactly on the
+  ! specified coordinates are captured (consistent with >= / <= tests
+  ! on the flow side, but robust against floating-point rounding).
+  x_min = x_min - tol
+  x_max = x_max + tol
+  y_min = y_min - tol
+  y_max = y_max + tol
+  z_min = z_min - tol
+  z_max = z_max + tol
+
+  ! Iterate over local vertices and collect those inside the bounding box.
+  ! If FACE is specified (iface /= NONE), additionally require that the
+  ! vertex lies on the specified domain boundary face.
+  allocate(tmp_int_array(geomech_grid%nlmax_node))
+  count = 0
+  do ghosted_id = 1, geomech_grid%ngmax_node
+    local_id = geomech_grid%nG2L(ghosted_id)
+    if (local_id < 1) cycle
+
+    x = geomech_grid%nodes(ghosted_id)%x
+    y = geomech_grid%nodes(ghosted_id)%y
+    z = geomech_grid%nodes(ghosted_id)%z
+
+    ! Check bounding box containment
+    if (x >= x_min .and. x <= x_max .and. &
+        y >= y_min .and. y <= y_max .and. &
+        z >= z_min .and. z <= z_max) then
+
+      in_region = PETSC_TRUE
+
+      ! If FACE is set, additionally check the face constraint
+      if (geomech_region%iface /= GM_FACE_NONE) then
+        select case(geomech_region%iface)
+          case(GM_FACE_WEST)
+            in_region = abs(x - xmin_global) <= tol
+          case(GM_FACE_EAST)
+            in_region = abs(x - xmax_global) <= tol
+          case(GM_FACE_SOUTH)
+            in_region = abs(y - ymin_global) <= tol
+          case(GM_FACE_NORTH)
+            in_region = abs(y - ymax_global) <= tol
+          case(GM_FACE_BOTTOM)
+            in_region = abs(z - zmin_global) <= tol
+          case(GM_FACE_TOP)
+            in_region = abs(z - zmax_global) <= tol
+          case default
+            option%io_buffer = 'Unsupported FACE in GEOMECHANICS_REGION: ' // &
+                               trim(geomech_region%name)
+            call PrintErrMsg(option)
+        end select
+      endif
+
+      if (in_region) then
+        count = count + 1
+        tmp_int_array(count) = local_id
+      endif
+    endif
+  enddo
+
+  geomech_region%num_verts = count
+  if (associated(geomech_region%vertex_ids)) deallocate(geomech_region%vertex_ids)
+  if (count > 0) then
+    allocate(geomech_region%vertex_ids(count))
+    geomech_region%vertex_ids(1:count) = tmp_int_array(1:count)
+  else
+    nullify(geomech_region%vertex_ids)
+  endif
+  deallocate(tmp_int_array)
+
+end subroutine GeomechGridLocalizeRegFromCoordinates
 
 ! ************************************************************************** !
 !
@@ -1106,6 +1413,20 @@ end subroutine GeomechGridLocalizeRegFromSideSet
 ! ************************************************************************** !
 subroutine GeomechGridLocalizeRegFromVertIDs(geomech_grid,geomech_region, &
                                              option)
+  !
+  ! Restricts a vertex-set region to the nodes locally owned by this rank.
+  !
+  ! The region's vertex_ids array is distributed: each rank holds only a
+  ! contiguous chunk of the full natural-ID list (set during file reading).
+  ! To determine which local nodes belong to the region we:
+  !   1. Gather all natural IDs from every rank onto every rank
+  !      (MPI_Allgatherv).
+  !   2. Build a direct-address flag array indexed by natural ID.
+  !   3. For each locally-owned node, check the flag and keep matches.
+  !
+  ! This replaces a previous Vec/scatter/AO implementation that produced
+  ! incorrect node counts in parallel due to a mismatch between PETSc
+  ! ordering and the natural-ID indexing used by VecSetValues.
 
   use Option_module
   use Geomechanics_Region_module
@@ -1116,136 +1437,90 @@ subroutine GeomechGridLocalizeRegFromVertIDs(geomech_grid,geomech_region, &
   type(gm_region_type) :: geomech_region
   type(option_type) :: option
 
-  Vec :: vec_vertex_ids,vec_vertex_ids_loc
-  IS :: is_from, is_to
-  VecScatter :: vec_scat
   PetscErrorCode :: ierr
-  PetscInt :: ii,count
-  PetscInt :: istart,iend
-  PetscInt :: ghosted_id,local_id
-  PetscInt :: natural_id
-  PetscInt, pointer :: tmp_int_array(:)
-  PetscScalar, pointer :: v_loc_p(:)
-  PetscScalar, pointer :: tmp_scl_array(:)
+  PetscInt :: ii, count, local_id, natural_id
+  PetscInt :: irank, nsize, total_verts
+  PetscInt, allocatable :: num_verts_per_rank(:)
+  PetscInt, allocatable :: displs(:)
+  PetscInt, allocatable :: all_natural_ids(:)
+  PetscInt, allocatable :: flag(:)
+  PetscInt :: num_verts_mpi
 
 #ifdef GEOMECH_DEBUG
   character(len=MAXSTRINGLENGTH) :: string, string1
-  PetscViewer :: viewer
 #endif
 
-  if (associated(geomech_region%vertex_ids)) then
-    call VecCreateMPI(option%mycomm,geomech_grid%nlmax_node,PETSC_DECIDE, &
-                      vec_vertex_ids,ierr);CHKERRQ(ierr)
-    call VecCreateMPI(option%mycomm,geomech_grid%nlmax_node,PETSC_DECIDE, &
-                      vec_vertex_ids_loc,ierr);CHKERRQ(ierr)
-    call VecZeroEntries(vec_vertex_ids,ierr);CHKERRQ(ierr)
+  if (.not. associated(geomech_region%vertex_ids)) return
 
-    allocate(tmp_int_array(geomech_region%num_verts))
-    allocate(tmp_scl_array(geomech_region%num_verts))
+  ! -----------------------------------------------------------------------
+  ! Step 1: gather the number of vertices each rank holds for this region
+  ! -----------------------------------------------------------------------
+  nsize = option%comm%size
+  allocate(num_verts_per_rank(nsize))
+  num_verts_mpi = geomech_region%num_verts
+  call MPI_Allgather(num_verts_mpi, ONE_INTEGER_MPI, MPIU_INTEGER, &
+                     num_verts_per_rank, ONE_INTEGER_MPI, MPIU_INTEGER, &
+                     option%mycomm, ierr); CHKERRQ(ierr)
 
-    count = 0
-    do ii = 1, geomech_region%num_verts
-      count = count + 1
-      ! Change to zero-based numbering
-      tmp_int_array(count) = geomech_region%vertex_ids(ii) - 1
-      tmp_scl_array(count) = 1.d0
-    enddo
+  ! -----------------------------------------------------------------------
+  ! Step 2: compute total count and displacements for MPI_Allgatherv
+  ! -----------------------------------------------------------------------
+  allocate(displs(nsize))
+  displs(1) = 0
+  do irank = 2, nsize
+    displs(irank) = displs(irank-1) + num_verts_per_rank(irank-1)
+  enddo
+  total_verts = displs(nsize) + num_verts_per_rank(nsize)
 
-#ifdef GEOMECH_DEBUG
-    call PetscViewerASCIIOpen(option%mycomm,'vec_vertex_ids_bef.out',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call VecView(vec_vertex_ids,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
+  ! -----------------------------------------------------------------------
+  ! Step 3: gather ALL natural IDs onto every rank
+  ! -----------------------------------------------------------------------
+  allocate(all_natural_ids(total_verts))
+  call MPI_Allgatherv(geomech_region%vertex_ids, num_verts_mpi, &
+                      MPIU_INTEGER, all_natural_ids, num_verts_per_rank, &
+                      displs, MPIU_INTEGER, option%mycomm, ierr); CHKERRQ(ierr)
 
-    call VecSetValues(vec_vertex_ids,geomech_region%num_verts,tmp_int_array, &
-                      tmp_scl_array,ADD_VALUES,ierr);CHKERRQ(ierr)
+  deallocate(num_verts_per_rank)
+  deallocate(displs)
 
-    deallocate(tmp_int_array)
-    deallocate(tmp_scl_array)
+  ! -----------------------------------------------------------------------
+  ! Step 4: build a direct-address flag array (natural IDs are 1-based)
+  ! -----------------------------------------------------------------------
+  allocate(flag(geomech_grid%nmax_node))
+  flag = 0
+  do ii = 1, total_verts
+    flag(all_natural_ids(ii)) = 1
+  enddo
+  deallocate(all_natural_ids)
 
-    call VecAssemblyBegin(vec_vertex_ids,ierr);CHKERRQ(ierr)
-    call VecAssemblyEnd(vec_vertex_ids,ierr);CHKERRQ(ierr)
-
-#ifdef GEOMECH_DEBUG
-    call PetscViewerASCIIOpen(option%mycomm,'vec_vertex_ids_aft.out',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call VecView(vec_vertex_ids,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
-
-  endif
-
-  allocate(tmp_int_array(geomech_grid%nlmax_node))
+  ! -----------------------------------------------------------------------
+  ! Step 5: count matching local nodes
+  ! -----------------------------------------------------------------------
   count = 0
-  do ghosted_id = 1, geomech_grid%ngmax_node
-    local_id = geomech_grid%nG2L(ghosted_id)
-    if (local_id < 1) cycle
-    count = count + 1
-    natural_id = geomech_grid%nG2A(ghosted_id)
-    tmp_int_array(count) = natural_id
+  do local_id = 1, geomech_grid%nlmax_node
+    natural_id = geomech_grid%node_ids_local_natural(local_id)
+    if (flag(natural_id) == 1) count = count + 1
   enddo
 
-  tmp_int_array = tmp_int_array - 1
-  call ISCreateBlock(option%mycomm,1,geomech_grid%nlmax_node,tmp_int_array, &
-                     PETSC_COPY_VALUES,is_from,ierr);CHKERRQ(ierr)
-
-  call VecGetOwnershipRange(vec_vertex_ids_loc,istart,iend, &
-                            ierr);CHKERRQ(ierr)
-  do ii = 1,geomech_grid%nlmax_node
-    tmp_int_array(ii) = ii + istart
-  enddo
-
-  ! is_from is natural_numbering
-  ! is_to is PETSc_numbering
-
-  tmp_int_array = tmp_int_array - 1
-  call ISCreateBlock(option%mycomm,1,geomech_grid%nlmax_node,tmp_int_array, &
-                     PETSC_COPY_VALUES,is_to,ierr);CHKERRQ(ierr)
-
-  deallocate(tmp_int_array)
-
-  call VecScatterCreate(vec_vertex_ids,is_from,vec_vertex_ids_loc,is_to, &
-                        vec_scat,ierr);CHKERRQ(ierr)
-
-  call ISDestroy(is_from,ierr);CHKERRQ(ierr)
-  call ISDestroy(is_to,ierr);CHKERRQ(ierr)
-
-  call VecScatterBegin(vec_scat,vec_vertex_ids,vec_vertex_ids_loc, &
-                       INSERT_VALUES,SCATTER_FORWARD,ierr);CHKERRQ(ierr)
-  call VecScatterEnd(vec_scat,vec_vertex_ids,vec_vertex_ids_loc,INSERT_VALUES, &
-                     SCATTER_FORWARD,ierr);CHKERRQ(ierr)
-  call VecScatterDestroy(vec_scat,ierr);CHKERRQ(ierr)
-
-#if GEOMECH_DEBUG
-    call PetscViewerASCIIOpen(option%mycomm,'vec_vertex_ids_loc.out',viewer, &
-                              ierr);CHKERRQ(ierr)
-    call VecView(vec_vertex_ids_loc,viewer,ierr);CHKERRQ(ierr)
-    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
-#endif
-
-  call VecGetArray(vec_vertex_ids_loc,v_loc_p,ierr);CHKERRQ(ierr)
-  count = 0
-  do ii = 1,geomech_grid%nlmax_node
-    if (v_loc_p(ii) == 1) count = count + 1
-  enddo
-
+  ! -----------------------------------------------------------------------
+  ! Step 6: build the new local vertex_ids list
+  ! -----------------------------------------------------------------------
   geomech_region%num_verts = count
+  deallocate(geomech_region%vertex_ids)
+  nullify(geomech_region%vertex_ids)
   if (count > 0) then
-    allocate(tmp_int_array(count))
+    allocate(geomech_region%vertex_ids(count))
     count = 0
-    do ii = 1,geomech_grid%nlmax_node
-      if (v_loc_p(ii) == 1) then
+    do local_id = 1, geomech_grid%nlmax_node
+      natural_id = geomech_grid%node_ids_local_natural(local_id)
+      if (flag(natural_id) == 1) then
         count = count + 1
-        tmp_int_array(count) = ii
+        geomech_region%vertex_ids(count) = local_id
       endif
     enddo
-
-    deallocate(geomech_region%vertex_ids)
-    allocate(geomech_region%vertex_ids(geomech_region%num_verts))
-    geomech_region%vertex_ids = tmp_int_array
-    deallocate(tmp_int_array)
   endif
+
+  deallocate(flag)
 
 #ifdef GEOMECH_DEBUG
   write(string,*) option%myrank
@@ -1258,11 +1533,6 @@ subroutine GeomechGridLocalizeRegFromVertIDs(geomech_grid,geomech_region, &
   enddo
   close(86)
 #endif
-
-  call VecRestoreArray(vec_vertex_ids_loc,v_loc_p,ierr);CHKERRQ(ierr)
-
-  call VecDestroy(vec_vertex_ids,ierr);CHKERRQ(ierr)
-  call VecDestroy(vec_vertex_ids_loc,ierr);CHKERRQ(ierr)
 
 end subroutine GeomechGridLocalizeRegFromVertIDs
 

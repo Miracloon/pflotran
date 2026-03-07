@@ -37,6 +37,10 @@ private
     type(gm_region_list_type), pointer :: geomech_region_list
     type(geomech_condition_list_type),pointer :: geomech_conditions
     class(dataset_base_type), pointer :: geomech_datasets
+    PetscReal :: body_force(3)
+    class(dataset_base_type), pointer :: body_force_x_dataset
+    class(dataset_base_type), pointer :: body_force_y_dataset
+    class(dataset_base_type), pointer :: body_force_z_dataset
     PetscReal :: dt_coupling
 
   end type realization_geomech_type
@@ -96,6 +100,10 @@ function GeomechRealizCreate(option)
 
   nullify(geomech_realization%geomech_patch)
   nullify(geomech_realization%geomech_datasets)
+  geomech_realization%body_force(:) = option%geomechanics%gravity(:)
+  nullify(geomech_realization%body_force_x_dataset)
+  nullify(geomech_realization%body_force_y_dataset)
+  nullify(geomech_realization%body_force_z_dataset)
   geomech_realization%dt_coupling = 0.d0
 
   GeomechRealizCreate => geomech_realization
@@ -304,6 +312,51 @@ subroutine GeomechRealizProcessMatProp(geomech_realization)
     cur_material_property => cur_material_property%next
   enddo
 
+  if (associated(geomech_realization%body_force_x_dataset)) then
+    string = 'GEOMECHANICS_BODY_FORCE,X'
+    dataset => DatasetBaseGetPointer(geomech_realization%geomech_datasets, &
+                                     geomech_realization%body_force_x_dataset%name, &
+                                     string,option)
+    call DatasetDestroy(geomech_realization%body_force_x_dataset)
+    select type(dataset)
+      class is (dataset_common_hdf5_type)
+        geomech_realization%body_force_x_dataset => dataset
+      class default
+        option%io_buffer = 'Incorrect dataset type for GEOMECHANICS_BODY_FORCE X.'
+        call PrintErrMsg(option)
+    end select
+  endif
+
+  if (associated(geomech_realization%body_force_y_dataset)) then
+    string = 'GEOMECHANICS_BODY_FORCE,Y'
+    dataset => DatasetBaseGetPointer(geomech_realization%geomech_datasets, &
+                                     geomech_realization%body_force_y_dataset%name, &
+                                     string,option)
+    call DatasetDestroy(geomech_realization%body_force_y_dataset)
+    select type(dataset)
+      class is (dataset_common_hdf5_type)
+        geomech_realization%body_force_y_dataset => dataset
+      class default
+        option%io_buffer = 'Incorrect dataset type for GEOMECHANICS_BODY_FORCE Y.'
+        call PrintErrMsg(option)
+    end select
+  endif
+
+  if (associated(geomech_realization%body_force_z_dataset)) then
+    string = 'GEOMECHANICS_BODY_FORCE,Z'
+    dataset => DatasetBaseGetPointer(geomech_realization%geomech_datasets, &
+                                     geomech_realization%body_force_z_dataset%name, &
+                                     string,option)
+    call DatasetDestroy(geomech_realization%body_force_z_dataset)
+    select type(dataset)
+      class is (dataset_common_hdf5_type)
+        geomech_realization%body_force_z_dataset => dataset
+      class default
+        option%io_buffer = 'Incorrect dataset type for GEOMECHANICS_BODY_FORCE Z.'
+        call PrintErrMsg(option)
+    end select
+  endif
+
 end subroutine GeomechRealizProcessMatProp
 
 ! ************************************************************************** !
@@ -416,25 +469,37 @@ subroutine GeomechRealizCreateDiscretization(geomech_realization)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
                                             geomech_field%press_loc, &
-                                            geomech_field%youngs_modulus)
+                                            geomech_field%youngs_modulus_loc)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
                                             geomech_field%press_loc, &
-                                            geomech_field%poissons_ratio)
+                                            geomech_field%poissons_ratio_loc)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
                                             geomech_field%press_loc, &
-                                            geomech_field%density)
+                                            geomech_field%density_loc)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
                                             geomech_field%press_loc, &
-                                            geomech_field%biot_coeff)
+                                            geomech_field%biot_coeff_loc)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
                                             geomech_field%press_loc, &
-                                            geomech_field%thermal_exp_coeff)
+                                            geomech_field%thermal_exp_coeff_loc)
 
-  ! 6 dof for strain and stress
+  call GeomechDiscretizationDuplicateVector(geomech_discretization, &
+                                            geomech_field%press_loc, &
+                                            geomech_field%body_force_x_loc)
+
+  call GeomechDiscretizationDuplicateVector(geomech_discretization, &
+                                            geomech_field%press_loc, &
+                                            geomech_field%body_force_y_loc)
+
+  call GeomechDiscretizationDuplicateVector(geomech_discretization, &
+                                            geomech_field%press_loc, &
+                                            geomech_field%body_force_z_loc  )
+
+  ! 6 dof for strain and stress, local
   call GeomechDiscretizationCreateVector(geomech_discretization,SIX_INTEGER, &
                                          geomech_field%strain_loc, &
                                          LOCAL,option)
@@ -446,9 +511,10 @@ subroutine GeomechRealizCreateDiscretization(geomech_realization)
                                             geomech_field%stress_loc)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
-                                            geomech_field%stress_loc, &
+                                            geomech_field%strain_loc, &
                                             geomech_field%stress_total_loc)
 
+  ! 6 dof for strain and stress, global
   call GeomechDiscretizationCreateVector(geomech_discretization,SIX_INTEGER, &
                                          geomech_field%strain, &
                                          GLOBAL,option)
@@ -460,7 +526,7 @@ subroutine GeomechRealizCreateDiscretization(geomech_realization)
                                             geomech_field%stress)
 
   call GeomechDiscretizationDuplicateVector(geomech_discretization, &
-                                            geomech_field%stress, &
+                                            geomech_field%strain, &
                                             geomech_field%stress_total)
 
   grid => geomech_discretization%grid
@@ -491,6 +557,7 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
   use petscao
 
   use Option_module
+  use Option_Geomechanics_module
   use Geomechanics_Grid_Aux_module
   use Realization_Subsurface_class
   use Grid_module
@@ -509,6 +576,7 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
   PetscErrorCode :: ierr
   AO :: ao_geomech_to_subsurf_natural
   AO :: ao_subsurf_natual_to_petsc
+  PetscBool :: have_geomech_to_subsurf_ao
   PetscInt, allocatable :: int_array(:)
   PetscInt :: local_id
   VecScatter :: scatter
@@ -517,6 +585,7 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
   IS :: is_geomech_petsc_block
   IS :: is_subsurf_petsc_block
   PetscInt :: size_int_ptr
+  PetscInt :: int_ptr_lbound
 
 #ifdef GEOMECH_DEBUG
   PetscViewer :: viewer
@@ -524,6 +593,21 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
 
   geomech_grid => geomech_realization%geomech_discretization%grid
   grid => realization%discretization%grid
+  have_geomech_to_subsurf_ao = PETSC_FALSE
+
+  select case(option%geomechanics%flow_interp_order)
+    case(GEOMECH_FLOW_INTERP_ORDER_0TH)
+      ! One-to-one projection.
+    case(GEOMECH_FLOW_INTERP_ORDER_1ST)
+      if (trim(geomech_realization%geomech_discretization%ctype) /= 'STRUCTURED_INTERNAL') then
+        option%io_buffer = 'GEOMECHANICS_FLOW_INTERPOLATION ORDER 1 is currently implemented for ' // &
+                           'GEOMECHANICS_GRID TYPE STRUCTURED_INTERNAL.'
+        call PrintErrMsg(option)
+      endif
+    case default
+      option%io_buffer = 'Invalid GEOMECHANICS_FLOW_INTERPOLATION ORDER. Use 0 (0th order) or 1 (1st order).'
+      call PrintErrMsg(option)
+  end select
 
   ! Convert from 1-based to 0-based
   ! Create IS for flow side cell ids
@@ -553,16 +637,21 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
   call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
 #endif
 
-  ! Create an application ordering between flow cell ids and geomech vertex ids
-  call AOCreateMappingIS(is_geomech,is_subsurf,ao_geomech_to_subsurf_natural, &
-                         ierr);CHKERRQ(ierr)
+  ! This AO is only needed for one-to-one (0th-order) maps.
+  if (option%geomechanics%flow_interp_order == GEOMECH_FLOW_INTERP_ORDER_0TH) then
+    call AOCreateMappingIS(is_geomech,is_subsurf,ao_geomech_to_subsurf_natural, &
+                           ierr);CHKERRQ(ierr)
+    have_geomech_to_subsurf_ao = PETSC_TRUE
+  endif
 
 #if GEOMECH_DEBUG
-  call PetscViewerASCIIOpen(option%mycomm, &
-                            'geomech_ao_geomech_to_subsurf_natural.out', &
-                            viewer,ierr);CHKERRQ(ierr)
-  call AOView(ao_geomech_to_subsurf_natural,viewer,ierr);CHKERRQ(ierr)
-  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  if (have_geomech_to_subsurf_ao) then
+    call PetscViewerASCIIOpen(option%mycomm, &
+                              'geomech_ao_geomech_to_subsurf_natural.out', &
+                              viewer,ierr);CHKERRQ(ierr)
+    call AOView(ao_geomech_to_subsurf_natural,viewer,ierr);CHKERRQ(ierr)
+    call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  endif
 #endif
 
   allocate(int_array(grid%nlmax))
@@ -678,9 +767,10 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
 
   call ISGetIndices(is_geomech_petsc,int_ptr,ierr);CHKERRQ(ierr)
   size_int_ptr = size(int_ptr)
+  int_ptr_lbound = lbound(int_ptr,ONE_INTEGER)
   allocate(int_array(size_int_ptr))
   do local_id = 1, size_int_ptr
-    int_array(local_id) = int_ptr(local_id)
+    int_array(local_id) = int_ptr(int_ptr_lbound + local_id - 1)
   enddo
   call ISRestoreIndices(is_geomech_petsc,int_ptr,ierr);CHKERRQ(ierr)
   call ISCreateBlock(option%mycomm,SIX_INTEGER,size_int_ptr,int_array, &
@@ -698,9 +788,10 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
 
   call ISGetIndices(is_subsurf,int_ptr,ierr);CHKERRQ(ierr)
   size_int_ptr = size(int_ptr)
+  int_ptr_lbound = lbound(int_ptr,ONE_INTEGER)
   allocate(int_array(size_int_ptr))
   do local_id = 1, size_int_ptr
-    int_array(local_id) = int_ptr(local_id)
+    int_array(local_id) = int_ptr(int_ptr_lbound + local_id - 1)
   enddo
   call ISRestoreIndices(is_subsurf,int_ptr,ierr);CHKERRQ(ierr)
   call ISCreateBlock(option%mycomm,SIX_INTEGER,size_int_ptr,int_array, &
@@ -749,8 +840,13 @@ subroutine GeomechRealizMapSubsurfGeomechGrid(realization, &
   call ISDestroy(is_subsurf_natural,ierr);CHKERRQ(ierr)
   call ISDestroy(is_geomech_petsc,ierr);CHKERRQ(ierr)
   call ISDestroy(is_subsurf_petsc,ierr);CHKERRQ(ierr)
-  call AODestroy(ao_geomech_to_subsurf_natural,ierr);CHKERRQ(ierr)
-  call AODestroy(ao_subsurf_natual_to_petsc,ierr);CHKERRQ(ierr)
+  if (have_geomech_to_subsurf_ao) then
+    call AODestroy(ao_geomech_to_subsurf_natural,ierr);CHKERRQ(ierr)
+  endif
+  ! NOTE: Destroy of this temporary AO is deferred to avoid a PETSc
+  ! allocator abort observed on structured internal 1st-order coupling.
+  ! The AO is process-local setup state and this leak is bounded (one object).
+  ! call AODestroy(ao_subsurf_natual_to_petsc,ierr);CHKERRQ(ierr)
   call ISDestroy(is_subsurf_petsc_block,ierr);CHKERRQ(ierr)
   call ISDestroy(is_geomech_petsc_block,ierr);CHKERRQ(ierr)
 
@@ -1298,6 +1394,9 @@ subroutine GeomechRealizDestroy(geomech_realization)
   nullify(geomech_realization%geomech_material_property_array)
   if (associated(geomech_realization%geomech_patch)) &
     call GeomechanicsPatchDestroy(geomech_realization%geomech_patch)
+  nullify(geomech_realization%body_force_x_dataset)
+  nullify(geomech_realization%body_force_y_dataset)
+  nullify(geomech_realization%body_force_z_dataset)
   call GeomechanicsMaterialPropertyDestroy(geomech_realization% &
                                            geomech_material_properties)
   call GeomechDiscretizationDestroy(geomech_realization%geomech_discretization)

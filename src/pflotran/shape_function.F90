@@ -179,17 +179,50 @@ subroutine ShapeFunctionCalculate(shapefunction,option)
   PetscInt :: i
   PetscReal :: c4, c8
   PetscReal :: x1m, x1p, x2m, x2p, x3m, x3p
+  PetscBool :: zeta_valid
 
   N => shapefunction%N
   DN => shapefunction%DN
   zeta => shapefunction%zeta
 
-  do i = 1, size(zeta)
-    if (zeta(i) < -1.d0 .or. zeta(i) > 1.d0) then
-      call ShapeFunctionError('Enter values between -1 and 1 for zeta.',option)
-      return
-    endif
-  enddo
+  ! Element-type-aware coordinate range validation
+  zeta_valid = PETSC_TRUE
+  select case(shapefunction%element_type)
+    case(TRI_TYPE)
+      ! Barycentric: each zeta(i) in [0,1], sum(zeta) <= 1
+      do i = 1, size(zeta)
+        if (zeta(i) < 0.d0 .or. zeta(i) > 1.d0) zeta_valid = PETSC_FALSE
+      enddo
+      if (zeta(1) + zeta(2) > 1.d0 + 1.d-12) zeta_valid = PETSC_FALSE
+    case(TET_TYPE)
+      ! Barycentric: each zeta(i) in [0,1], sum(zeta) <= 1
+      do i = 1, size(zeta)
+        if (zeta(i) < 0.d0 .or. zeta(i) > 1.d0) zeta_valid = PETSC_FALSE
+      enddo
+      if (zeta(1) + zeta(2) + zeta(3) > 1.d0 + 1.d-12) zeta_valid = PETSC_FALSE
+    case(WEDGE_TYPE)
+      ! Triangular face: zeta(1),zeta(2) in [0,1] with sum <= 1
+      ! Axial: zeta(3) in [-1,1]
+      if (zeta(1) < 0.d0 .or. zeta(1) > 1.d0) zeta_valid = PETSC_FALSE
+      if (zeta(2) < 0.d0 .or. zeta(2) > 1.d0) zeta_valid = PETSC_FALSE
+      if (zeta(1) + zeta(2) > 1.d0 + 1.d-12) zeta_valid = PETSC_FALSE
+      if (zeta(3) < -1.d0 .or. zeta(3) > 1.d0) zeta_valid = PETSC_FALSE
+    case(PYR_TYPE)
+      ! Base: zeta(1),zeta(2) in [-1,1]; apex: zeta(3) in [0,1]
+      if (zeta(1) < -1.d0 .or. zeta(1) > 1.d0) zeta_valid = PETSC_FALSE
+      if (zeta(2) < -1.d0 .or. zeta(2) > 1.d0) zeta_valid = PETSC_FALSE
+      if (zeta(3) < 0.d0  .or. zeta(3) > 1.d0) zeta_valid = PETSC_FALSE
+    case default
+      ! LINE_TYPE, QUAD_TYPE, HEX_TYPE: all coords in [-1,1]
+      do i = 1, size(zeta)
+        if (zeta(i) < -1.d0 .or. zeta(i) > 1.d0) zeta_valid = PETSC_FALSE
+      enddo
+  end select
+  if (zeta_valid .eqv. PETSC_FALSE) then
+    call ShapeFunctionError('Zeta coordinates out of valid range ' // &
+      'for the element type.',option)
+    return
+  endif
 
   select case(shapefunction%element_type)
     case(LINE_TYPE)

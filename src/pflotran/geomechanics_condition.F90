@@ -923,6 +923,7 @@ subroutine GeomechConditionDestroy(condition)
   nullify(condition%force_x)
   nullify(condition%force_y)
   nullify(condition%force_z)
+  nullify(condition%traction)
 
   nullify(condition%next)
 

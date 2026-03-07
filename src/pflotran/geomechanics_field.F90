@@ -38,11 +38,14 @@ module Geomechanics_Field_module
     Vec :: porosity_init_loc
 
     ! spatially-varying material properties
-    Vec :: youngs_modulus
-    Vec :: poissons_ratio
-    Vec :: density
-    Vec :: biot_coeff
-    Vec :: thermal_exp_coeff
+    Vec :: youngs_modulus_loc
+    Vec :: poissons_ratio_loc
+    Vec :: density_loc
+    Vec :: biot_coeff_loc
+    Vec :: thermal_exp_coeff_loc
+    Vec :: body_force_x_loc
+    Vec :: body_force_y_loc
+    Vec :: body_force_z_loc
 
     Vec :: fluid_density ! store density from subsurf
     Vec :: fluid_density_loc
@@ -113,11 +116,14 @@ function GeomechFieldCreate()
   PetscObjectNullify(geomech_field%porosity_loc)
   PetscObjectNullify(geomech_field%porosity_init_loc)
 
-  PetscObjectNullify(geomech_field%youngs_modulus)
-  PetscObjectNullify(geomech_field%poissons_ratio)
-  PetscObjectNullify(geomech_field%density)
-  PetscObjectNullify(geomech_field%biot_coeff)
-  PetscObjectNullify(geomech_field%thermal_exp_coeff)
+  PetscObjectNullify(geomech_field%youngs_modulus_loc)
+  PetscObjectNullify(geomech_field%poissons_ratio_loc)
+  PetscObjectNullify(geomech_field%density_loc)
+  PetscObjectNullify(geomech_field%biot_coeff_loc)
+  PetscObjectNullify(geomech_field%thermal_exp_coeff_loc)
+  PetscObjectNullify(geomech_field%body_force_x_loc)
+  PetscObjectNullify(geomech_field%body_force_y_loc)
+  PetscObjectNullify(geomech_field%body_force_z_loc)
 
   PetscObjectNullify(geomech_field%fluid_density)
   PetscObjectNullify(geomech_field%fluid_density_loc)
@@ -174,11 +180,14 @@ subroutine GeomechFieldDestroy(geomech_field)
   call PUVecDestroy(geomech_field%porosity)
   call PUVecDestroy(geomech_field%porosity_loc)
   call PUVecDestroy(geomech_field%porosity_init_loc)
-  call PUVecDestroy(geomech_field%youngs_modulus)
-  call PUVecDestroy(geomech_field%poissons_ratio)
-  call PUVecDestroy(geomech_field%density)
-  call PUVecDestroy(geomech_field%biot_coeff)
-  call PUVecDestroy(geomech_field%thermal_exp_coeff)
+  call PUVecDestroy(geomech_field%youngs_modulus_loc)
+  call PUVecDestroy(geomech_field%poissons_ratio_loc)
+  call PUVecDestroy(geomech_field%density_loc)
+  call PUVecDestroy(geomech_field%biot_coeff_loc)
+  call PUVecDestroy(geomech_field%thermal_exp_coeff_loc)
+  call PUVecDestroy(geomech_field%body_force_x_loc)
+  call PUVecDestroy(geomech_field%body_force_y_loc)
+  call PUVecDestroy(geomech_field%body_force_z_loc)
   call PUVecDestroy(geomech_field%fluid_density)
   call PUVecDestroy(geomech_field%fluid_density_loc)
   call PUVecDestroy(geomech_field%fluid_density_init_loc)

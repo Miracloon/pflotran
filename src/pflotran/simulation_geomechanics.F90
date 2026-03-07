@@ -111,10 +111,6 @@ subroutine GeomechanicsSimulationInitializeRun(this)
   call PrintMsg(this%option,'Simulation%InitializeRun()')
 #endif
 
-  if (this%option%restart_flag) then
-    call PrintErrMsg(this%option,'add code for restart of GeomechanicsSimulation')
-  endif
-
   call SimSubsurfInitializeRun(this)
 
 end subroutine GeomechanicsSimulationInitializeRun
@@ -148,14 +144,24 @@ end subroutine GeomechanicsSimInputRecord
 
 subroutine GeomechanicsSimulationExecuteRun(this)
   !
-  ! This routine
+  ! Executes the geomechanics simulation with checkpoint/restart support.
+  !
+  ! For the decoupled path (no geomech realization), delegates to
+  ! SimSubsurfExecuteRun which handles checkpoints via waypoint_list_outer.
+  !
+  ! For the coupled path, integrates checkpoint handling into the
+  ! dt_coupling loop: after each RunToTime call, any checkpoint waypoints
+  ! that have been reached trigger a checkpoint. A final checkpoint is
+  ! written on successful completion.
   !
   ! Author: Gautam Bisht, LBNL
   ! Date: 01/01/14
+  ! Modified: J.A. Angeles, 2025 - added checkpoint/restart support
   !
 
   use Waypoint_module
-  use Timestepper_Base_class, only : TS_CONTINUE
+  use Timestepper_Base_class
+  use Checkpoint_module
 
   implicit none
 
@@ -164,11 +170,12 @@ subroutine GeomechanicsSimulationExecuteRun(this)
   PetscReal :: time
   PetscReal :: final_time
   PetscReal :: dt
+  PetscReal :: target_time
   PetscReal, parameter :: tolerance = 1.d-3
+  type(waypoint_type), pointer :: cur_waypoint
+  character(len=MAXSTRINGLENGTH) :: append_name
 
   time = this%option%time
-  dt = this%geomech%realization%dt_coupling
-
   final_time = SimSubsurfGetFinalWaypointTime(this)
 
 #ifdef GEOMECH_DEBUG
@@ -176,31 +183,111 @@ subroutine GeomechanicsSimulationExecuteRun(this)
 #endif
 
   if (.not.associated(this%geomech%realization)) then
-    call this%RunToTime(final_time)
+    ! Decoupled path: delegate to parent which handles checkpoints
+    call SimSubsurfExecuteRun(this)
 
   else
 
-    ! If simulation is decoupled subsurfac-geomech simulation, set
+    dt = this%geomech%realization%dt_coupling
+
+    ! If simulation is decoupled subsurface-geomech simulation, set
     ! dt_coupling to be dt_max
     if (Equal(this%geomech%realization%dt_coupling,0.d0)) then
       this%option%io_buffer = 'Set non-zero COUPLING_TIME_SIZE in GEOMECHANICS_TIME.'
       call PrintErrMsg(this%option)
     else
+
+      ! Clear checkpoint flags from subsurface waypoints. In the coupled
+      ! geomechanics path, checkpoints are handled explicitly in this
+      ! loop via waypoint_list_outer. If we leave the flags on the
+      ! subsurface waypoints, the flow PMC (which has is_master=TRUE)
+      ! will also trigger its own checkpoint inside PMCBaseRunToTime,
+      ! resulting in duplicate checkpoint writes.
+      cur_waypoint => this%waypoint_list_subsurface%first
+      do while (associated(cur_waypoint))
+        cur_waypoint%print_checkpoint = PETSC_FALSE
+        cur_waypoint => cur_waypoint%next
+      enddo
+
+      ! Initialize waypoint pointer for checkpoint tracking
+      cur_waypoint => this%waypoint_list_outer%first
+      ! Checkpoint at initial time if the first waypoint says so (restart case)
+      if (associated(cur_waypoint)) then
+        if (cur_waypoint%print_checkpoint .and. &
+            Equal(cur_waypoint%time,this%option%time)) then
+          append_name = &
+            CheckpointAppendNameAtTime( &
+              this%process_model_coupler_list%option%time, &
+              this%process_model_coupler_list%option)
+          call this%process_model_coupler_list%Checkpoint(append_name)
+        endif
+      endif
+      call WaypointSkipToTime(cur_waypoint,this%option%time)
+
       do
         dt = this%geomech%realization%dt_coupling
+
+        ! Compute next target time from dt_coupling
         if (time + dt*(1.d0+tolerance) >= final_time) then
-          dt = final_time-time
-          time = final_time
+          target_time = final_time
         else
-          time = time + dt
+          target_time = time + dt
         endif
-        this%geomech%process_model_coupler%timestepper%dt = dt
-        call this%RunToTime(time)
+
+        ! If a checkpoint waypoint falls before our coupling target,
+        ! run to the waypoint time first so checkpoint is written at
+        ! the correct time.
+        do while (associated(cur_waypoint))
+          if (cur_waypoint%time > target_time) exit
+          ! Waypoint is at or before our target — run to it
+          this%geomech%process_model_coupler%timestepper%dt = &
+            cur_waypoint%time - time
+          if (cur_waypoint%time - time > 0.d0) then
+            call this%RunToTime(cur_waypoint%time)
+            time = cur_waypoint%time
+          endif
+          if (this%stop_flag /= TS_CONTINUE) exit
+          ! Write checkpoint if this waypoint requests it
+          if (cur_waypoint%print_checkpoint) then
+            append_name = &
+              CheckpointAppendNameAtTime( &
+                this%process_model_coupler_list%option%time, &
+                this%process_model_coupler_list%option)
+            call this%process_model_coupler_list%Checkpoint(append_name)
+          endif
+          cur_waypoint => cur_waypoint%next
+        enddo
+
+        if (this%stop_flag /= TS_CONTINUE) exit
+
+        ! Run remaining interval to the coupling target
+        if (target_time > time) then
+          this%geomech%process_model_coupler%timestepper%dt = &
+            target_time - time
+          call this%RunToTime(target_time)
+          time = target_time
+        endif
 
         if (this%stop_flag /= TS_CONTINUE) exit ! end simulation
 
         if (time >= final_time) exit
       enddo
+
+      ! Final checkpoint: only checkpoint successful simulations
+      if (this%stop_flag /= TS_STOP_FAILURE) then
+        select case(this%stop_flag)
+          case(TS_STOP_MAX_TIME_STEP)
+            append_name = '-restart-max-ts'
+          case(TS_STOP_WALLCLOCK_EXCEEDED)
+            append_name = '-restart-max-wc'
+          case default ! TS_STOP_END_SIMULATION
+            append_name = '-restart'
+        end select
+        if (associated(this%option%checkpoint)) then
+          call this%process_model_coupler_list%Checkpoint(append_name)
+        endif
+      endif
+
     endif
   endif
 

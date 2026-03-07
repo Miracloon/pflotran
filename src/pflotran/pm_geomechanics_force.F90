@@ -32,6 +32,8 @@ module PM_Geomechanics_Force_class
     procedure, public :: UpdateSolution => PMGeomechForceUpdateSolution
     procedure, public :: CheckpointBinary => PMGeomechForceCheckpointBinary
     procedure, public :: RestartBinary => PMGeomechForceRestartBinary
+    procedure, public :: CheckpointHDF5 => PMGeomechForceCheckpointHDF5
+    procedure, public :: RestartHDF5 => PMGeomechForceRestartHDF5
     procedure, public :: InputRecord => PMGeomechForceInputRecord
     procedure, public :: Destroy => PMGeomechForceDestroy
     procedure, public :: FinalizeTimestep => PMGeomechForceFinalizeTimestep
@@ -451,20 +453,31 @@ end subroutine PMGeomechForceFinalizeTimestep
 
 subroutine PMGeomechForceCheckpointBinary(this,viewer)
   !
-  ! This routine
+  ! Checkpoints geomechanics displacement, stress, and strain vectors
+  ! in binary format.
   !
-  ! Author: Gautam Bisht, LBNL
-  ! Date: 12/31/13
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
   !
 
-  use Checkpoint_module
+  use Geomechanics_Field_module
 
   implicit none
 
   class(pm_geomech_force_type) :: this
   PetscViewer :: viewer
 
-  call PrintErrMsg(this%option,'add code for checkpointing Geomech in PM approach')
+  type(geomech_field_type), pointer :: geomech_field
+  PetscErrorCode :: ierr
+
+  geomech_field => this%geomech_realization%geomech_field
+
+  ! Write displacement (NGEODOF per node)
+  call VecView(geomech_field%disp_xx,viewer,ierr);CHKERRQ(ierr)
+  ! Write effective stress (6 DOF per node)
+  call VecView(geomech_field%stress,viewer,ierr);CHKERRQ(ierr)
+  ! Write strain (6 DOF per node)
+  call VecView(geomech_field%strain,viewer,ierr);CHKERRQ(ierr)
 
 end subroutine PMGeomechForceCheckpointBinary
 
@@ -472,22 +485,190 @@ end subroutine PMGeomechForceCheckpointBinary
 
 subroutine PMGeomechForceRestartBinary(this,viewer)
   !
-  ! This routine
+  ! Restarts geomechanics displacement, stress, and strain vectors
+  ! from a binary checkpoint file.
   !
-  ! Author: Gautam Bisht, LBNL
-  ! Date: 12/31/13
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
   !
 
-  use Checkpoint_module
+  use Geomechanics_Field_module
+  use Geomechanics_Discretization_module
 
   implicit none
 
   class(pm_geomech_force_type) :: this
   PetscViewer :: viewer
 
-  call PrintErrMsg(this%option,'add code for restarting Geomech in PM approach')
+  type(geomech_field_type), pointer :: geomech_field
+  class(geomech_discretization_type), pointer :: geomech_discretization
+  PetscErrorCode :: ierr
+
+  geomech_field => this%geomech_realization%geomech_field
+  geomech_discretization => this%geomech_realization%geomech_discretization
+
+  ! Read displacement (NGEODOF per node)
+  call VecLoad(geomech_field%disp_xx,viewer,ierr);CHKERRQ(ierr)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%disp_xx, &
+                                          geomech_field%disp_xx_loc, &
+                                          NGEODOF)
+  ! Read effective stress (6 DOF per node)
+  call VecLoad(geomech_field%stress,viewer,ierr);CHKERRQ(ierr)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%stress, &
+                                          geomech_field%stress_loc, &
+                                          SIX_INTEGER)
+  ! Read strain (6 DOF per node)
+  call VecLoad(geomech_field%strain,viewer,ierr);CHKERRQ(ierr)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%strain, &
+                                          geomech_field%strain_loc, &
+                                          SIX_INTEGER)
 
 end subroutine PMGeomechForceRestartBinary
+
+! ************************************************************************** !
+
+subroutine PMGeomechForceCheckpointHDF5(this,pm_grp_id)
+  !
+  ! Checkpoints geomechanics displacement, stress, and strain vectors
+  ! in HDF5 format.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+
+  use Geomechanics_Field_module
+  use Geomechanics_Discretization_module
+  use hdf5
+  use HDF5_module, only : HDF5WriteDataSetFromVec
+
+  implicit none
+
+  class(pm_geomech_force_type) :: this
+  integer(HID_T) :: pm_grp_id
+
+  type(geomech_field_type), pointer :: geomech_field
+  class(geomech_discretization_type), pointer :: geomech_discretization
+  Vec :: natural_vec
+  character(len=MAXSTRINGLENGTH) :: dataset_name
+  PetscErrorCode :: ierr
+
+  geomech_field => this%geomech_realization%geomech_field
+  geomech_discretization => this%geomech_realization%geomech_discretization
+
+  ! Write displacement (NGEODOF per node): global -> natural -> HDF5
+  call GeomechDiscretizationCreateVector(geomech_discretization, &
+                                         NGEODOF,natural_vec, &
+                                         NATURAL,this%option)
+  call GeomechDiscretizationGlobalToNatural(geomech_discretization, &
+                                            geomech_field%disp_xx, &
+                                            natural_vec,NGEODOF)
+  dataset_name = "Displacement" // CHAR(0)
+  call HDF5WriteDataSetFromVec(dataset_name,this%option,natural_vec, &
+                               pm_grp_id,H5T_NATIVE_DOUBLE)
+  call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
+
+  ! Write stress (SIX_INTEGER DOF per node): global -> natural -> HDF5
+  call GeomechDiscretizationCreateVector(geomech_discretization, &
+                                         SIX_INTEGER,natural_vec, &
+                                         NATURAL,this%option)
+  call GeomechDiscretizationGlobalToNatural(geomech_discretization, &
+                                            geomech_field%stress, &
+                                            natural_vec,SIX_INTEGER)
+  dataset_name = "Stress" // CHAR(0)
+  call HDF5WriteDataSetFromVec(dataset_name,this%option,natural_vec, &
+                               pm_grp_id,H5T_NATIVE_DOUBLE)
+
+  ! Write strain (SIX_INTEGER DOF per node): global -> natural -> HDF5
+  call GeomechDiscretizationGlobalToNatural(geomech_discretization, &
+                                            geomech_field%strain, &
+                                            natural_vec,SIX_INTEGER)
+  dataset_name = "Strain" // CHAR(0)
+  call HDF5WriteDataSetFromVec(dataset_name,this%option,natural_vec, &
+                               pm_grp_id,H5T_NATIVE_DOUBLE)
+  call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
+
+end subroutine PMGeomechForceCheckpointHDF5
+
+! ************************************************************************** !
+
+subroutine PMGeomechForceRestartHDF5(this,pm_grp_id)
+  !
+  ! Restarts geomechanics displacement, stress, and strain vectors
+  ! from an HDF5 checkpoint file.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+
+  use Geomechanics_Field_module
+  use Geomechanics_Discretization_module
+  use hdf5
+  use HDF5_module, only : HDF5ReadDataSetInVec
+
+  implicit none
+
+  class(pm_geomech_force_type) :: this
+  integer(HID_T) :: pm_grp_id
+
+  type(geomech_field_type), pointer :: geomech_field
+  class(geomech_discretization_type), pointer :: geomech_discretization
+  Vec :: natural_vec
+  character(len=MAXSTRINGLENGTH) :: dataset_name
+  PetscErrorCode :: ierr
+
+  geomech_field => this%geomech_realization%geomech_field
+  geomech_discretization => this%geomech_realization%geomech_discretization
+
+  ! Read displacement (NGEODOF per node): HDF5 -> natural -> global -> local
+  call GeomechDiscretizationCreateVector(geomech_discretization, &
+                                         NGEODOF,natural_vec, &
+                                         NATURAL,this%option)
+  dataset_name = "Displacement" // CHAR(0)
+  call HDF5ReadDataSetInVec(dataset_name,this%option,natural_vec, &
+                            pm_grp_id,H5T_NATIVE_DOUBLE)
+  call GeomechDiscretizationNaturalToGlobal(geomech_discretization, &
+                                            natural_vec, &
+                                            geomech_field%disp_xx,NGEODOF)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%disp_xx, &
+                                          geomech_field%disp_xx_loc, &
+                                          NGEODOF)
+  call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
+
+  ! Read stress (SIX_INTEGER DOF per node): HDF5 -> natural -> global -> local
+  call GeomechDiscretizationCreateVector(geomech_discretization, &
+                                         SIX_INTEGER,natural_vec, &
+                                         NATURAL,this%option)
+  dataset_name = "Stress" // CHAR(0)
+  call HDF5ReadDataSetInVec(dataset_name,this%option,natural_vec, &
+                            pm_grp_id,H5T_NATIVE_DOUBLE)
+  call GeomechDiscretizationNaturalToGlobal(geomech_discretization, &
+                                            natural_vec, &
+                                            geomech_field%stress, &
+                                            SIX_INTEGER)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%stress, &
+                                          geomech_field%stress_loc, &
+                                          SIX_INTEGER)
+
+  ! Read strain (SIX_INTEGER DOF per node): HDF5 -> natural -> global -> local
+  dataset_name = "Strain" // CHAR(0)
+  call HDF5ReadDataSetInVec(dataset_name,this%option,natural_vec, &
+                            pm_grp_id,H5T_NATIVE_DOUBLE)
+  call GeomechDiscretizationNaturalToGlobal(geomech_discretization, &
+                                            natural_vec, &
+                                            geomech_field%strain, &
+                                            SIX_INTEGER)
+  call GeomechDiscretizationGlobalToLocal(geomech_discretization, &
+                                          geomech_field%strain, &
+                                          geomech_field%strain_loc, &
+                                          SIX_INTEGER)
+  call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
+
+end subroutine PMGeomechForceRestartHDF5
 
 ! ************************************************************************** !
 

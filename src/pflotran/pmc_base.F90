@@ -102,6 +102,12 @@ module PMC_Base_class
             PMCBaseSetChildPeerPtr, &
             PMCBaseFinalizeRun, &
             PMCBaseStrip, &
+            PMCBaseRegisterHeader, &
+            PMCBaseSetHeader, &
+            PMCBaseGetHeader, &
+            PMCBaseSetHeaderHDF5, &
+            PMCBaseGetHeaderHDF5, &
+            PetscBagGetData, &
             SetOutputFlags
 
 contains

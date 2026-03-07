@@ -155,6 +155,33 @@ subroutine GeomechanicsMaterialPropertyRead(geomech_material_property, &
   enddo
   call InputPopBlock(input,option)
 
+  ! Validate material property ranges (only for constant values, not datasets)
+  if (.not.associated(geomech_material_property%youngs_modulus_dataset)) then
+    if (geomech_material_property%youngs_modulus <= 0.d0) then
+      option%io_buffer = 'YOUNGS_MODULUS must be positive in ' // &
+        'GEOMECHANICS_MATERIAL_PROPERTY "' // &
+        trim(geomech_material_property%name) // '".'
+      call PrintErrMsg(option)
+    endif
+  endif
+  if (.not.associated(geomech_material_property%poissons_ratio_dataset)) then
+    if (geomech_material_property%poissons_ratio < 0.d0 .or. &
+        geomech_material_property%poissons_ratio >= 0.5d0) then
+      option%io_buffer = 'POISSONS_RATIO must be in [0, 0.5) in ' // &
+        'GEOMECHANICS_MATERIAL_PROPERTY "' // &
+        trim(geomech_material_property%name) // '".'
+      call PrintErrMsg(option)
+    endif
+  endif
+  if (.not.associated(geomech_material_property%density_dataset)) then
+    if (geomech_material_property%density <= 0.d0) then
+      option%io_buffer = 'ROCK_DENSITY must be positive in ' // &
+        'GEOMECHANICS_MATERIAL_PROPERTY "' // &
+        trim(geomech_material_property%name) // '".'
+      call PrintErrMsg(option)
+    endif
+  endif
+
 end subroutine GeomechanicsMaterialPropertyRead
 
 ! ************************************************************************** !

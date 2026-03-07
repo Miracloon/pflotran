@@ -11,6 +11,14 @@ module Geomechanics_Region_module
 
   private
 
+  PetscInt, parameter, public :: GM_FACE_NONE = 0
+  PetscInt, parameter, public :: GM_FACE_WEST = 1
+  PetscInt, parameter, public :: GM_FACE_EAST = 2
+  PetscInt, parameter, public :: GM_FACE_SOUTH = 3
+  PetscInt, parameter, public :: GM_FACE_NORTH = 4
+  PetscInt, parameter, public :: GM_FACE_BOTTOM = 5
+  PetscInt, parameter, public :: GM_FACE_TOP = 6
+
   type, public :: gm_region_type
     PetscInt :: id
     character(len=MAXWORDLENGTH) :: name
@@ -18,6 +26,7 @@ module Geomechanics_Region_module
     type(point3d_type), pointer :: coordinates(:)
     PetscInt :: num_verts
     PetscInt, pointer :: vertex_ids(:)
+    PetscInt :: iface  ! FACE keyword (WEST/EAST/...), consistent with flow side
     type(gm_region_type), pointer :: next
     type(region_sideset_type), pointer :: sideset
   end type gm_region_type
@@ -77,6 +86,7 @@ function GeomechRegionCreateWithNothing()
   region%name = ""
   region%filename = ""
   region%num_verts = 0
+  region%iface = GM_FACE_NONE
   nullify(region%coordinates)
   nullify(region%vertex_ids)
   nullify(region%next)
@@ -139,6 +149,7 @@ function GeomechRegionCreateWithGeomechRegion(region)
   new_region%name = region%name
   new_region%filename = region%filename
   new_region%num_verts = region%num_verts
+  new_region%iface = region%iface
   if (associated(region%coordinates)) then
     call GeometryCopyCoordinates(region%coordinates, &
                                  new_region%coordinates)
@@ -245,6 +256,7 @@ subroutine GeomechRegionRead(region,input,option)
   type(input_type), pointer :: input
 
   character(len=MAXWORDLENGTH) :: keyword
+  character(len=MAXWORDLENGTH) :: face_word
 
   input%ierr = INPUT_ERROR_NONE
   call InputPushBlock(input,option)
@@ -282,6 +294,28 @@ subroutine GeomechRegionRead(region,input,option)
         call GeomechRegionReadFromFilename(region,option,region%filename)
       case('LIST')
         call GeomechRegionReadList(region,input,option)
+      case('FACE')
+        call InputReadCard(input,option,face_word)
+        call InputErrorMsg(input,option,'face','GEOMECHANICS_REGION,FACE')
+        call StringToUpper(face_word)
+        select case(trim(face_word))
+          case('WEST')
+            region%iface = GM_FACE_WEST
+          case('EAST')
+            region%iface = GM_FACE_EAST
+          case('SOUTH')
+            region%iface = GM_FACE_SOUTH
+          case('NORTH')
+            region%iface = GM_FACE_NORTH
+          case('BOTTOM')
+            region%iface = GM_FACE_BOTTOM
+          case('TOP')
+            region%iface = GM_FACE_TOP
+          case default
+            option%io_buffer = 'FACE "' // trim(face_word) // &
+              '" not recognized in GEOMECHANICS_REGION.'
+            call PrintErrMsg(option)
+        end select
       case default
         call InputKeywordUnrecognized(input,keyword, &
                                       'GEOMECHANICS_REGION',option)

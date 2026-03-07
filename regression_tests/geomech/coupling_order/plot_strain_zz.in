@@ -1,0 +1,86 @@
+SIMULATION
+  SIMULATION_TYPE GEOMECHANICS_SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE richards
+    /
+    GEOMECHANICS_SUBSURFACE geomech
+      OPTIONS
+        FLOW_COUPLING ONE_WAY_COUPLED
+      /
+    /
+  /
+END
+
+EXTERNAL_FILE subsurface_common.txt
+
+GEOMECHANICS
+
+EXTERNAL_FILE geomechanics_common.txt
+
+GEOMECHANICS_FLOW_INTERPOLATION
+  ORDER 1
+/
+
+GEOMECHANICS_REGRESSION
+  VARIABLES
+    STRAIN_ZZ
+  /
+  VERTICES
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15
+    16
+    17
+    18
+    19
+    20
+    21
+    22
+    23
+    24
+    25
+    26
+    27
+    28
+    29
+    30
+    31
+    32
+    33
+    34
+    35
+    36
+    37
+    38
+    39
+    40
+    41
+    42
+    43
+    44
+  /
+END
+
+GEOMECHANICS_MATERIAL_PROPERTY soil1
+  ID 1
+  ROCK_DENSITY 1.0
+  YOUNGS_MODULUS 1000.0
+  POISSONS_RATIO 0.0
+  BIOT_COEFFICIENT 0.0
+  THERMAL_EXPANSION_COEFFICIENT 0.0
+END
+
+END_GEOMECHANICS

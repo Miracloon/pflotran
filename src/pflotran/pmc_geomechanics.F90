@@ -21,6 +21,10 @@ module PMC_Geomechanics_class
     procedure, public :: RunToTime => PMCGeomechanicsRunToTime
     procedure, public :: GetAuxData => PMCGeomechanicsGetAuxData
     procedure, public :: SetAuxData => PMCGeomechanicsSetAuxData
+    procedure, public :: CheckpointBinary => PMCGeomechanicsCheckpointBinary
+    procedure, public :: RestartBinary => PMCGeomechanicsRestartBinary
+    procedure, public :: CheckpointHDF5 => PMCGeomechanicsCheckpointHDF5
+    procedure, public :: RestartHDF5 => PMCGeomechanicsRestartHDF5
     procedure, public :: Destroy => PMCGeomechanicsDestroy
   end type pmc_geomechanics_type
 
@@ -196,6 +200,20 @@ recursive subroutine PMCGeomechanicsInitializeRun(this)
   if (this%option%geomechanics%split_scheme == GEOMECH_DRAINED_SPLIT) &
     return
 
+  ! On restart, the geomech state is already restored from checkpoint.
+  ! The RunToTime(0.0) initialization solve must be skipped because the
+  ! KSP timestepper's target_time is already past 0 (= the restart time),
+  ! and calling SetTargetTime(0.0) would produce a negative dt.
+  ! Also seed option%flow_dt from the restored flow timestepper so that
+  ! the first post-restart coupling step has a valid value for the
+  ! overwrite in PMCGeomechanicsRunToTime.
+  if (this%option%restart_flag) then
+    if (associated(this%peer)) then
+      this%option%flow_dt = this%peer%timestepper%dt
+    endif
+    return
+  endif
+
   ! continue to initialize geomechanics
   ! used for GEOMECH_FIXED_STRESS_SPLIT and
   ! GEOMECH_FIXED_STRAIN_SPLIT
@@ -235,6 +253,8 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   PetscBool :: peer_already_run_to_time
 
   class(pm_base_type), pointer :: cur_pm
+  PetscReal :: geomech_target_time
+  PetscReal :: geomech_dt
 
   if (stop_flag == TS_STOP_FAILURE) return
 
@@ -260,6 +280,14 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
                                       observation_plot_flag, &
                                       massbal_plot_flag, &
                                       conserv_plot_flag,checkpoint_flag)
+
+  ! Save the correct geomech target_time and dt before the overwrite below.
+  ! For fixed-stress/fixed-strain splits, lines 271-272 overwrite the KSP
+  ! timestepper's dt and target_time with flow values needed for the solve.
+  ! We restore the correct geomech values at the end of this routine so that
+  ! checkpoint writes consistent state.
+  geomech_target_time = this%timestepper%target_time
+  geomech_dt = this%timestepper%dt
 
   ! overwrites target time and dt for geomech when flow is the master pm
   select case(this%option%geomechanics%split_scheme)
@@ -340,6 +368,16 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
     call this%peer%RunToTime(sync_time,local_stop_flag)
     call this%GetAuxData()
   endif
+
+  ! Restore the correct geomech target_time and dt for the KSP timestepper.
+  ! The overwrite at lines 271-272 set the KSP timestepper to flow values
+  ! needed during StepDT, but the timestepper must reflect the actual geomech
+  ! coupling step for checkpoint correctness.
+  select case(this%option%geomechanics%split_scheme)
+    case(GEOMECH_FIXED_STRAIN_SPLIT, GEOMECH_FIXED_STRESS_SPLIT)
+      this%timestepper%target_time = geomech_target_time
+      this%timestepper%dt = geomech_dt
+  end select
 
   stop_flag = max(stop_flag,local_stop_flag)
 
@@ -593,6 +631,17 @@ subroutine PMCGeomechanicsSetAuxData(this)
           call VecGetArray(pmc%subsurf_realization%field%flow_xx,press_p, &
                               ierr);CHKERRQ(ierr)
 
+          ! Hoist constant parameter ID lookups outside the element loop
+          if (option%geomechanics%split_scheme == &
+              GEOMECH_FIXED_STRESS_SPLIT) then
+            strainv_0_id = ParameterGetIDFromName('vol_strain_0',option)
+            strainv_id = ParameterGetIDFromName('vol_strain', option)
+            press_0_id = ParameterGetIDFromName('press_0', option)
+            flow_porosity_id = ParameterGetIDFromName('flow_porosity',option)
+            temp_0_id = ParameterGetIDFromName('temp_0',option)
+            id_porosity_mech=ParameterGetIDFromName('stored_porosity',option)
+            id_pressure_mech=ParameterGetIDFromName('stored_pressure', option)
+          endif
 
           do local_id = 1, grid%nlmax
             do i = 1, SIX_INTEGER
@@ -623,16 +672,7 @@ subroutine PMCGeomechanicsSetAuxData(this)
             select case(option%geomechanics%split_scheme)
             case(GEOMECH_FIXED_STRESS_SPLIT)
               ! ID's are registered in factory_subsurface.F90
-              strainv_0_id = ParameterGetIDFromName('vol_strain_0',option)
-              strainv_id = ParameterGetIDFromName('vol_strain', option)
-              press_0_id = ParameterGetIDFromName('press_0', option)
-              flow_porosity_id = ParameterGetIDFromName('flow_porosity',option)
-              temp_0_id = ParameterGetIDFromName('temp_0',option)
-              ! used to track threshold updates
-              ! needed since this routine will be skipped
-              ! if threshold is not met
-              id_porosity_mech=ParameterGetIDFromName('stored_porosity',option)
-              id_pressure_mech=ParameterGetIDFromName('stored_pressure', option)
+              ! (lookups hoisted before loop)
               ghosted_id = grid%nL2G(local_id)
               global_auxvar => global_auxvars(ghosted_id)
               imat = pmc%subsurf_realization%patch%aux%Material% &
@@ -794,6 +834,530 @@ print *, 'PMCGeomechanicsGetAuxData'
   end select
 
 end subroutine PMCGeomechanicsGetAuxData
+
+! ************************************************************************** !
+
+recursive subroutine PMCGeomechanicsCheckpointBinary(this,viewer,append_name)
+  !
+  ! Checkpoints both flow and geomechanics PMC state to a binary file.
+  ! Overrides PMCBaseCheckpointBinary to handle the ordering problem:
+  ! geomech is the list head but is_master=FALSE, so the base class would
+  ! try to write geomech data before the file is opened by the master (flow).
+  ! This override opens the file, writes flow data first (preserving
+  ! flow-as-master ordering), then writes geomech data, then closes the file.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+#include <petsc/finclude/petscbag.h>
+  use petscbag
+
+  use Logging_module
+  use Checkpoint_module, only : CheckpointOpenFileForWriteBinary, &
+                                CheckPointWriteCompatibilityBinary
+  use PM_Base_class
+  use Option_module, only : PrintMsg
+
+  implicit none
+
+  class(pmc_geomechanics_type) :: this
+  PetscViewer :: viewer
+  character(len=MAXSTRINGLENGTH) :: append_name
+
+  class(pm_base_type), pointer :: cur_pm
+  class(pmc_base_header_type), pointer :: header
+  type(pmc_base_header_type) :: dummy_header
+  character(len=1),pointer :: dummy_char(:)
+  PetscBag :: bag
+  PetscSizeT :: bagsize
+  PetscLogDouble :: tstart, tend
+  PetscErrorCode :: ierr
+
+  bagsize = size(transfer(dummy_header,dummy_char))
+
+  ! --- Open file (taking over the role of is_master) ---
+  call PetscLogStagePush(logging%stage(OUTPUT_STAGE),ierr);CHKERRQ(ierr)
+  call PetscLogEventBegin(logging%event_checkpoint,ierr);CHKERRQ(ierr)
+  call PetscTime(tstart,ierr);CHKERRQ(ierr)
+  call CheckpointOpenFileForWriteBinary(viewer,append_name,this%option)
+  call CheckPointWriteCompatibilityBinary(viewer,this%option)
+
+  ! --- Write PMC header using flow (peer) PMC's output info ---
+  ! Use flow PMC's header info since flow is the conceptual master.
+  call PetscBagCreate(this%option%mycomm,bagsize,bag,ierr);CHKERRQ(ierr)
+  call PetscBagGetData(bag,header,ierr);CHKERRQ(ierr)
+  call PMCBaseRegisterHeader(this%peer,bag,header)
+  call PMCBaseSetHeader(this%peer,bag,header)
+  call PetscBagView(bag,viewer,ierr);CHKERRQ(ierr)
+  call PetscBagDestroy(bag,ierr);CHKERRQ(ierr)
+
+  ! --- Write flow (peer) PMC data first ---
+  ! Flow timestepper
+  if (associated(this%peer%timestepper)) then
+    call this%peer%timestepper%CheckpointBinary(viewer,this%option)
+  endif
+  ! Flow PM(s)
+  cur_pm => this%peer%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call cur_pm%CheckpointBinary(viewer)
+    cur_pm => cur_pm%next
+  enddo
+  ! Flow children (if any)
+  if (associated(this%peer%child)) then
+    call this%peer%child%CheckpointBinary(viewer,append_name)
+  endif
+
+  ! --- Write geomechanics (this) PMC data second ---
+  ! Geomech timestepper
+  if (associated(this%timestepper)) then
+    call this%timestepper%CheckpointBinary(viewer,this%option)
+  endif
+  ! Geomech PM(s)
+  cur_pm => this%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call cur_pm%CheckpointBinary(viewer)
+    cur_pm => cur_pm%next
+  enddo
+  ! Geomech children (if any)
+  if (associated(this%child)) then
+    call this%child%CheckpointBinary(viewer,append_name)
+  endif
+
+  ! --- Close file ---
+  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  PetscObjectNullify(viewer)
+  call PetscTime(tend,ierr);CHKERRQ(ierr)
+  write(this%option%io_buffer, &
+        '(6x,"Seconds to write to checkpoint file: ", f10.2)') &
+    tend-tstart
+  call PrintMsg(this%option)
+  call PetscLogEventEnd(logging%event_checkpoint,ierr);CHKERRQ(ierr)
+  call PetscLogStagePop(ierr);CHKERRQ(ierr)
+
+end subroutine PMCGeomechanicsCheckpointBinary
+
+! ************************************************************************** !
+
+recursive subroutine PMCGeomechanicsRestartBinary(this,viewer)
+  !
+  ! Restarts both flow and geomechanics PMC state from a binary file.
+  ! Overrides PMCBaseRestartBinary to handle the ordering problem.
+  ! Opens the file, reads flow data first (matching checkpoint order),
+  ! then reads geomech data, then closes the file.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+#include <petsc/finclude/petscbag.h>
+  use petscbag
+
+  use Logging_module
+  use Checkpoint_module, only : CheckPointReadCompatibilityBinary
+  use Petsc_Utility_module, only : PUTestFile
+  use PM_Base_class
+  use Option_module, only : PrintMsg, PrintErrMsg
+  use Waypoint_module, only : WaypointSkipToTime
+
+  implicit none
+
+  class(pmc_geomechanics_type) :: this
+  PetscViewer :: viewer
+
+  class(pm_base_type), pointer :: cur_pm
+  class(pmc_base_header_type), pointer :: header
+  type(pmc_base_header_type) :: dummy_header
+  character(len=1),pointer :: dummy_char(:)
+  PetscBag :: bag
+  PetscSizeT :: bagsize
+  PetscLogDouble :: tstart, tend
+  PetscBool :: flag
+  PetscErrorCode :: ierr
+
+  bagsize = size(transfer(dummy_header,dummy_char))
+
+  ! --- Open file ---
+  call PUTestFile(this%option%restart_filename,'r',flag, &
+                  ierr);CHKERRQ(ierr)
+  if (.not.flag) then
+    this%option%io_buffer = 'Restart file "' // &
+      trim(this%option%restart_filename) // '" not found.'
+    call PrintErrMsg(this%option)
+  endif
+  this%option%io_buffer = 'Restarting with checkpoint file "' // &
+    trim(this%option%restart_filename) // '".'
+  call PrintMsg(this%option)
+  call PetscLogEventBegin(logging%event_restart,ierr);CHKERRQ(ierr)
+  call PetscTime(tstart,ierr);CHKERRQ(ierr)
+  call PetscViewerBinaryOpen(this%option%mycomm, &
+                             this%option%restart_filename,FILE_MODE_READ, &
+                             viewer,ierr);CHKERRQ(ierr)
+  call PetscViewerBinarySetSkipOptions(viewer,PETSC_TRUE, &
+                                       ierr);CHKERRQ(ierr)
+  call CheckPointReadCompatibilityBinary(viewer,this%option)
+
+  ! --- Read PMC header (flow's header, since flow wrote it) ---
+  call PetscBagCreate(this%option%mycomm,bagsize,bag,ierr);CHKERRQ(ierr)
+  call PetscBagGetData(bag,header,ierr);CHKERRQ(ierr)
+  call PMCBaseRegisterHeader(this%peer,bag,header)
+  call PetscBagLoad(viewer,bag,ierr);CHKERRQ(ierr)
+  call PMCBaseGetHeader(this%peer,header)
+  if (Initialized(this%option%restart_time)) then
+    this%peer%pm_list%realization_base%output_option%plot_number = 0
+  endif
+  call PetscBagDestroy(bag,ierr);CHKERRQ(ierr)
+
+  ! --- Read flow (peer) PMC data first ---
+  ! Flow timestepper
+  if (associated(this%peer%timestepper)) then
+    call this%peer%timestepper%RestartBinary(viewer,this%option)
+    if (Initialized(this%option%restart_time)) then
+      call this%peer%timestepper%Reset()
+    endif
+    call WaypointSkipToTime(this%peer%timestepper%cur_waypoint, &
+                            this%peer%timestepper%target_time)
+    if (.not.associated(this%peer%timestepper%cur_waypoint)) then
+      write(this%option%io_buffer,*) this%peer%timestepper%target_time* &
+        this%peer%pm_list%realization_base%output_option%tconv
+      this%option%io_buffer = 'Simulation is being restarted at a time that &
+        &is at or beyond the end of checkpointed simulation (' // &
+        trim(adjustl(this%option%io_buffer)) // &
+        trim(this%peer%pm_list%realization_base%output_option%tunit) // ').'
+      call PrintMsg(this%option)
+    endif
+    ! dt_max is not saved in the checkpoint header, so restore it from the
+    ! current waypoint to avoid UNINITIALIZED_DOUBLE (-999) corrupting dt
+    ! when revert_dt is TRUE in SetTargetTime.
+    if (associated(this%peer%timestepper%cur_waypoint)) then
+      this%peer%timestepper%dt_max = &
+        this%peer%timestepper%cur_waypoint%dt_max
+    endif
+    this%option%time = this%peer%timestepper%target_time
+  endif
+  ! Flow PM(s)
+  cur_pm => this%peer%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    if (cur_pm%skip_restart) then
+      this%option%io_buffer = 'Due to sequential nature of binary files, &
+        &skipping restart for binary formatted files is not allowed.'
+      call PrintErrMsg(this%option)
+    endif
+    call cur_pm%RestartBinary(viewer)
+    cur_pm => cur_pm%next
+  enddo
+  ! Flow children (if any)
+  if (associated(this%peer%child)) then
+    call this%peer%child%RestartBinary(viewer)
+  endif
+
+  ! --- Read geomechanics (this) PMC data second ---
+  ! Geomech timestepper
+  if (associated(this%timestepper)) then
+    call this%timestepper%RestartBinary(viewer,this%option)
+    if (Initialized(this%option%restart_time)) then
+      call this%timestepper%Reset()
+    endif
+    call WaypointSkipToTime(this%timestepper%cur_waypoint, &
+                            this%timestepper%target_time)
+    if (.not.associated(this%timestepper%cur_waypoint)) then
+      write(this%option%io_buffer,*) this%timestepper%target_time* &
+        this%pm_list%realization_base%output_option%tconv
+      this%option%io_buffer = 'Simulation is being restarted at a time that &
+        &is at or beyond the end of checkpointed simulation (' // &
+        trim(adjustl(this%option%io_buffer)) // &
+        trim(this%pm_list%realization_base%output_option%tunit) // ').'
+      call PrintMsg(this%option)
+    endif
+    ! dt_max is not saved in the checkpoint header, so restore it from the
+    ! current waypoint to avoid UNINITIALIZED_DOUBLE (-999) corrupting dt
+    ! when revert_dt is TRUE in SetTargetTime.
+    if (associated(this%timestepper%cur_waypoint)) then
+      this%timestepper%dt_max = this%timestepper%cur_waypoint%dt_max
+    endif
+    this%option%time = this%timestepper%target_time
+  endif
+  ! Geomech PM(s)
+  cur_pm => this%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    if (cur_pm%skip_restart) then
+      this%option%io_buffer = 'Due to sequential nature of binary files, &
+        &skipping restart for binary formatted files is not allowed.'
+      call PrintErrMsg(this%option)
+    endif
+    call cur_pm%RestartBinary(viewer)
+    cur_pm => cur_pm%next
+  enddo
+  ! Geomech children (if any)
+  if (associated(this%child)) then
+    call this%child%RestartBinary(viewer)
+  endif
+
+  ! --- Close file ---
+  call PetscViewerDestroy(viewer,ierr);CHKERRQ(ierr)
+  call PetscTime(tend,ierr);CHKERRQ(ierr)
+  write(this%option%io_buffer, &
+        '("      Seconds to read from restart file: ", f10.2)') &
+    tend-tstart
+  call PrintMsg(this%option)
+  call PetscLogEventEnd(logging%event_restart,ierr);CHKERRQ(ierr)
+
+end subroutine PMCGeomechanicsRestartBinary
+
+! ************************************************************************** !
+
+recursive subroutine PMCGeomechanicsCheckpointHDF5(this,h5_chk_grp_id, &
+                                                    append_name)
+  !
+  ! Checkpoints both flow and geomechanics PMC state to an HDF5 file.
+  ! Overrides PMCBaseCheckpointHDF5 to handle the ordering problem.
+  ! Opens the file, writes flow data first, then geomech data.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+
+  use Logging_module
+  use Checkpoint_module, only : CheckpointOpenFileForWriteHDF5, &
+                                CheckPointWriteCompatibilityHDF5
+  use PM_Base_class
+  use hdf5
+  use HDF5_Aux_module
+  use Option_module, only : PrintMsg
+
+  implicit none
+
+  class(pmc_geomechanics_type) :: this
+  integer(HID_T) :: h5_chk_grp_id
+  character(len=MAXSTRINGLENGTH) :: append_name
+
+  integer(HID_T) :: h5_file_id
+  integer(HID_T) :: h5_pmc_grp_id
+  integer(HID_T) :: h5_pm_grp_id
+
+  class(pm_base_type), pointer :: cur_pm
+  PetscLogDouble :: tstart, tend
+  PetscErrorCode :: ierr
+
+  ! --- Open file ---
+  call PetscLogStagePush(logging%stage(OUTPUT_STAGE),ierr);CHKERRQ(ierr)
+  call PetscLogEventBegin(logging%event_checkpoint,ierr);CHKERRQ(ierr)
+  call PetscTime(tstart,ierr);CHKERRQ(ierr)
+  call CheckpointOpenFileForWriteHDF5(h5_file_id, &
+                                      h5_chk_grp_id, &
+                                      append_name,this%option)
+  call CheckPointWriteCompatibilityHDF5(h5_chk_grp_id, &
+                                        this%option)
+
+  ! --- Write flow (peer) PMC data first ---
+  call HDF5GroupCreate(h5_chk_grp_id,trim(this%peer%name),h5_pmc_grp_id, &
+                       this%option)
+  call PMCBaseSetHeaderHDF5(this%peer,h5_pmc_grp_id,this%option)
+  if (associated(this%peer%timestepper)) then
+    call this%peer%timestepper%CheckpointHDF5(h5_pmc_grp_id,this%option)
+  endif
+  cur_pm => this%peer%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call HDF5GroupCreate(h5_pmc_grp_id,trim(cur_pm%name),h5_pm_grp_id, &
+                         this%option)
+    call cur_pm%CheckpointHDF5(h5_pm_grp_id)
+    call HDF5GroupClose(h5_pm_grp_id,this%option)
+    cur_pm => cur_pm%next
+  enddo
+  call HDF5GroupClose(h5_pmc_grp_id,this%option)
+  ! Flow children (if any)
+  if (associated(this%peer%child)) then
+    call this%peer%child%CheckpointHDF5(h5_chk_grp_id,append_name)
+  endif
+
+  ! --- Write geomechanics (this) PMC data second ---
+  call HDF5GroupCreate(h5_chk_grp_id,trim(this%name),h5_pmc_grp_id, &
+                       this%option)
+  if (associated(this%timestepper)) then
+    call this%timestepper%CheckpointHDF5(h5_pmc_grp_id,this%option)
+  endif
+  cur_pm => this%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call HDF5GroupCreate(h5_pmc_grp_id,trim(cur_pm%name),h5_pm_grp_id, &
+                         this%option)
+    call cur_pm%CheckpointHDF5(h5_pm_grp_id)
+    call HDF5GroupClose(h5_pm_grp_id,this%option)
+    cur_pm => cur_pm%next
+  enddo
+  call HDF5GroupClose(h5_pmc_grp_id,this%option)
+  ! Geomech children (if any)
+  if (associated(this%child)) then
+    call this%child%CheckpointHDF5(h5_chk_grp_id,append_name)
+  endif
+
+  ! --- Close file ---
+  call HDF5GroupClose(h5_chk_grp_id,this%option)
+  call HDF5FileClose(h5_file_id,this%option)
+  call PetscTime(tend,ierr);CHKERRQ(ierr)
+  write(this%option%io_buffer, &
+        '("      Seconds to write to checkpoint file: ", f10.2)') &
+    tend-tstart
+  call PrintMsg(this%option)
+  call PetscLogEventEnd(logging%event_checkpoint,ierr);CHKERRQ(ierr)
+  call PetscLogStagePop(ierr);CHKERRQ(ierr)
+
+end subroutine PMCGeomechanicsCheckpointHDF5
+
+! ************************************************************************** !
+
+recursive subroutine PMCGeomechanicsRestartHDF5(this,h5_chk_grp_id)
+  !
+  ! Restarts both flow and geomechanics PMC state from an HDF5 file.
+  ! Overrides PMCBaseRestartHDF5 to handle the ordering problem.
+  ! Opens the file, reads flow data first, then geomech data.
+  !
+  ! Author: Satish Karra, PNNL
+  ! Date: 07/09/2025
+  !
+
+  use Logging_module
+  use PM_Base_class
+  use hdf5
+  use HDF5_Aux_module
+  use Checkpoint_module, only : CheckPointReadCompatibilityHDF5, &
+                                CheckpointOpenFileForReadHDF5
+  use Option_module, only : PrintMsg, PrintErrMsg
+  use Waypoint_module, only : WaypointSkipToTime
+
+  implicit none
+
+  class(pmc_geomechanics_type) :: this
+  integer(HID_T) :: h5_chk_grp_id
+
+  class(pm_base_type), pointer :: cur_pm
+  PetscLogDouble :: tstart, tend
+  PetscErrorCode :: ierr
+
+  integer(HID_T) :: h5_file_id
+  integer(HID_T) :: h5_pmc_grp_id
+  integer(HID_T) :: h5_pm_grp_id
+
+  ! --- Open file ---
+  this%option%io_buffer = 'Restarting with checkpoint file: ' // &
+    trim(this%option%restart_filename)
+  call PrintMsg(this%option)
+  call PetscLogEventBegin(logging%event_restart,ierr);CHKERRQ(ierr)
+  call PetscTime(tstart,ierr);CHKERRQ(ierr)
+
+  call CheckpointOpenFileForReadHDF5(this%option%restart_filename, &
+                                     h5_file_id, &
+                                     h5_chk_grp_id, &
+                                     this%option)
+
+  call CheckPointReadCompatibilityHDF5(h5_chk_grp_id, &
+                                       this%option)
+
+  ! --- Read flow (peer) PMC data first ---
+  call HDF5GroupOpen(h5_chk_grp_id,this%peer%name,h5_pmc_grp_id, &
+                     this%option)
+  call PMCBaseGetHeaderHDF5(this%peer,h5_pmc_grp_id,this%option)
+  if (Initialized(this%option%restart_time)) then
+    this%peer%pm_list%realization_base%output_option%plot_number = 0
+  endif
+  if (associated(this%peer%timestepper)) then
+    call this%peer%timestepper%RestartHDF5(h5_pmc_grp_id,this%option)
+    if (Initialized(this%option%restart_time)) then
+      call this%peer%timestepper%Reset()
+    endif
+    call WaypointSkipToTime(this%peer%timestepper%cur_waypoint, &
+                            this%peer%timestepper%target_time)
+    if (.not.associated(this%peer%timestepper%cur_waypoint)) then
+      write(this%option%io_buffer,*) this%peer%timestepper%target_time/ &
+        this%peer%pm_list%realization_base%output_option%tconv
+      this%option%io_buffer = 'Simulation is being restarted at a time that &
+        &is at or beyond the end of checkpointed simulation (' // &
+        trim(adjustl(this%option%io_buffer)) // &
+        trim(this%peer%pm_list%realization_base%output_option%tunit) // ').'
+      call PrintErrMsg(this%option)
+    endif
+    ! dt_max is not saved in the checkpoint header, so restore it from the
+    ! current waypoint to avoid UNINITIALIZED_DOUBLE (-999) corrupting dt
+    ! when revert_dt is TRUE in SetTargetTime.
+    if (associated(this%peer%timestepper%cur_waypoint)) then
+      this%peer%timestepper%dt_max = &
+        this%peer%timestepper%cur_waypoint%dt_max
+    endif
+    this%option%time = this%peer%timestepper%target_time
+  endif
+  cur_pm => this%peer%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call HDF5GroupOpen(h5_pmc_grp_id,cur_pm%name,h5_pm_grp_id, &
+                       this%option)
+    call cur_pm%RestartHDF5(h5_pm_grp_id)
+    call HDF5GroupClose(h5_pm_grp_id,this%option)
+    call this%peer%SetAuxData()
+    cur_pm => cur_pm%next
+  enddo
+  call HDF5GroupClose(h5_pmc_grp_id,this%option)
+  ! Flow children (if any)
+  if (associated(this%peer%child)) then
+    call this%peer%child%RestartHDF5(h5_chk_grp_id)
+  endif
+
+  ! --- Read geomechanics (this) PMC data second ---
+  call HDF5GroupOpen(h5_chk_grp_id,this%name,h5_pmc_grp_id, &
+                     this%option)
+  if (associated(this%timestepper)) then
+    call this%timestepper%RestartHDF5(h5_pmc_grp_id,this%option)
+    if (Initialized(this%option%restart_time)) then
+      call this%timestepper%Reset()
+    endif
+    call WaypointSkipToTime(this%timestepper%cur_waypoint, &
+                            this%timestepper%target_time)
+    if (.not.associated(this%timestepper%cur_waypoint)) then
+      write(this%option%io_buffer,*) this%timestepper%target_time/ &
+        this%pm_list%realization_base%output_option%tconv
+      this%option%io_buffer = 'Simulation is being restarted at a time that &
+        &is at or beyond the end of checkpointed simulation (' // &
+        trim(adjustl(this%option%io_buffer)) // &
+        trim(this%pm_list%realization_base%output_option%tunit) // ').'
+      call PrintErrMsg(this%option)
+    endif
+    ! dt_max is not saved in the checkpoint header, so restore it from the
+    ! current waypoint to avoid UNINITIALIZED_DOUBLE (-999) corrupting dt
+    ! when revert_dt is TRUE in SetTargetTime.
+    if (associated(this%timestepper%cur_waypoint)) then
+      this%timestepper%dt_max = this%timestepper%cur_waypoint%dt_max
+    endif
+    this%option%time = this%timestepper%target_time
+  endif
+  cur_pm => this%pm_list
+  do
+    if (.not.associated(cur_pm)) exit
+    call HDF5GroupOpen(h5_pmc_grp_id,cur_pm%name,h5_pm_grp_id, &
+                       this%option)
+    call cur_pm%RestartHDF5(h5_pm_grp_id)
+    call HDF5GroupClose(h5_pm_grp_id,this%option)
+    call this%SetAuxData()
+    cur_pm => cur_pm%next
+  enddo
+  call HDF5GroupClose(h5_pmc_grp_id,this%option)
+  ! Geomech children (if any)
+  if (associated(this%child)) then
+    call this%child%RestartHDF5(h5_chk_grp_id)
+  endif
+
+  ! --- Close file ---
+  call HDF5GroupClose(h5_chk_grp_id,this%option)
+  call HDF5FileClose(h5_file_id,this%option)
+  call PetscTime(tend,ierr);CHKERRQ(ierr)
+  write(this%option%io_buffer, &
+        '("      Seconds to read from restart file: ", f10.2)') &
+    tend-tstart
+  call PrintMsg(this%option)
+  call PetscLogEventEnd(logging%event_restart,ierr);CHKERRQ(ierr)
+
+end subroutine PMCGeomechanicsRestartHDF5
 
 ! ************************************************************************** !
 
