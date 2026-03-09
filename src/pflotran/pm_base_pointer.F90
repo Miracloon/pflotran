@@ -73,6 +73,7 @@ subroutine PMJacobianPtr(snes,xx,A,B,this,ierr)
   type(pm_base_pointer_type) :: this
   PetscErrorCode :: ierr
 
+  call this%pm%DebugCells()
   call this%pm%Jacobian(snes,xx,A,B,ierr)
   call this%pm%ScaleJacobian(A,B)
 

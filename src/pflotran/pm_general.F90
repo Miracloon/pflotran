@@ -58,6 +58,7 @@ module PM_General_class
     procedure, public :: InputRecord => PMGeneralInputRecord
     procedure, public :: CheckpointBinary => PMGeneralCheckpointBinary
     procedure, public :: RestartBinary => PMGeneralRestartBinary
+    procedure, public :: DebugCells => PMGeneralDebugCells
     procedure, public :: Destroy => PMGeneralDestroy
   end type pm_general_type
 
@@ -2034,6 +2035,61 @@ subroutine PMGeneralRestartBinary(this,viewer)
   call PMSubsurfaceFlowRestartBinary(this,viewer)
 
 end subroutine PMGeneralRestartBinary
+
+! ************************************************************************** !
+
+subroutine PMGeneralDebugCells(this)
+  !
+  ! Prints auxvar information for select grid cells
+  !
+  ! Author: Glenn Hammond
+  ! Date: 03/09/26
+
+  use Grid_module
+  use Option_module
+  use Realization_Subsurface_class
+  use General_Aux_module
+  use Global_Aux_module
+  use Material_Aux_module
+  use Debug_module
+
+  implicit none
+
+  class(pm_general_type) :: this
+
+  type(grid_type), pointer :: grid
+  type(option_type), pointer :: option
+  type(general_auxvar_type), pointer :: general_auxvars(:,:)
+  type(global_auxvar_type), pointer :: global_auxvars(:)
+  type(material_auxvar_type), pointer :: material_auxvars(:)
+  PetscInt :: i
+  PetscInt :: local_id, ghosted_id, natural_id
+  PetscErrorCode :: ierr
+
+  if (.not.associated(this%debug)) return
+  if (.not.associated(this%debug%cell_ids)) return
+
+  grid => this%realization%patch%grid
+  option => this%realization%option
+  general_auxvars => this%realization%patch%aux%General%auxvars
+  global_auxvars => this%realization%patch%aux%Global%auxvars
+  material_auxvars => this%realization%patch%aux%Material%auxvars
+
+  call PetscSequentialPhaseBegin(option%mycomm,ONE_INTEGER_MPI, &
+                                 ierr);CHKERRQ(ierr)
+  do i = 1, size(this%debug%cell_ids)
+    local_id = this%debug%cell_ids(i)
+    ghosted_id = grid%nL2G(local_id)
+    natural_id = grid%nG2A(ghosted_id)
+    call GeneralPrintAuxVars(general_auxvars(ZERO_INTEGER,ghosted_id), &
+                             global_auxvars(ghosted_id), &
+                             material_auxvars(ghosted_id), &
+                             natural_id,'',option)
+  enddo
+  call PetscSequentialPhaseEnd(option%mycomm,ONE_INTEGER_MPI, &
+                               ierr);CHKERRQ(ierr)
+
+end subroutine PMGeneralDebugCells
 
 ! ************************************************************************** !
 

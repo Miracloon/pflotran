@@ -72,6 +72,7 @@ module PM_Base_class
     procedure, public :: CheckpointHDF5 => PMBaseCheckpointHDF5
     procedure, public :: RestartHDF5 => PMBaseCheckpointHDF5
     procedure, public :: PrintErrMsg => PMBasePrintErrMsg
+    procedure, public :: DebugCells => PMBaseDebugCells
   end type pm_base_type
 
   type, public :: pm_base_header_type
@@ -403,6 +404,16 @@ subroutine PMBaseCheckConvergence(this,snes,it,xnorm,unorm,fnorm,reason,ierr)
   PetscErrorCode :: ierr
   call this%PrintErrMsg('PMBaseCheckConvergence')
 end subroutine PMBaseCheckConvergence
+
+! ************************************************************************** !
+
+subroutine PMBaseDebugCells(this)
+  implicit none
+  class(pm_base_type) :: this
+  if (.not.associated(this%debug)) return
+  if (.not.associated(this%debug%cell_ids)) return
+  call this%PrintErrMsg('PMBaseDebugCells')
+end subroutine PMBaseDebugCells
 
 ! ************************************************************************** !
 

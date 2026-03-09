@@ -24,6 +24,7 @@ module Debug_module
     PetscBool :: print_regions_tec
     character(len=MAXSTRINGLENGTH) :: coupler_string
     PetscBool :: print_waypoints
+    PetscInt, pointer :: cell_ids(:)
   end type debug_type
 
   interface DebugMatView
@@ -78,6 +79,8 @@ function DebugCreate()
   debug%coupler_string = ''
   debug%print_waypoints = PETSC_FALSE
 
+  nullify(debug%cell_ids)
+
   DebugCreate => debug
 
 end function DebugCreate
@@ -95,6 +98,7 @@ subroutine DebugRead(debug,input,option)
   use Option_module
   use Input_Aux_module
   use String_module
+  use Utility_module, only: ReallocateArray
 
   implicit none
 
@@ -103,6 +107,9 @@ subroutine DebugRead(debug,input,option)
   type(option_type) :: option
 
   character(len=MAXWORDLENGTH) :: keyword
+  PetscInt :: max_cells
+  PetscInt :: count
+  PetscInt, pointer :: int_array(:)
 
   input%ierr = INPUT_ERROR_NONE
   call InputPushBlock(input,option)
@@ -159,6 +166,25 @@ subroutine DebugRead(debug,input,option)
           case('NATIVE','PARALLEL')
             debug%output_format = VIEWER_NATIVE_FORMAT
         end select
+      case('CELL_IDS')
+        max_cells = 100
+        allocate(int_array(max_cells))
+        count = 0
+        call InputPushBlock(input,option)
+        do
+          call InputReadPflotranString(input,option)
+          if (InputCheckExit(input,option)) exit
+          count = count + 1
+          if (count > max_cells) then
+            call ReallocateArray(int_array,max_cells)
+          endif
+          call InputReadInt(input,option,int_array(count))
+          call InputErrorMsg(input,option,'natural cell id','DEBUG,CELL_IDS')
+        enddo
+        call InputPopBlock(input,option)
+        allocate(debug%cell_ids(count))
+        debug%cell_ids = int_array(1:count)
+        deallocate(int_array)
       case default
         call InputKeywordUnrecognized(input,keyword,'DEBUG',option)
     end select
@@ -317,12 +343,15 @@ subroutine DebugDestroy(debug)
   ! Author: Glenn Hammond
   ! Date: 12/21/07
   !
+  use Utility_module
+
   implicit none
 
   type(debug_type), pointer :: debug
 
   if (.not.associated(debug)) return
 
+  call DeallocateArray(debug%cell_ids)
   deallocate(debug)
   nullify(debug)
 

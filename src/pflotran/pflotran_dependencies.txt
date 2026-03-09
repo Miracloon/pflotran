@@ -365,7 +365,8 @@ debug.o : \
   option.o \
   petsc_utility.o \
   pflotran_constants.o \
-  string.o
+  string.o \
+  utility.o
 discretization.o : \
   dm_custom.o \
   grid.o \
@@ -760,8 +761,8 @@ gas_eos_mod.o : \
   pflotran_constants.o
 gauss.o : \
   grid_unstructured_cell.o \
-  pflotran_constants.o \
-  utility.o
+  option.o \
+  pflotran_constants.o
 general.o : \
   connection.o \
   coupler.o \
@@ -2137,6 +2138,7 @@ pm_fracture.o : \
 pm_general.o : \
   checkpoint.o \
   convergence.o \
+  debug.o \
   field.o \
   general.o \
   general_aux.o \
@@ -2145,6 +2147,7 @@ pm_general.o : \
   grid.o \
   input_aux.o \
   material.o \
+  material_aux.o \
   option.o \
   patch.o \
   pflotran_constants.o \
@@ -3709,6 +3712,7 @@ secondary_continuum_np.o : \
 shape_function.o : \
   gauss.o \
   grid_unstructured_cell.o \
+  option.o \
   pflotran_constants.o
 simulation_aux.o : \
   option.o \

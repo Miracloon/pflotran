@@ -946,4 +946,84 @@ subroutine FactorySubsurfaceInsertWellCells(simulation)
 
 end subroutine FactorySubsurfaceInsertWellCells
 
+! ************************************************************************** !
+
+subroutine FactorySubsurfaceDebugSetup(simulation)
+  !
+  ! Author: Glenn Hammond
+  ! Date: 06/11/13
+  !
+  use PMC_Base_class
+  use Option_module
+
+  implicit none
+
+  type(simulation_subsurface_type) :: simulation
+
+  class(pmc_base_type), pointer :: pmc
+
+  pmc => simulation%process_model_coupler_list
+  call FactorySubsurfaceDebugSetupPM(pmc%pm_list)
+  call FactorySubsurfaceDebugSetupPMC(pmc%child)
+  call FactorySubsurfaceDebugSetupPMC(pmc%peer)
+
+contains
+
+recursive subroutine FactorySubsurfaceDebugSetupPMC(pmc)
+
+  use PMC_Base_class
+
+  class(pmc_base_type), pointer :: pmc
+
+  if (.not.associated(pmc)) return
+
+  call FactorySubsurfaceDebugSetupPM(pmc%pm_list)
+  call FactorySubsurfaceDebugSetupPMC(pmc%child)
+  call FactorySubsurfaceDebugSetupPMC(pmc%peer)
+
+end subroutine FactorySubsurfaceDebugSetupPMC
+
+subroutine FactorySubsurfaceDebugSetupPM(pm)
+
+  use PM_Base_class
+  use Realization_Subsurface_class
+  use Grid_module
+  use Discretization_module
+
+  class(pm_base_type) :: pm
+  class(realization_subsurface_type), pointer :: realization
+  type(grid_type), pointer :: grid
+  PetscInt, allocatable :: int_array(:)
+  PetscInt :: i, ii
+  PetscCount :: sortcount
+  PetscErrorCode :: ierr
+
+  if (.not.associated(pm%debug)) return
+
+  if (associated(pm%debug%cell_ids)) then
+    realization => RealizationCast(pm%realization_base)
+    grid => realization%patch%grid
+    allocate(int_array(size(pm%debug%cell_ids)))
+    int_array = pm%debug%cell_ids
+    call DiscretAOApplicationToPetsc(realization%discretization,int_array)
+    sortcount = size(int_array)
+    call PetscSortInt(sortcount,int_array,ierr);CHKERRQ(ierr)
+    ii = 0
+    do i = 1, size(int_array)
+      if (int_array(i) > grid%global_offset .and. &
+          int_array(i) < grid%global_offset + grid%nlmax) then
+        ii = ii + 1
+        int_array(ii) = int_array(i)
+      endif
+    enddo
+    deallocate(pm%debug%cell_ids)
+    allocate(pm%debug%cell_ids(ii))
+    pm%debug%cell_ids = int_array(1:ii)
+    deallocate(int_array)
+  endif
+
+end subroutine FactorySubsurfaceDebugSetupPM
+
+end subroutine FactorySubsurfaceDebugSetup
+
 end module Factory_Subsurface_module
