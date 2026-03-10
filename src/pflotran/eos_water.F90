@@ -1833,7 +1833,7 @@ subroutine EOSWaterDensityIF97(T,P,calculate_derivatives,dw,dwmol, &
     ! put into separate routine, to minimize weighing down this
     ! much more commonly used routine (Region 1)
     call EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
-                                    dwp,dwt)
+                                    dwp,dwt,ierr)
   end if
 
 end subroutine EOSWaterDensityIF97
@@ -1841,7 +1841,7 @@ end subroutine EOSWaterDensityIF97
 ! ************************************************************************** !
 
 subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
-                                     dwp,dwt)
+                                     dwp,dwt,ierr)
   ! only ever called by EOSWaterDensityIF97()
   ! implements "backward equations" and "auxiliary equations" for
   ! specific volume as a funciton of p,T near the critical point
@@ -3271,10 +3271,11 @@ subroutine EOSWaterEnthalpyIF97Region3(T,P,calculate_derivatives,hw,hwp,hwt)
        7,22,26,0,2, 4,16,26,0,2, 4,26,1,3,26, 0,2,26,2,26, 2,26,0,1,26]
   PetscReal :: tau,  phi_tau, phi_delta, T_Kelvin, delta, dw
   PetscReal :: dum1, dum2, dum3
+  PetscErrorCode :: ierr
 
   T_Kelvin = T+Tf
   ! P only used to compute density
-  call EOSWaterDensityIF97Region3(T,P,PETSC_FALSE,dw,dum1,dum2,dum3)
+  call EOSWaterDensityIF97Region3(T,P,PETSC_FALSE,dw,dum1,dum2,dum3,ierr)
   delta = dw/rho_c
   tau = T_c/T_Kelvin
 
