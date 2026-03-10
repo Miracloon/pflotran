@@ -105,9 +105,9 @@ contains
     PetscErrorCode :: ierr
     character(len=MAXSTRINGLENGTH) :: error_string
 
-    PetscReal, parameter :: density = 1234.5
-    PetscReal, parameter :: temperature = -23.4
-    PetscReal, parameter :: pressure = 1.0
+    PetscReal, parameter :: density = 1234.5d0
+    PetscReal, parameter :: temperature = -23.4d0
+    PetscReal, parameter :: pressure = 1.0d0
     PetscReal :: aux(1)
     PetscReal :: dw, dwmol, dwp, dwt
 
@@ -480,6 +480,349 @@ contains
     end subroutine CalcLambda
 
   end subroutine testEOSWater_ThermCondIF97
+
+  ! ************************************************************************** !
+
+  @Test
+  subroutine testEOSWater_DensityIF97(this)
+    !
+    ! Cover densities calculated by IF97 algorithm
+
+    use PFLOTRAN_Constants_module, only : MAXSTRINGLENGTH
+
+    implicit none
+
+    class (Test_EOS_Water), intent(inout) :: this
+
+    PetscErrorCode :: ierr
+
+    PetscReal :: temperature = 20.0d0
+    PetscReal :: pressure = 101325.0d0
+    PetscReal :: density
+    PetscReal :: dum1
+    PetscReal :: correct_density
+    PetscReal, parameter :: tol = 1.d-16
+
+    call EOSWaterInit()
+    call EOSWaterSetDensity('IF97')
+
+    pressure = 20.d6
+    temperature = 200.d0
+    correct_density = 877.97408902435325d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, density
+    @assertEqual(correct_density, density, tol)
+
+end subroutine testEOSWater_DensityIF97
+
+! ************************************************************************** !
+
+  @Test
+  subroutine testEOSWater_DensityIF97_Region3(this)
+    !
+    ! Exercises EOSWaterDensityIF97() for Region 3 of the IAPWS-IF97 standard,
+    ! which spans T > 623.15 K (350 C), pressures above the saturation curve,
+    ! and up to 100 MPa. Region 3 is computed via the backward equations
+    ! v(p,T) of IAPWS SR5-05(2016), which subdivide Region 3 into 26
+    ! sub-regions (3a-3z).
+    !
+    ! P/T centroid pairs are provided for all 26 sub-regions, derived from
+    ! Figures 3, 4, and 5 of IAPWS SR5-05(2016):
+    !   Figure 3: full Region 3 overview (3a-3f, 3k, 3q, 3r, 3s, 3t)
+    !   Figure 4: enlargement of sub-regions 3c-3r
+    !   Figure 5: auxiliary sub-regions 3u-3z (near-critical, 2016 update)
+    ! Sub-regions appearing in multiple figures have one pair per figure.
+    ! The first three pairs have no associated figure.
+
+    implicit none
+
+    class (Test_EOS_Water), intent(inout) :: this
+
+    PetscErrorCode :: ierr
+
+    PetscReal :: temperature
+    PetscReal :: pressure
+    PetscReal :: density
+    PetscReal :: correct_density
+    PetscReal :: dum1
+    PetscReal, parameter :: tol = 1.d-16
+
+    call EOSWaterInit()
+    call EOSWaterSetDensity('IF97')
+
+    ! Region 3 (30 MPa, 400 C): [no figure]
+    pressure = 30.d6
+    temperature = 400.d0
+    correct_density = 357.59973899020429d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3 (30 MPa, 400 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3 near-critical (23 MPa, 374 C): [no figure]
+    pressure = 23.d6
+    temperature = 374.d0
+    correct_density = 468.89641477622831d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3 near-critical (23 MPa, 374 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3a (50 MPa, 356.85 C): [no figure]
+    pressure = 50.d6
+    temperature = 356.85d0
+    correct_density = 679.87754856320737d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3a (50 MPa, 356.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3a (70 MPa, 386.85 C): [Figure 3]
+    pressure = 70.0d6
+    temperature = 386.85d0
+    correct_density = 663.40112368054167d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3a (70 MPa, 386.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3b (70 MPa, 446.85 C): [Figure 3]
+    pressure = 70.0d6
+    temperature = 446.85d0
+    correct_density = 536.10407765829439d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3b (70 MPa, 446.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3c (24.0 MPa, 366.85 C): [Figure 4]
+    pressure = 24.0d6
+    temperature = 366.85d0
+    correct_density = 548.74127042438977d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3c (24.0 MPa, 366.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3c (33 MPa, 369.85 C): [Figure 3, Figure 4]
+    pressure = 33.0d6
+    temperature = 369.85d0
+    correct_density = 595.45931425287483d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3c (33 MPa, 369.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3d (25.0 MPa, 378.85 C): [Figure 4]
+    pressure = 25.0d6
+    temperature = 378.85d0
+    correct_density = 466.67140063918697d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3d (25.0 MPa, 378.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3d (33 MPa, 391.85 C): [Figure 3, Figure 4]
+    pressure = 33.0d6
+    temperature = 391.85d0
+    correct_density = 499.22200823293110d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3d (33 MPa, 391.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3e (25.2 MPa, 385.35 C): [Figure 4]
+    pressure = 25.2d6
+    temperature = 385.35d0
+    correct_density = 326.36058159308914d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3e (25.2 MPa, 385.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3e (33 MPa, 406.85 C): [Figure 3, Figure 4]
+    pressure = 33.0d6
+    temperature = 406.85d0
+    correct_density = 383.00484452231541d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3e (33 MPa, 406.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3f (25.0 MPa, 397.85 C): [Figure 4]
+    pressure = 25.0d6
+    temperature = 397.85d0
+    correct_density = 173.16423830476310d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3f (25.0 MPa, 397.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3f (33 MPa, 426.85 C): [Figure 3, Figure 4]
+    pressure = 33.0d6
+    temperature = 426.85d0
+    correct_density = 237.27658278475144d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3f (33 MPa, 426.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3g (24.0 MPa, 375.85 C): [Figure 4]
+    pressure = 24.0d6
+    temperature = 375.85d0
+    correct_density = 475.46496932538292d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3g (24.0 MPa, 375.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3h (24.0 MPa, 381.85 C): [Figure 4]
+    pressure = 24.0d6
+    temperature = 381.85d0
+    correct_density = 281.66396881478931d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3h (24.0 MPa, 381.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3i (24.0 MPa, 385.85 C): [Figure 4]
+    pressure = 24.0d6
+    temperature = 385.85d0
+    correct_density = 204.11798151543536d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3i (24.0 MPa, 385.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3j (24.0 MPa, 389.85 C): [Figure 4]
+    pressure = 24.0d6
+    temperature = 389.85d0
+    correct_density = 178.82940759277494d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3j (24.0 MPa, 389.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3k (21.3 MPa, 373.85 C): [Figure 3, Figure 4, Figure 5]
+    pressure = 21.3d6
+    temperature = 373.85d0
+    correct_density = 171.61972199514591d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3k (21.3 MPa, 373.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3k (24.5 MPa, 399.85 C): [Figure 3, Figure 4]
+    pressure = 24.5d6
+    temperature = 399.85d0
+    correct_density = 157.43761255120120d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3k (24.5 MPa, 399.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3l (23.0 MPa, 375.35 C): [Figure 4]
+    pressure = 23.0d6
+    temperature = 375.35d0
+    correct_density = 443.09111459660465d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3l (23.0 MPa, 375.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3m (22.65 MPa, 371.85 C): [Figure 4]
+    pressure = 22.65d6
+    temperature = 371.85d0
+    correct_density = 487.67852604653564d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3m (22.65 MPa, 371.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3n (22.7 MPa, 374.85 C): [Figure 4]
+    pressure = 22.7d6
+    temperature = 374.85d0
+    correct_density = 435.26919619420528d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3n (22.7 MPa, 374.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3o (22.7 MPa, 376.85 C): [Figure 4]
+    pressure = 22.7d6
+    temperature = 376.85d0
+    correct_density = 255.25063378899551d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3o (22.7 MPa, 376.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3p (22.7 MPa, 377.85 C): [Figure 4]
+    pressure = 22.7d6
+    temperature = 377.85d0
+    correct_density = 219.45103697050007d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3p (22.7 MPa, 377.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3q (21.8 MPa, 370.85 C): [Figure 3, Figure 4, Figure 5]
+    pressure = 21.8d6
+    temperature = 370.85d0
+    correct_density = 474.17328091449338d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3q (21.8 MPa, 370.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3q (22.35 MPa, 371.85 C): [Figure 3, Figure 4, Figure 5]
+    pressure = 22.35d6
+    temperature = 371.85d0
+    correct_density = 478.57870750550330d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3q (22.35 MPa, 371.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3r (21.55 MPa, 376.35 C): [Figure 3, Figure 4, Figure 5]
+    pressure = 21.55d6
+    temperature = 376.35d0
+    correct_density = 166.19431584711370d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3r (21.55 MPa, 376.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3r (22.4 MPa, 378.35 C): [Figure 3, Figure 4, Figure 5]
+    pressure = 22.4d6
+    temperature = 378.35d0
+    correct_density = 189.87343579679779d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3r (22.4 MPa, 378.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3u (22.2 MPa, 372.85 C): [Figure 5]
+    pressure = 22.2d6
+    temperature = 372.85d0
+    correct_density = 453.68525591292291d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3u (22.2 MPa, 372.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3v (22.35 MPa, 373.35 C): [Figure 5]
+    pressure = 22.35d6
+    temperature = 373.35d0
+    correct_density = 450.86819812533628d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3v (22.35 MPa, 373.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3w (22.35 MPa, 375.65 C): [Figure 5]
+    pressure = 22.35d6
+    temperature = 375.65d0
+    correct_density = 234.21171025667502d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3w (22.35 MPa, 375.65 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3x (22.0 MPa, 375.35 C): [Figure 5]
+    pressure = 22.0d6
+    temperature = 375.35d0
+    correct_density = 198.44716234026981d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3x (22.0 MPa, 375.35 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3y (22.09 MPa, 373.99 C): [Figure 5]
+    pressure = 22.09d6
+    temperature = 373.99d0
+    correct_density = 368.26989159462534d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3y (22.09 MPa, 373.99 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3z (22.09 MPa, 374.09 C): [Figure 5]
+    pressure = 22.09d6
+    temperature = 374.09d0
+    correct_density = 275.06862769384787d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3z (22.09 MPa, 374.09 C):', density
+    @assertEqual(correct_density, density, tol)
+
+  end subroutine testEOSWater_DensityIF97_Region3
 
 end module Test_EOS_Water_module
 
