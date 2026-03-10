@@ -1939,7 +1939,7 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
     else
       nu = IF97_subregion_3c(P,T_temp)
     end if
-  else if (P > 21.11D+6) then
+  else if (P > 22.11D+6) then
     if (T_temp > T3bdry(P,T3jk)) then
       nu = IF97_subregion_3k(P,T_temp)
     else if (T_temp > T3bdry(P,T3rx)) then
