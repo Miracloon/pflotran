@@ -1861,7 +1861,6 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
   PetscInt, parameter :: T3ef=12, T3uv=10, T3wx=11
 
   PetscReal, parameter :: Tf = T273K !K
-  PetscReal, parameter :: R = 0.461526d0 ! kJ/kg-K
 
   ! Region 3:  Region 3: Valid in "wedge" >623.15K, >Ps(T), and 100MPa
   ! first, determine which of 24 sub-regions we fall into:
@@ -2049,6 +2048,12 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
     end if
   else
     !stop 'IF97 Region 3 ERROR: either > 100 MPa or < 16.5292 MPa'
+    dw = UNINITIALIZED_DOUBLE
+    dwmol = UNINITIALIZED_DOUBLE
+    dwp = UNINITIALIZED_DOUBLE
+    dwt = UNINITIALIZED_DOUBLE
+    ierr = 1
+    return
   end if
 
   ! nu is the specific volume in m^3/kg, so density is 1/nu
@@ -3206,16 +3211,16 @@ subroutine EOSWaterEnthalpyIF97(T,P,calculate_derivatives,hw, &
     ! Region 1: Valid from 273.15 K to 623.15 K, Ps(T) to 100MPa
     g_tao = sum((n_i*(7.1d0-pi)**(I_i))*J_i*(tao-1.222d0)**(J_i-1))
 
-    hw = g_tao *T_ref*R
-    hw = hw*FMWH2O * 1.d3
+    hw = g_tao * T_ref * R
+    hw = hw * FMWH2O * 1.d3
 
     if (calculate_derivatives) then
       hwp = T_ref*R/p_ref * sum(-n_i*I_i*(7.1d0-pi)**(I_i-1) * &
            J_i*(tao-1.222d0)**(J_i-1))
       hwt = -T_ref*T_ref*R/(T_Kelvin*T_Kelvin) * sum(n_i*(7.1d0-pi)**(I_i)* &
            J_i*(J_i-1)*(tao-1.222d0)**(J_i-2))
-      hwp = hwp*FMWH2O * 1.d3
-      hwt = hwt*FMWH2O * 1.d3
+      hwp = hwp * FMWH2O * 1.d3
+      hwt = hwt * FMWH2O * 1.d3
     else
       hwp = UNINITIALIZED_DOUBLE
       hwt = UNINITIALIZED_DOUBLE
@@ -3281,6 +3286,7 @@ subroutine EOSWaterEnthalpyIF97Region3(T,P,calculate_derivatives,hw,hwp,hwt)
 
   ! Table 31
   hw = (tau * phi_tau + delta * phi_delta) * R * T_Kelvin
+  hw = hw * FMWH2O * 1.d3  ! convert kJ/kg -> J/kmol to match Region 1
 
   if (calculate_derivatives) then
     stop 'IF97 region 3 water enthalpy derivative not implemented yet'
