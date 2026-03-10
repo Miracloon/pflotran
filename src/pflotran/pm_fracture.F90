@@ -1980,9 +1980,9 @@ subroutine PMFracUpdateGTMOD(this)
   integral_flux => this%gtmod_coupler%prod_well_intflux
   ! need to do MPISUM on instantaneous_value because only the processor that
   ! owns the integral flux surface has non-zero values
-  call MPI_Allreduce(integral_flux%instantaneous_value,global_instval, &
-    TWO_INTEGER,MPI_DOUBLE_PRECISION,MPI_SUM,this%option%mycomm, &
-    ierr);CHKERRQ(ierr)
+  call MPI_Allreduce(integral_flux%unscaled_instantaneous_value, &
+    global_instval,TWO_INTEGER,MPI_DOUBLE_PRECISION,MPI_SUM, &
+    this%option%mycomm,ierr);CHKERRQ(ierr)
   this%gtmod_coupler%prod_well_mdot = global_instval(ONE_INTEGER)*FMWH2O !kg/sec
   this%gtmod_coupler%prod_well_MW = global_instval(TWO_INTEGER) !MJ/sec = MW
   ! a flux out of the domain is (-), but we want this to be (+) for GTMOD
