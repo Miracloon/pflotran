@@ -2051,8 +2051,9 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
     !stop 'IF97 Region 3 ERROR: either > 100 MPa or < 16.5292 MPa'
   end if
 
-  dw = 1.d0 / (nu * R * T_temp / P * 1.0D+3)
-  dwmol = dw/FMWH2O
+  ! nu is the specific volume in m^3/kg, so density is 1/nu
+  dw = 1.d0 / nu ! kg/m^3
+  dwmol = dw/FMWH2O ! kmol/m^3
 
   if (calculate_derivatives) then
     stop 'IF97 region 3 water density derivative not implemented yet'
