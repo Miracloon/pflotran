@@ -2065,6 +2065,8 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
 end subroutine EOSWaterDensityIF97Region3
 
 function T3bdry(P,idx)
+  ! Returns the temperature (in Kelvin) of the boundary between sub-regions
+  ! in IF97 Region 3, as a function of pressure (in Pa)
   implicit none
   PetscReal, parameter :: n_i(11,5) = reshape([ &
         0.154793642129415D4, -0.187661219490113D3, 0.213144632222113D2, & !T3ab
@@ -2092,10 +2094,12 @@ function T3bdry(P,idx)
   PetscInt, parameter :: I_i(11,5) = reshape([0,1,2,-1,-2, 0,1,2,3,0, 0,1,2,3,4, &
        0,1,2,3,4, 0,1,2,3,4, 0,1,2,3,0, 0,1,2,-1,-2, 0,1,2,3,0, 0,1,2,3,0, 0,1,2,3,0, &
        0,1,2,-1,-2],shape=[11,5],order=[2,1])
-  PetscReal, intent(in) :: P
+  PetscReal, intent(in) :: P ! Pa
   PetscInt, intent(in) :: idx
   PetscReal :: T3bdry, pi
 
+  ! pi is p/p^* where p^* 1 MPa, so convert P from Pa to MPa and your done
+  ! T^* is 1 K, so no conversion needed for T
   pi = P * 1.0D-6
   select case(idx)
   case(1,7,11)
