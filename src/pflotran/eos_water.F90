@@ -2134,7 +2134,7 @@ function IF97_subregion_3a(p,T) result (v)
   PetscReal, parameter :: a = 0.085d0, b = 0.817d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3a
 
@@ -2164,7 +2164,7 @@ function IF97_subregion_3b(p,T) result (v)
   PetscReal, parameter :: a = 0.280d0, b = 0.779d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3b
 
@@ -2195,7 +2195,7 @@ function IF97_subregion_3c(p,T) result (v)
   PetscReal, parameter :: a = 0.259d0, b = 0.903d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3c
 
@@ -2227,7 +2227,7 @@ function IF97_subregion_3d(p,T) result (v)
   PetscReal, parameter :: a = 0.559d0, b = 0.939d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3d
 
@@ -2256,7 +2256,7 @@ function IF97_subregion_3e(p,T) result (v)
   PetscReal, parameter :: a = 0.587d0, b = 0.918d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3e
 
@@ -2290,7 +2290,7 @@ function IF97_subregion_3f(p,T) result (v)
   PetscReal, parameter :: a = 0.587d0, b = 0.891d0
   PetscReal, parameter :: c = 0.5d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3f
 
@@ -2323,7 +2323,7 @@ function IF97_subregion_3g(p,T) result (v)
   PetscReal, parameter :: a = 0.872d0, b = 0.971d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3g
 
@@ -2352,7 +2352,7 @@ function IF97_subregion_3h(p,T) result (v)
   PetscReal, parameter :: a = 0.898d0, b = 0.983d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3h
 
@@ -2386,7 +2386,7 @@ function IF97_subregion_3i(p,T) result (v)
   PetscReal, parameter :: a = 0.910d0, b = 0.984d0
   PetscReal, parameter :: c = 0.5d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3i
 
@@ -2414,7 +2414,7 @@ function IF97_subregion_3j(p,T) result (v)
   PetscReal, parameter :: a = 0.875d0, b = 0.964d0
   PetscReal, parameter :: c = 0.5d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3j
 
@@ -2444,7 +2444,7 @@ function IF97_subregion_3k(p,T) result (v)
   PetscReal, parameter :: a = 0.802d0, b = 0.935d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3k
 
@@ -2478,7 +2478,7 @@ function IF97_subregion_3l(p,T) result (v)
   PetscReal, parameter :: a = 0.908d0, b = 0.989d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3l
 
@@ -2511,7 +2511,7 @@ function IF97_subregion_3m(p,T) result (v)
   PetscReal, parameter :: a = 1.000d0, b = 0.997d0
   PetscReal, parameter :: c = 1.0d0, d = 0.25d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3m
 
@@ -2542,7 +2542,7 @@ function IF97_subregion_3n(p,T) result (v)
   PetscReal, parameter :: v_star = 0.0031d0, p_star = 23.d0, T_star = 650.d0
   PetscReal, parameter :: a = 0.976d0, b = 0.997d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = exp(sum(n_i * (pi - a)**I_i * (theta - b)**J_i)) * v_star
 end function IF97_subregion_3n
 
@@ -2566,7 +2566,7 @@ function IF97_subregion_3o(p,T) result (v)
   PetscReal, parameter :: a = 0.974d0, b = 0.996d0
   PetscReal, parameter :: c = 0.5d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3o
 
@@ -2593,7 +2593,7 @@ function IF97_subregion_3p(p,T) result (v)
   PetscReal, parameter :: a = 0.972d0, b = 0.997d0
   PetscReal, parameter :: c = 0.5d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3p
 
@@ -2619,7 +2619,7 @@ function IF97_subregion_3q(p,T) result (v)
   PetscReal, parameter :: a = 0.848d0, b = 0.983d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3q
 
@@ -2646,7 +2646,7 @@ function IF97_subregion_3r(p,T) result (v)
   PetscReal, parameter :: a = 0.874d0, b = 0.982d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3r
 
@@ -2674,7 +2674,7 @@ function IF97_subregion_3s(p,T) result (v)
   PetscReal, parameter :: a = 0.886d0, b = 0.990d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3s
 
@@ -2703,7 +2703,7 @@ function IF97_subregion_3t(p,T) result (v)
   PetscReal, parameter :: a = 0.803d0, b = 1.020d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3t
 
@@ -2736,7 +2736,7 @@ function IF97_subregion_3u(p,T) result (v)
   PetscReal, parameter :: a = 0.902d0, b = 0.988d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3u
 
@@ -2769,7 +2769,7 @@ function IF97_subregion_3v(p,T) result (v)
   PetscReal, parameter :: a = 0.960d0, b = 0.995d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3v
 
@@ -2801,7 +2801,7 @@ function IF97_subregion_3w(p,T) result (v)
   PetscReal, parameter :: a = 0.959d0, b = 0.995d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3w
 
@@ -2833,7 +2833,7 @@ function IF97_subregion_3x(p,T) result (v)
   PetscReal, parameter :: a = 0.910d0, b = 0.988d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 1.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3x
 
@@ -2855,7 +2855,7 @@ function IF97_subregion_3y(p,T) result (v)
   PetscReal, parameter :: a = 0.996d0, b = 0.994d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3y
 
@@ -2881,7 +2881,7 @@ function IF97_subregion_3z(p,T) result (v)
   PetscReal, parameter :: a = 0.993d0, b = 0.994d0
   PetscReal, parameter :: c = 1.0d0, d = 1.00d0, e = 4.d0
   pi = p/(p_star * 1.0D+6)
-  theta = (T + T273K)/T_star
+  theta = T/T_star
   v = sum(n_i * ((pi - a)**c)**I_i * ((theta - b)**d)**J_i)**e * v_star
 end function IF97_subregion_3z
 
