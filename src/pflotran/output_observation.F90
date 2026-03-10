@@ -2240,7 +2240,7 @@ subroutine OutputIntegralFlux(realization_base)
                                         option%nflowdof, &
                                         instantaneous_array,option)
       array(istart:iend,1) = &
-        integral_flux%integral_value(istart:iend)
+        integral_flux%unscaled_integral_value(istart:iend)
       array(istart:iend,2) = &
         instantaneous_array(1:option%nflowdof)
     endif
@@ -2255,7 +2255,7 @@ subroutine OutputIntegralFlux(realization_base)
                                         option%ntrandof, &
                                         instantaneous_array,option)
       array(istart:iend,1) = &
-        integral_flux%integral_value(istart:iend)
+        integral_flux%unscaled_integral_value(istart:iend)
       array(istart:iend,2) = &
         instantaneous_array(1:option%ntrandof)
     endif

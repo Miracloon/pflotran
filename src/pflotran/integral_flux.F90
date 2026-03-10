@@ -31,7 +31,7 @@ module Integral_Flux_module
     PetscInt, pointer :: internal_connections(:)
     PetscInt, pointer :: boundary_connections(:)
     PetscInt, pointer :: source_sink_connections(:)
-    PetscReal, pointer :: integral_value(:)
+    PetscReal, pointer :: unscaled_integral_value(:)
     PetscReal, pointer :: unscaled_instantaneous_value(:)
     type(integral_flux_type), pointer :: next
   end type integral_flux_type
@@ -86,7 +86,7 @@ function IntegralFluxCreate()
   nullify(integral_flux%internal_connections)
   nullify(integral_flux%boundary_connections)
   nullify(integral_flux%source_sink_connections)
-  nullify(integral_flux%integral_value)
+  nullify(integral_flux%unscaled_integral_value)
   nullify(integral_flux%unscaled_instantaneous_value)
   nullify(integral_flux%next)
 
@@ -286,8 +286,9 @@ subroutine IntegralFluxSizeStorage(integral_flux,option)
   type(integral_flux_type) :: integral_flux
   type(option_type) :: option
 
-  allocate(integral_flux%integral_value(option%nflowdof+option%ntrandof))
-  integral_flux%integral_value = 0.d0
+  allocate(integral_flux%unscaled_integral_value(option%nflowdof + &
+                                                 option%ntrandof))
+  integral_flux%unscaled_integral_value = 0.d0
 
   allocate(integral_flux%unscaled_instantaneous_value(option%nflowdof + &
                                                       option%ntrandof))
@@ -349,8 +350,8 @@ subroutine IntegralFluxUpdate(integral_flux_list,internal_fluxes, &
                                       num_values,sum_array,option)
     integral_flux%unscaled_instantaneous_value(offset+1:offset+num_values) = &
       sum_array(1:num_values)
-    integral_flux%integral_value(offset+1:offset+num_values) = &
-      integral_flux%integral_value(offset+1:offset+num_values) + &
+    integral_flux%unscaled_integral_value(offset+1:offset+num_values) = &
+      integral_flux%unscaled_integral_value(offset+1:offset+num_values) + &
       sum_array(1:num_values)*dt
     integral_flux => integral_flux%next
   enddo
@@ -697,7 +698,7 @@ subroutine IntegralFluxDestroy(integral_flux)
   call DeallocateArray(integral_flux%internal_connections)
   call DeallocateArray(integral_flux%boundary_connections)
   call DeallocateArray(integral_flux%source_sink_connections)
-  call DeallocateArray(integral_flux%integral_value)
+  call DeallocateArray(integral_flux%unscaled_integral_value)
   call DeallocateArray(integral_flux%unscaled_instantaneous_value)
   deallocate(integral_flux)
   nullify(integral_flux)
