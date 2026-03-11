@@ -1765,19 +1765,18 @@ end subroutine EOSWaterDensityIFC67
 
 ! ************************************************************************** !
 
-subroutine EOSWaterDensityIF97(T,P,calculate_derivatives,dw,dwmol, &
+subroutine EOSWaterDensityIF97(T_Celsius,P,calculate_derivatives,dw,dwmol, &
                                 dwp,dwt,ierr,table_idxs)
 
   implicit none
 
-  PetscReal, intent(in) :: T   ! Temperature in centigrade
+  PetscReal, intent(in) :: T_Celsius   ! Temperature in centigrade
   PetscReal, intent(in) :: P   ! Pressure in Pascals
   PetscBool, intent(in) :: calculate_derivatives
   PetscReal, intent(out) :: dw,dwmol,dwp,dwt
   PetscErrorCode, intent(inout) :: ierr
   PetscInt, pointer, optional, intent(inout) :: table_idxs(:)
 
-  PetscReal, parameter :: Tf = T273K !K
   PetscReal, parameter :: p_ref = 16.53d6 !Pa
   PetscReal, parameter :: T_ref = 1386.d0  ! K
   PetscReal, parameter :: R = 0.461526d0 ! kJ/kg-K
@@ -1801,7 +1800,7 @@ subroutine EOSWaterDensityIF97(T,P,calculate_derivatives,dw,dwmol, &
   PetscReal :: pi, tao, g_pi, T_Kelvin
   PetscReal :: dg_pi_dT, dv_dt, dg_pi_dp, dv_dp
 
-  T_Kelvin = T + T273K
+  T_Kelvin = T_Celsius + T273K
   if (T_Kelvin <= 623.15d0) then
     ! Region 1: Valid from 273.15 K to 623.15 K, Ps(T) to 100MPa
 
@@ -1832,23 +1831,23 @@ subroutine EOSWaterDensityIF97(T,P,calculate_derivatives,dw,dwmol, &
     ! Region 3: Valid in "wedge" >623.15K, >Ps(T), and 100MPa
     ! put into separate routine, to minimize weighing down this
     ! much more commonly used routine (Region 1)
-    call EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
-                                    dwp,dwt,ierr)
+    call EOSWaterDensityIF97Region3(T_Celsius,P,calculate_derivatives, &
+                                    dw,dwmol,dwp,dwt,ierr)
   end if
 
 end subroutine EOSWaterDensityIF97
 
 ! ************************************************************************** !
 
-subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
-                                     dwp,dwt,ierr)
+subroutine EOSWaterDensityIF97Region3(T_Celsius,P,calculate_derivatives, &
+                                      dw,dwmol,dwp,dwt,ierr)
   ! only ever called by EOSWaterDensityIF97()
   ! implements "backward equations" and "auxiliary equations" for
   ! specific volume as a funciton of p,T near the critical point
   ! in report IAPWS SR5-05(2016).
 
   implicit none
-  PetscReal, intent(in) :: T   ! Temperature [C]
+  PetscReal, intent(in) :: T_Celsius   ! Temperature [C]
   PetscReal, intent(in) :: P   ! Pressure [Pa]
   PetscBool, intent(in) :: calculate_derivatives
   PetscReal, intent(out) :: dw,dwmol,dwp,dwt
@@ -1860,12 +1859,10 @@ subroutine EOSWaterDensityIF97Region3(T,P,calculate_derivatives,dw,dwmol, &
   PetscInt, parameter :: T3op=7, T3qu=8, T3rx=9
   PetscInt, parameter :: T3ef=12, T3uv=10, T3wx=11
 
-  PetscReal, parameter :: Tf = T273K !K
-
   ! Region 3:  Region 3: Valid in "wedge" >623.15K, >Ps(T), and 100MPa
   ! first, determine which of 24 sub-regions we fall into:
 
-  T_Kelvin = T+Tf
+  T_Kelvin = T_Celsius + T273K
 
   ! 21.0434 MPa
   call EOSWaterSaturationPressureIF97(370.d0, PETSC_FALSE, &
@@ -3170,17 +3167,16 @@ subroutine EOSWaterEnthalpyIFC67(t,p,calculate_derivatives,hw, &
 
 end subroutine EOSWaterEnthalpyIFC67
 
-subroutine EOSWaterEnthalpyIF97(T,P,calculate_derivatives,hw, &
+subroutine EOSWaterEnthalpyIF97(T_Celsius,P,calculate_derivatives,hw, &
                                  hwp,hwt,ierr)
   implicit none
 
-  PetscReal, intent(in) :: T   ! Temperature in centigrade
+  PetscReal, intent(in) :: T_Celsius   ! Temperature in centigrade
   PetscReal, intent(in) :: P   ! Pressure in Pascals
   PetscBool, intent(in) :: calculate_derivatives
   PetscReal, intent(out) :: hw,hwp,hwt
   PetscErrorCode, intent(inout) :: ierr
 
-  PetscReal, parameter :: Tf = T273K !K
   PetscReal, parameter :: p_ref = 16.53d6 !Pa
   PetscReal, parameter :: T_ref = 1386.d0  ! K
   PetscReal, parameter :: R = 0.461526d0 ! kJ/kg-K
@@ -3203,7 +3199,7 @@ subroutine EOSWaterEnthalpyIF97(T,P,calculate_derivatives,hw, &
                                      -38,-39,-40,-41]
   PetscReal :: pi, tao,  g_tao, T_Kelvin
 
-  T_Kelvin = T+Tf
+  T_Kelvin = T_Celsius + T273K
   pi = P/p_ref
   tao = T_ref/T_Kelvin
 
@@ -3228,26 +3224,26 @@ subroutine EOSWaterEnthalpyIF97(T,P,calculate_derivatives,hw, &
   else
     ! Region 3: Valid in "wedge" >623.15K, >Ps(T), and 100MPa
     ! moved to subroutine to avoid weighting down this more-used routine
-    call EOSWaterEnthalpyIF97Region3(T,P,PETSC_FALSE,hw,hwp,hwt)
+    call EOSWaterEnthalpyIF97Region3(T_Celsius,P,PETSC_FALSE,hw,hwp,hwt)
   end if
 
 end subroutine EOSWaterEnthalpyIF97
 
 ! ************************************************************************** !
 
-subroutine EOSWaterEnthalpyIF97Region3(T,P,calculate_derivatives,hw,hwp,hwt)
+subroutine EOSWaterEnthalpyIF97Region3(T_Celsius,P,calculate_derivatives, &
+                                       hw,hwp,hwt)
 
   ! Region 3 is in terms of Helmholtz free energy, rather than
   ! Gibbs free energy. Enthalpy is in terms of density and temperature.
 
   implicit none
 
-  PetscReal, intent(in) :: T   ! Temperature in centigrade
+  PetscReal, intent(in) :: T_Celsius   ! Temperature in centigrade
   PetscReal, intent(in) :: P   ! Pressure in Pascals
   PetscBool, intent(in) :: calculate_derivatives
   PetscReal, intent(out) :: hw,hwp,hwt
 
-  PetscReal, parameter :: Tf = T273K !K
   PetscReal, parameter :: T_c = 647.096d0 ! K
   PetscReal, parameter :: rho_c = 322.d0 ! kg/m^3
   PetscReal, parameter :: R = 0.461526d0 ! kJ/kg-K
@@ -3273,9 +3269,9 @@ subroutine EOSWaterEnthalpyIF97Region3(T,P,calculate_derivatives,hw,hwp,hwt)
   PetscReal :: dum1, dum2, dum3
   PetscErrorCode :: ierr
 
-  T_Kelvin = T+Tf
+  T_Kelvin = T_Celsius + T273K
   ! P only used to compute density
-  call EOSWaterDensityIF97Region3(T,P,PETSC_FALSE,dw,dum1,dum2,dum3,ierr)
+  call EOSWaterDensityIF97Region3(T_Celsius,P,PETSC_FALSE,dw,dum1,dum2,dum3,ierr)
   delta = dw/rho_c
   tau = T_c/T_Kelvin
 
@@ -4415,9 +4411,10 @@ end subroutine EOSWaterSteamDenEnthTPPlanar
 
 ! ************************************************************************** !
 
-subroutine EOSWaterSteamDensityEnthalpyIF97(T, Pv, calculate_derivatives, &
-                                             dg, dgmol, hg, dgp, dgt, hgp, &
-                                             hgt, ierr)
+subroutine EOSWaterSteamDensityEnthalpyIF97(T_Celsius, Pv, &
+                                            calculate_derivatives, &
+                                            dg, dgmol, hg, dgp, dgt, hgp, &
+                                            hgt, ierr)
 
   !Author: Michael Nole
   !Date: 01/20/19
@@ -4430,7 +4427,7 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T, Pv, calculate_derivatives, &
 
   implicit none
 
-  PetscReal, intent(in) :: T
+  PetscReal, intent(in) :: T_Celsius
   PetscReal, intent(in) :: Pv
   PetscBool, intent(in) :: calculate_derivatives
   PetscReal, intent(out) :: dg,dgmol,dgp,dgt
@@ -4440,7 +4437,6 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T, Pv, calculate_derivatives, &
   PetscReal, parameter :: p_ref = 1.d6 !16.53d6 !Pa
   PetscReal, parameter :: T_ref = 540d0 !1386  ! K
   PetscReal, parameter :: R = 0.461526d0 ! kJ/kg-K
-  PetscReal, parameter :: Tf = T273K
   PetscReal :: pi, tao, T_Kelvin
   PetscReal :: gamma_0_pi, gamma_r_pi, gamma_0_tao, gamma_r_tao
   ! region 2, Tables 10 and 11
@@ -4481,7 +4477,7 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T, Pv, calculate_derivatives, &
   PetscInt, parameter :: I5_i(6) = [1,1,1,2,2,3]
   PetscInt, parameter :: J5_i(6) = [1,2,3,3,9,7]
 
-  T_Kelvin = T+Tf
+  T_Kelvin = T_Celsius + T273K
   pi = Pv/p_ref
   tao = T_ref/T_Kelvin
 
