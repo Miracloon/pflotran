@@ -774,6 +774,22 @@ end subroutine testEOSWater_DensityIF97
     !print *, 'Region 3r (22.4 MPa, 378.35 C):', density
     @assertEqual(correct_density, density, tol)
 
+    ! Region 3s (20.0 MPa, 362.85 C): [Figure 3]
+    pressure = 20.0d6
+    temperature = 362.85d0
+    correct_density = -999.d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3s (20.0 MPa, 362.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
+    ! Region 3t (17.5 MPa, 358.85 C): [Figure 3]
+    pressure = 17.5d6
+    temperature = 358.85d0
+    correct_density = -999.d0
+    call EOSWaterDensity(temperature, pressure, density, dum1, ierr)
+    !print *, 'Region 3t (17.5 MPa, 358.85 C):', density
+    @assertEqual(correct_density, density, tol)
+
     ! Region 3u (22.2 MPa, 372.85 C): [Figure 5]
     pressure = 22.2d6
     temperature = 372.85d0
