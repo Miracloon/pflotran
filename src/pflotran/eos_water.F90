@@ -3224,7 +3224,8 @@ subroutine EOSWaterEnthalpyIF97(T_Celsius,P,calculate_derivatives,hw, &
   else
     ! Region 3: Valid in "wedge" >623.15K, >Ps(T), and 100MPa
     ! moved to subroutine to avoid weighting down this more-used routine
-    call EOSWaterEnthalpyIF97Region3(T_Celsius,P,PETSC_FALSE,hw,hwp,hwt)
+    call EOSWaterEnthalpyIF97Region3(T_Celsius,P,calculate_derivatives, &
+                                     hw,hwp,hwt)
   end if
 
 end subroutine EOSWaterEnthalpyIF97
