@@ -864,10 +864,17 @@ function HDF5DatasetExists3(filename,group_name,dataset_name, &
 
   if (.not.group_exists) then
     HDF5DatasetExists3 = PETSC_FALSE
+    call HDF5FileClose(file_id,print_handler)
+    return
   endif
 
-  call HDF5DatasetOpen(grp_id,dataset_name,dataset_id,print_handler)
+  ! must use this routine here instead of HDF5DatasetOpen since
+  ! I do not want an error message printed if the dataset does not
+  ! exist, but the user does not need to see this.
+  call h5eset_auto_f(OFF,hdf5_err2)
+  call h5dopen_f(grp_id,dataset_name,dataset_id,hdf5_err)
   dataset_exists = .not.(hdf5_err < 0)
+  call h5eset_auto_f(ON,hdf5_err2)
 
   if (.not.dataset_exists) then
     HDF5DatasetExists3 = PETSC_FALSE

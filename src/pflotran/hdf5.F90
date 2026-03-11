@@ -1162,7 +1162,7 @@ subroutine HDF5ReadCellIndexedRealArray(realization,global_vec,filename, &
     option%io_buffer = 'Reading dataset: ' // trim(string)
   endif
   call PrintMsg(option)
-  call HDF5ReadArray(discretization,grid,option,file_id,string,grid%nmax, &
+  call HDF5ReadArray(discretization,grid,option,grp_id,string,grid%nmax, &
                      indices,global_vec,H5T_NATIVE_DOUBLE)
   call PetscTime(tend,ierr);CHKERRQ(ierr)
   write(option%io_buffer,'(f6.2," Seconds to read real array")') &
@@ -1391,6 +1391,7 @@ subroutine HDF5WriteDataSetFromVec(name,option,vec,file_id,data_type)
 
   call HDF5DatasetClose(data_set_id,option)
   call h5sclose_f(file_space_id,hdf5_err)
+  call h5sclose_f(memory_space_id,hdf5_err)
 
 end subroutine HDF5WriteDataSetFromVec
 
@@ -1509,9 +1510,8 @@ subroutine HDF5ReadDataSetInVec(name, option, vec, file_id, data_type)
 
   if (data_type == H5T_NATIVE_INTEGER) then
     allocate(int_array(local_size))
-
     call PetscLogEventBegin(logging%event_h5dwrite_f,ierr);CHKERRQ(ierr)
-    call h5dwrite_f(data_set_id,data_type,int_array,dims, &
+    call h5dread_f(data_set_id,data_type,int_array,dims, &
                     hdf5_err,memory_space_id,file_space_id,prop_id)
     call PetscLogEventEnd(logging%event_h5dwrite_f,ierr);CHKERRQ(ierr)
 

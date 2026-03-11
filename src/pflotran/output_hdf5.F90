@@ -1222,13 +1222,13 @@ function OutputHDF5FilenameID(output_option,option,var_list_type)
 
   if (file_number < 10) then
     write(OutputHDF5FilenameID,'("00",i1)') file_number
-  else if (output_option%plot_number < 100) then
+  else if (file_number < 100) then
     write(OutputHDF5FilenameID,'("0",i2)') file_number
-  else if (output_option%plot_number < 1000) then
+  else if (file_number < 1000) then
     write(OutputHDF5FilenameID,'(i3)') file_number
-  else if (output_option%plot_number < 10000) then
+  else if (file_number < 10000) then
     write(OutputHDF5FilenameID,'(i4)') file_number
-  else if (output_option%plot_number < 100000) then
+  else if (file_number < 100000) then
     write(OutputHDF5FilenameID,'(i5)') file_number
   else
     option%io_buffer = 'Plot number exceeds current maximum of 10^5.'
@@ -2686,16 +2686,15 @@ subroutine OutputHDF5WriteFlowratesUGrid(realization_base,option,file_id, &
 
   select case (var_list_type)
     case (INSTANTANEOUS_VARS)
-      call VecGetArray(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+      call VecGetArrayRead(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
       mass_flowrate = output_option%print_hdf5_mass_flowrate
       energy_flowrate = output_option%print_hdf5_energy_flowrate
     case (AVERAGED_VARS)
-      call VecGetArray(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
-      call VecGetArray(field%flowrate_aveg,vec_ptr2,ierr);CHKERRQ(ierr)
+      call VecGetArrayRead(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+      call VecGetArrayRead(field%flowrate_aveg,vec_ptr2,ierr);CHKERRQ(ierr)
       mass_flowrate = output_option%print_hdf5_aveg_mass_flowrate
       energy_flowrate = output_option%print_hdf5_aveg_energy_flowrate
   end select
-
 
   do dof = 1,option%nflowdof
 
@@ -2808,9 +2807,18 @@ subroutine OutputHDF5WriteFlowratesUGrid(realization_base,option,file_id, &
     call h5pclose_f(prop_id,hdf5_err)
 
     call HDF5DatasetClose(data_set_id,option)
+    call h5sclose_f(memory_space_id,hdf5_err)
     call h5sclose_f(file_space_id,hdf5_err)
 
   enddo
+
+  select case (var_list_type)
+    case (INSTANTANEOUS_VARS)
+      call VecRestoreArrayRead(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+    case (AVERAGED_VARS)
+      call VecRestoreArrayRead(field%flowrate_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+      call VecRestoreArrayRead(field%flowrate_aveg,vec_ptr2,ierr);CHKERRQ(ierr)
+  end select
 
   ! Free up memory
   deallocate(double_array)
@@ -2904,13 +2912,13 @@ subroutine OutputHDF5WriteFaceVelUGrid(realization_base,option,file_id, &
     select case (idir)
       case (1)
         string_dir = 'X'
-        call VecGetArray(field%vx_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+        call VecGetArrayRead(field%vx_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
       case (2)
         string_dir = 'Y'
-        call VecGetArray(field%vy_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+        call VecGetArrayRead(field%vy_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
       case (3)
         string_dir = 'Z'
-        call VecGetArray(field%vz_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
+        call VecGetArrayRead(field%vz_face_inst,vec_ptr1,ierr);CHKERRQ(ierr)
     end select
 
     do iphase = 1,option%nphase
@@ -3000,18 +3008,19 @@ subroutine OutputHDF5WriteFaceVelUGrid(realization_base,option,file_id, &
 
       call HDF5DatasetClose(data_set_id,option)
       call h5sclose_f(file_space_id,hdf5_err)
+      call h5sclose_f(memory_space_id,hdf5_err)
 
     enddo
 
     select case (idir)
       case (1)
-        call VecRestoreArray(field%vx_face_inst,vec_ptr1, &
+        call VecRestoreArrayRead(field%vx_face_inst,vec_ptr1, &
                                 ierr);CHKERRQ(ierr)
       case (2)
-        call VecRestoreArray(field%vy_face_inst,vec_ptr1, &
+        call VecRestoreArrayRead(field%vy_face_inst,vec_ptr1, &
                                 ierr);CHKERRQ(ierr)
       case (3)
-        call VecRestoreArray(field%vz_face_inst,vec_ptr1, &
+        call VecRestoreArrayRead(field%vz_face_inst,vec_ptr1, &
                                 ierr);CHKERRQ(ierr)
     end select
 
@@ -3695,7 +3704,7 @@ end subroutine OutputH5CloseGroup
 
 ! ************************************************************************** !
 
-subroutine OutputHDF5WriteGrid_Int(file_id, grp_id, dataspace_id, dims, &
+subroutine OutputHDF5WriteGrid_Int(grp_id, dataspace_id, dims, &
                                    dataset_name, to_write, option)
   !
   ! Writes an integer array to an existing file_id and grp_id
@@ -3711,7 +3720,7 @@ subroutine OutputHDF5WriteGrid_Int(file_id, grp_id, dataspace_id, dims, &
   implicit none
 
   type(option_type), pointer :: option
-  integer(HID_T) :: file_id, grp_id, dataset_id, dataspace_id
+  integer(HID_T) :: grp_id, dataset_id, dataspace_id
   integer :: error
   integer(HSIZE_T) :: dims(1)
   character(len=*) :: dataset_name
@@ -3737,7 +3746,7 @@ end subroutine OutputHDF5WriteGrid_Int
 
 ! ************************************************************************** !
 
-subroutine OutputHDF5WriteGrid_Real8(file_id, grp_id, dataspace_id, dims, &
+subroutine OutputHDF5WriteGrid_Real8(grp_id, dataspace_id, dims, &
                                dataset_name, to_write, option)
   !
   ! Writes a real array to an existing file_id and grp_id
@@ -3753,7 +3762,7 @@ subroutine OutputHDF5WriteGrid_Real8(file_id, grp_id, dataspace_id, dims, &
   implicit none
 
   type(option_type), pointer :: option
-  integer(HID_T) :: file_id, grp_id, dataset_id, dataspace_id
+  integer(HID_T) :: grp_id, dataset_id, dataspace_id
   integer :: error
   integer(HSIZE_T) :: dims(1)
   character(len=*) :: dataset_name
@@ -3857,17 +3866,17 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
     option%io_buffer = 'Could not create dataspace for ' // trim(string)
     call PrintErrMsg(option)
   endif
-  call OutputHDF5WriteGrid_Int(file_id, grp_conn_id, dataspace_id, dims, &
+  call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
                          "Cell1", nat_ids_up, option)
-  call OutputHDF5WriteGrid_Int(file_id, grp_conn_id, dataspace_id, dims, &
+  call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
                          "Cell2", nat_ids_dn, option)
-  call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+  call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
                            "Flux", darcy, option)
   if (output_density) then
-    call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+    call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
                              "Density", density_kg, option)
   endif
-  call OutputHDF5WriteGrid_Real8(file_id, grp_conn_id, dataspace_id, dims, &
+  call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
                            "Area", area, option)
   call h5sclose_f(dataspace_id, error)
   call HDF5GroupClose(grp_conn_id, option)
