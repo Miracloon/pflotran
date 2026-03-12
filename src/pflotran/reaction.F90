@@ -4772,9 +4772,11 @@ function RElectricalConductivity(rt_auxvar,global_auxvar,material_auxvar, &
 
   select case(reaction%elec_cond_method)
     case(ELEC_COND_LINEAR)
-      ec = 6.2d4 * RIonicStrength(rt_auxvar,reaction)
+         ! 6.2d4 * 1.d-4 for conversion from uS / cm -> S/m
+      ec = 6.2d0 * RIonicStrength(rt_auxvar,reaction)
     case(ELEC_COND_PSEUDO_LINEAR)
-      ec = 6.67d4 * (RIonicStrength(rt_auxvar,reaction)**0.991d0)
+         ! 6.2d4 * 1.d-4 for conversion from uS / cm -> S/m
+      ec = 6.67d0 * (RIonicStrength(rt_auxvar,reaction)**0.991d0)
     case(ELEC_COND_MOBILITY)
       ! \kappa = sum_i c_i z_i F u_i               [S/m] or [C/V-s-m]
       !   where
