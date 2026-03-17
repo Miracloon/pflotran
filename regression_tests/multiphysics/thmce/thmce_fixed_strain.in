@@ -49,15 +49,6 @@ SURVEY
   FORMAT E4D_SRV
 END
 
-#=========================== regression =======================================
-REGRESSION
-  CELLS_PER_PROCESS 3
-  CELL_IDS
-    7
-    13
-  /
-END
-
 #=========================== flow conditions ==================================
 FLOW_CONDITION initial
   TYPE
