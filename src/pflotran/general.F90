@@ -505,7 +505,8 @@ end subroutine GeneralNumericalJacobianTest
 
 ! ************************************************************************** !
 
-subroutine GeneralComputeMassBalance(realization,cell_ids,mass_balance)
+subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
+                                     mass_balance)
   !
   ! Initializes mass balance
   !
@@ -525,6 +526,7 @@ subroutine GeneralComputeMassBalance(realization,cell_ids,mass_balance)
   class(realization_subsurface_type) :: realization
   PetscReal :: mass_balance(realization%option%nflowspec, &
                             realization%option%nphase)
+  PetscInt :: num_cells
   PetscInt :: cell_ids(:)
 
   type(option_type), pointer :: option
@@ -549,7 +551,7 @@ subroutine GeneralComputeMassBalance(realization,cell_ids,mass_balance)
 
   mass_balance = 0.d0
 
-  do k = 1, size(cell_ids)
+  do k = 1, num_cells
     local_id = cell_ids(k)
     ghosted_id = grid%nL2G(local_id)
     !geh - Ignore inactive cells with inactive materials

@@ -3011,10 +3011,9 @@ subroutine OutputMassBalance(realization_base)
             call MphaseComputeMassBalance(realization_base,sum_kg(:,:), &
                                           sum_trapped(:))
          case(G_MODE)
-            cell_ids = (/ (i, i=1, realization_base%patch%grid%nlmax) /)
-            call GeneralComputeMassBalance(realization_base, &
-                                           cell_ids, &
-                                           sum_kg(:,:))
+            cell_ids = (/ (i, i=1, grid%nlmax) /)
+            call GeneralComputeMassBalance(realization_base,grid%nlmax, &
+                                           cell_ids,sum_kg(:,:))
           case(H_MODE)
             call HydrateComputeMassBalance(realization_base,sum_kg(:,:))
           case(WF_MODE)
@@ -3106,7 +3105,7 @@ subroutine OutputMassBalance(realization_base)
         select type(realization_base)
           class is(realization_subsurface_type)
             call RTComputeMassBalance(realization_base, &
-                                      realization_base%patch%grid%nlmax, &
+                                      grid%nlmax, &
                                       max_tran_size,sum_mol)
           class default
             option%io_buffer = 'Unrecognized realization class in MassBalance().'
@@ -3160,7 +3159,7 @@ subroutine OutputMassBalance(realization_base)
           class is(realization_subsurface_type)
             ! computes the global mass balance
             call NWTComputeMassBalance(realization_base, &
-                                       realization_base%patch%grid%nlmax, &
+                                       grid%nlmax, &
                                        max_tran_size,sum_mol)
           class default
             option%io_buffer = 'Unrecognized realization class in MassBalance().'
@@ -3766,8 +3765,10 @@ subroutine OutputMassBalance(realization_base)
 
             select case(option%iflowmode)
               case(G_MODE)
-                call GeneralComputeMassBalance(realization_base,cur_mbr% &
-                                               region_cell_ids,total_mass(:,:))
+                call GeneralComputeMassBalance(realization_base, &
+                                               cur_mbr%num_cells, &
+                                               cur_mbr%region_cell_ids, &
+                                               total_mass(:,:))
 
               case(SCO2_MODE)
                 deallocate(total_mass,global_total_mass)
