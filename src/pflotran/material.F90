@@ -508,6 +508,12 @@ subroutine MaterialPropertyRead(material_property,input,option)
         enddo
         call InputPopBlock(input,option)
       case('GEOMECHANICS_SUBSURFACE_PROPS')
+        if (option%geomechanics%flow_coupling == 0) then
+          option%io_buffer = 'To read GEOMECHANICS_SUBSURFACE_PROPS under &
+            &MATERIAL_PROPERTY, the geomechanics process model must be &
+            &employed with flow and a coupling schedule must be specified.'
+          call PrintErrMsg(option)
+        endif
         ! Changes the subsurface props (perm/porosity) due to changes in
         ! geomechanical stresses and strains
         material_property%geomechanics_subsurface_properties => &
