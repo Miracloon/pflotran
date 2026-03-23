@@ -204,8 +204,14 @@ subroutine PMCGeophysicsStepDT(this,stop_flag)
   skip_survey = PETSC_TRUE
   if (pm_ert%waypoint_list%num_waypoints > 0) then
     if (associated(this%cur_waypoint)) then
-      ! approximately equal within 1s tolerance
-      if (EqualTol(this%cur_waypoint%time,timestepper%target_time, 1.d0)) then
+      if (timestepper%target_time <= 1.d-3) then
+        write(option%io_buffer,'("SURVEY_TIMES matching tolerance is 1.d-3, " &
+              &"but target_time=",1pe12.5," <= 1.d-3. Please check " &
+              &"time stepping and survey times.")') timestepper%target_time
+        call PrintErrMsg(option)
+      endif
+      ! approximately equal within 1.d-3 seconds tolerance
+      if (EqualTol(this%cur_waypoint%time,timestepper%target_time, 1.d-3)) then
         skip_survey = PETSC_FALSE
         this%cur_waypoint => this%cur_waypoint%next
       endif
