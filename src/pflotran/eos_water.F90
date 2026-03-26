@@ -4483,7 +4483,7 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T_Celsius, Pv, &
   tao = T_ref/T_Kelvin
 
   if (T_Kelvin <= 1073.15d0) then
-    ! region 2, tables 13 & 14
+    ! region 2, tables 13 & 14 (up to 800 C, up to 100 MPa)
     gamma_0_pi = 1.d0/pi
     gamma_r_pi = sum(n_i*I_i*(pi**(I_i-1))*(tao-0.5)**J_i)
     gamma_0_tao = sum(n_i0*J_i0*tao**(J_i0-1))
@@ -4514,8 +4514,8 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T_Celsius, Pv, &
       hgp = UNINITIALIZED_DOUBLE
     endif
     hg = hg*FMWH2O * 1.d3
-  else if (T_Kelvin <= T273K) then
-    ! region 5: table 40
+  else if (T_Kelvin <= 2273.15d0) then
+    ! region 5: table 40 (800 C up to 2000 C, up to 50 MPa)
     gamma_0_pi = 1.d0/pi
     gamma_0_tao = sum(n5_i0*J5_i0*tao**(J5_i0-1))
     ! table 41
@@ -4535,7 +4535,7 @@ subroutine EOSWaterSteamDensityEnthalpyIF97(T_Celsius, Pv, &
       hgp = UNINITIALIZED_DOUBLE
     end if
   else
-    !stop 'wow. much hotness.'
+    stop 'wow. much hotness.' ! beyond 2000 C
   end if
 
 end subroutine EOSWaterSteamDensityEnthalpyIF97
