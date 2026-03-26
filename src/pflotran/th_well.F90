@@ -14,6 +14,9 @@ module TH_Well_module
   PetscReal :: liquid_pressure = 1.d6
   PetscReal :: thermal_diffusivity = 0.143d-6
 
+  PetscInt, parameter :: INLET_BC = 1
+  PetscInt, parameter :: OUTLET_BC = 2
+
   public :: THWellSetup, &
             THWellUpdateAuxVars, &
             THWellPerturb, &
@@ -51,7 +54,6 @@ subroutine THWellSetup(pm_well_base,realization)
   type(grid_type), pointer :: grid
   type(option_type), pointer :: option
   type(connection_set_type), pointer :: connection_set
-  type(connection_set_type), pointer :: grid_connection_set
   type(connection_set_type), pointer :: bc_connection_set
   type(th_parameter_type), pointer :: th_parameter
   type(th_auxvar_type), pointer :: auxvars(:)
@@ -60,8 +62,7 @@ subroutine THWellSetup(pm_well_base,realization)
   PetscReal :: surface_area
   PetscInt :: local_id
   PetscInt :: ghosted_id, ghosted_id_up, ghosted_id_dn
-  PetscInt :: grid_id_up, grid_id_dn
-  PetscInt :: i, j, k, iconn, idof, iconn2
+  PetscInt :: i, j, k, iconn, idof
   PetscInt :: nx, ny, nz
   PetscInt :: offset_i, offset_j, offset_k
   PetscInt :: istart, iend, kstart, kend, dk
@@ -72,7 +73,8 @@ subroutine THWellSetup(pm_well_base,realization)
   PetscInt, allocatable :: inactive_cells(:)
   PetscReal, allocatable :: len_(:,:)
   PetscReal :: segment_length
-  PetscBool :: found
+  PetscReal :: dx, dy, dz
+  PetscReal :: tempreal
 
   if (.not.associated(pm_well_base)) return
 
@@ -86,8 +88,10 @@ subroutine THWellSetup(pm_well_base,realization)
   select case(grid%itype)
     case(STRUCTURED_GRID)
     case default
-      option%io_buffer = 'THWell currently supports only structured grids.'
-      call PrintErrMsg(option)
+      if (pm_well%iscenario /= 4) then
+        option%io_buffer = 'THWell currently supports only structured grids.'
+        call PrintErrMsg(option)
+      endif
   end select
 
   pm_well%realization_base => realization
@@ -130,6 +134,9 @@ subroutine THWellSetup(pm_well_base,realization)
   endif
   if (Uninitialized(pm_well%flow_velocity)) then
     option%io_buffer = 'Well PIPE_FLOW_VELOCITY must be specified.'
+    call PrintErrMsg(option)
+  elseif (pm_well%flow_velocity < 0.d0) then
+    option%io_buffer = 'Well PIPE_FLOW_VELOCITY must be non-negative.'
     call PrintErrMsg(option)
   endif
 
@@ -182,21 +189,21 @@ subroutine THWellSetup(pm_well_base,realization)
         len_(1,ghosted_id_up) = len_(1,ghosted_id_up) + dist_up
         len_(1,ghosted_id_dn) = len_(1,ghosted_id_dn) + dist_dn
         if (iconn == 1) then
-          bc_connection_set%id_dn(1) = ghosted_id_up
-          bc_connection_set%dist(:,1) = 0.d0
-          bc_connection_set%dist(0,1) = dist_up
-          bc_connection_set%dist(-1,1) = 0.d0 ! fraction upwind
-          bc_connection_set%dist(1,1) = 1.d0
-          bc_connection_set%area(1) = pipe_cross_sectional_area
+          bc_connection_set%id_dn(INLET_BC) = ghosted_id_up
+          bc_connection_set%dist(:,INLET_BC) = 0.d0
+          bc_connection_set%dist(0,INLET_BC) = dist_up
+          bc_connection_set%dist(-1,INLET_BC) = 0.d0 ! fraction upwind
+          bc_connection_set%dist(1,INLET_BC) = 1.d0
+          bc_connection_set%area(INLET_BC) = pipe_cross_sectional_area
           len_(1,ghosted_id_up) = len_(1,ghosted_id_up) + dist_up
         endif
         if (iconn == num_connections) then
-          bc_connection_set%id_dn(2) = ghosted_id_dn
-          bc_connection_set%dist(:,2) = 0.d0
-          bc_connection_set%dist(0,2) = dist_dn
-          bc_connection_set%dist(-1,2) = 1.d0
-          bc_connection_set%dist(1,2) = -1.d0
-          bc_connection_set%area(2) = pipe_cross_sectional_area
+          bc_connection_set%id_dn(OUTLET_BC) = ghosted_id_dn
+          bc_connection_set%dist(:,OUTLET_BC) = 0.d0
+          bc_connection_set%dist(0,OUTLET_BC) = dist_dn
+          bc_connection_set%dist(-1,OUTLET_BC) = 1.d0
+          bc_connection_set%dist(1,OUTLET_BC) = -1.d0
+          bc_connection_set%area(OUTLET_BC) = pipe_cross_sectional_area
           len_(1,ghosted_id_dn) = len_(1,ghosted_id_dn) + dist_dn
         endif
       enddo
@@ -232,12 +239,12 @@ subroutine THWellSetup(pm_well_base,realization)
         len_(3,ghosted_id_up) = len_(3,ghosted_id_up) + dist_up
         len_(3,ghosted_id_dn) = len_(3,ghosted_id_dn) + dist_dn
         if (k == kstart) then
-          bc_connection_set%id_dn(1) = ghosted_id_up
-          bc_connection_set%dist(:,1) = 0.d0
-          bc_connection_set%dist(0,1) = dist_up
-          bc_connection_set%dist(-1,1) = 0.d0 ! fraction upwind
-          bc_connection_set%dist(3,1) = -1.d0
-          bc_connection_set%area(1) = pipe_cross_sectional_area
+          bc_connection_set%id_dn(INLET_BC) = ghosted_id_up
+          bc_connection_set%dist(:,INLET_BC) = 0.d0
+          bc_connection_set%dist(0,INLET_BC) = dist_up
+          bc_connection_set%dist(-1,INLET_BC) = 0.d0 ! fraction upwind
+          bc_connection_set%dist(3,INLET_BC) = -1.d0
+          bc_connection_set%area(INLET_BC) = pipe_cross_sectional_area
           len_(3,ghosted_id_up) = len_(3,ghosted_id_up) + dist_up
         endif
       enddo
@@ -297,12 +304,12 @@ subroutine THWellSetup(pm_well_base,realization)
         len_(3,ghosted_id_up) = len_(3,ghosted_id_up) + dist_up
         len_(3,ghosted_id_dn) = len_(3,ghosted_id_dn) + dist_dn
         if (k == kend) then
-          bc_connection_set%id_dn(2) = ghosted_id_dn
-          bc_connection_set%dist(:,2) = 0.d0
-          bc_connection_set%dist(0,2) = dist_dn
-          bc_connection_set%dist(-1,2) = 1.d0 ! fraction upwind
-          bc_connection_set%dist(3,2) = -1.d0
-          bc_connection_set%area(2) = pipe_cross_sectional_area
+          bc_connection_set%id_dn(OUTLET_BC) = ghosted_id_dn
+          bc_connection_set%dist(:,OUTLET_BC) = 0.d0
+          bc_connection_set%dist(0,OUTLET_BC) = dist_dn
+          bc_connection_set%dist(-1,OUTLET_BC) = 1.d0 ! fraction upwind
+          bc_connection_set%dist(3,OUTLET_BC) = -1.d0
+          bc_connection_set%area(OUTLET_BC) = pipe_cross_sectional_area
           len_(3,ghosted_id_dn) = len_(3,ghosted_id_dn) + dist_dn
         endif
       enddo
@@ -313,60 +320,51 @@ subroutine THWellSetup(pm_well_base,realization)
       endif
     case(4)
       iconn = 0
+      ! num_connections set to pm_well%well_grid%nsegments above
       do i = 1, num_connections
         iconn = iconn + 1
         ghosted_id_up = pm_well%well_grid%h_ghosted_id(i)
         ghosted_id_dn = pm_well%well_grid%h_ghosted_id(i+1)
         connection_set%id_up(iconn) = ghosted_id_up
         connection_set%id_dn(iconn) = ghosted_id_dn
+        dx = pm_well%well_grid%h(i+1)%x - pm_well%well_grid%h(i)%x
+        dy = pm_well%well_grid%h(i+1)%y - pm_well%well_grid%h(i)%y
+        dz = pm_well%well_grid%h(i+1)%z - pm_well%well_grid%h(i)%z
+        tempreal = sqrt(dx*dx+dy*dy+dz*dz)
+        connection_set%dist(-1,iconn) = UNINITIALIZED_DOUBLE
+        connection_set%dist(0,iconn) = tempreal
+        connection_set%dist(1,iconn) = dx/tempreal
+        connection_set%dist(2,iconn) = dy/tempreal
+        connection_set%dist(3,iconn) = dz/tempreal
+        connection_set%area(iconn) = pipe_cross_sectional_area
+        if (i == 1) then
+          dx = pm_well%well_grid%h(i)%x - pm_well%well_grid%tophole(1)
+          dy = pm_well%well_grid%h(i)%y - pm_well%well_grid%tophole(2)
+          dz = pm_well%well_grid%h(i)%z - pm_well%well_grid%tophole(3)
+          tempreal = sqrt(dx*dx+dy*dy+dz*dz)
+          bc_connection_set%id_dn(INLET_BC) = ghosted_id_up
+          bc_connection_set%dist(-1,INLET_BC) = UNINITIALIZED_DOUBLE
+          bc_connection_set%dist(0,INLET_BC) = tempreal
+          bc_connection_set%dist(1:3,INLET_BC) = [dx,dy,dz]/tempreal
+          bc_connection_set%area(INLET_BC) = pipe_cross_sectional_area
+        endif
+        if (i == num_connections) then
+          dx = pm_well%well_grid%bottomhole(1) - pm_well%well_grid%h(i+1)%x
+          dy = pm_well%well_grid%bottomhole(2) - pm_well%well_grid%h(i+1)%y
+          dz = pm_well%well_grid%bottomhole(3) - pm_well%well_grid%h(i+1)%z
+          tempreal = sqrt(dx*dx+dy*dy+dz*dz)
+          bc_connection_set%id_dn(OUTLET_BC) = ghosted_id_dn
+          bc_connection_set%dist(-1,OUTLET_BC) = UNINITIALIZED_DOUBLE
+          bc_connection_set%dist(0,OUTLET_BC) = tempreal
+          bc_connection_set%dist(1:3,OUTLET_BC) = [dx,dy,dz]/tempreal
+          bc_connection_set%area(OUTLET_BC) = pipe_cross_sectional_area
+        endif
       enddo
-      grid_connection_set => grid%internal_connection_set_list%first
-      do iconn2 = 1, grid_connection_set%num_connections
-        grid_id_up = grid_connection_set%id_up(iconn2)
-        grid_id_dn = grid_connection_set%id_dn(iconn2)
-        do iconn = 1, num_connections
-          if (connection_set%area(iconn) > 0.d0) cycle
-          ghosted_id_up = connection_set%id_up(iconn)
-          ghosted_id_dn = connection_set%id_dn(iconn)
-          found = PETSC_FALSE
-          if (grid_id_up == ghosted_id_up) then
-            found = (grid_id_dn == ghosted_id_dn)
-          elseif (grid_id_up == ghosted_id_dn) then
-            found = (grid_id_dn == ghosted_id_up)
-          endif
-          if (found) then
-            connection_set%dist(:,iconn) = grid_connection_set%dist(:,iconn2)
-            if (grid_id_up /= ghosted_id_up) then
-              connection_set%dist(1:3,iconn) = -connection_set%dist(1:3,iconn)
-              connection_set%dist(-1,iconn) = 1.d0-connection_set%dist(-1,iconn)
-            endif
-            dist_up = connection_set%dist(-1,iconn)*connection_set%dist(0,iconn)
-            dist_dn = connection_set%dist(0,iconn) - dist_up
-            connection_set%area(iconn) = pipe_cross_sectional_area
-            len_(:,ghosted_id_up) = len_(:,ghosted_id_up) + &
-              dist_up*connection_set%dist(1:3,iconn)
-            len_(:,ghosted_id_dn) = len_(:,ghosted_id_dn) + &
-              dist_dn*connection_set%dist(1:3,iconn)
-            if (iconn == 1) then
-              bc_connection_set%id_dn(1) = ghosted_id_up
-              bc_connection_set%dist(0,1) = dist_up
-              bc_connection_set%dist(-1,1) = 0.d0 ! fraction upwind
-              bc_connection_set%dist(1:3,1) = connection_set%dist(1:3,iconn)
-              bc_connection_set%area(1) = pipe_cross_sectional_area
-              len_(:,ghosted_id_up) = len_(:,ghosted_id_up) + &
-                dist_up*connection_set%dist(1:3,iconn)
-            elseif (iconn == num_connections) then
-              bc_connection_set%id_dn(2) = ghosted_id_up
-              bc_connection_set%dist(0,2) = dist_dn
-              bc_connection_set%dist(-1,2) = 0.d0 ! fraction upwind
-              bc_connection_set%dist(1:3,2) = -connection_set%dist(1:3,iconn)
-              bc_connection_set%area(2) = pipe_cross_sectional_area
-              len_(:,ghosted_id_dn) = len_(:,ghosted_id_dn) + &
-                dist_dn*connection_set%dist(1:3,iconn)
-            endif
-            exit
-          endif
-        enddo
+      do i = 1, num_well_cells
+        ghosted_id = pm_well%well_grid%h_ghosted_id(i)
+        len_(:,ghosted_id) = [pm_well%well_grid%dx(i), &
+                              pm_well%well_grid%dy(i), &
+                              pm_well%well_grid%dz(i)]
       enddo
   end select
   pm_well%connection_set => connection_set
@@ -521,10 +519,9 @@ subroutine THWellUpdateAuxVars(xx,pm_well_base)
   xxbc = UNINITIALIZED_DOUBLE
   do ibc = 1, 2
     select case(ibc)
-      case(1)
+      case(INLET_BC)
         xxbc(th_well_dof) = pm_well%inlet_temperature
-      case(2)
-        ghosted_id = pm_well%bc_connection_set%id_dn(ibc)
+      case(OUTLET_BC)
         ! to guarantee zero conduction at boundary
         xxbc(th_well_dof) = auxvars_well(size(pm_well%well_cells))%temp
     end select
@@ -640,14 +637,14 @@ subroutine THWell(r,J,pm_well_base,calculate_derivatives)
   type(th_well_auxvar_type), pointer :: auxvars_well(:)
   type(th_well_auxvar_type), pointer :: auxvars_well_bc(:)
   type(connection_set_type), pointer :: connection_set
-  type(th_well_auxvar_type), pointer :: auxvar_up, auxvar_dn
+  type(th_well_auxvar_type), pointer :: auxvar_well_up, auxvar_well_dn
   PetscReal :: Res(3)
   PetscReal :: Jup(3,3), Jdn(3,3)
   PetscInt :: ndof
   PetscInt :: local_id, local_id_up, local_id_dn
   PetscInt :: ghosted_id, ghosted_id_up, ghosted_id_dn
   PetscInt :: i, iconn, ibc
-  PetscBool :: forward_direction
+  PetscReal :: velocity_scale
   PetscErrorCode :: ierr
 
   if (.not.associated(pm_well_base)) return
@@ -685,7 +682,8 @@ subroutine THWell(r,J,pm_well_base,calculate_derivatives)
                     pm_well%flow_velocity, &
                     connection_set%dist(0,iconn), &
                     connection_set%area(iconn), &
-                    Res,Jup,Jdn,ndof,calculate_derivatives)
+                    Res,Jup,Jdn,ndof,calculate_derivatives, &
+                    PETSC_FALSE)
     if (calculate_derivatives) then
       if (local_id_up > 0) then
         call PetUtilMatSVBL(J,ghosted_id_up,ghosted_id_up,Jup,ndof)
@@ -712,41 +710,32 @@ subroutine THWell(r,J,pm_well_base,calculate_derivatives)
 
 #if 1
   do ibc = 1, 2
+    auxvar_well_up => auxvars_well_bc(ibc)
+    ghosted_id_dn = pm_well%bc_connection_set%id_dn(ibc)
+    local_id_dn = grid%nG2L(ghosted_id_dn)
     select case(ibc)
-      case(1)
-        ! the upstream cell on first internal connection is downstream on bc
-        ghosted_id_dn = pm_well%bc_connection_set%id_dn(ibc)
-        local_id_dn = grid%nG2L(ghosted_id_dn)
-        auxvar_up => auxvars_well_bc(ibc)
-!        auxvar_dn => auxvars_well(ghosted_id_dn)
-        auxvar_dn => auxvars_well(1)
-        forward_direction = PETSC_TRUE
-      case(2)
-        ghosted_id_dn = pm_well%bc_connection_set%id_dn(ibc)
-        local_id_dn = grid%nG2L(ghosted_id_dn)
-!        auxvar_up => auxvars_well(ghosted_id_dn)
-        auxvar_up => auxvars_well(size(pm_well%well_cells))
-        ! to guarantee no conductive heat flux
-!        auxvar_dn => auxvars_well(ghosted_id_dn)
-        auxvar_dn => auxvars_well_bc(ibc)
-        forward_direction = PETSC_FALSE
+      case(INLET_BC)
+        auxvar_well_dn => auxvars_well(1)
+        velocity_scale = 1.d0
+      case(OUTLET_BC) ! outflow
+        ! note that the temperature is currently equal to the last well cell,
+        ! so this is effectively a zero conduction bc
+        auxvar_well_dn => auxvars_well(size(pm_well%well_cells))
+        velocity_scale = -1.d0
     end select
-    call THWellFluxDerivative(auxvar_up, &
-                    auxvar_dn, &
-                    pm_well%flow_velocity, &
+    call THWellFluxDerivative(auxvar_well_up, &
+                    auxvar_well_dn, &
+                    pm_well%flow_velocity*velocity_scale, &
                     pm_well%bc_connection_set%dist(0,ibc), &
                     pm_well%bc_connection_set%area(ibc), &
-                    Res,Jup,Jdn,ndof,calculate_derivatives)
+                    Res,Jup,Jdn,ndof,calculate_derivatives, &
+                    PETSC_TRUE)
     if (calculate_derivatives) then
-      if (forward_direction) then
-        Jdn = -Jdn
-      endif
+      Jdn = -Jdn
       call PetUtilMatSVBL(J,ghosted_id_dn,ghosted_id_dn,Jdn,ndof)
     else
-      if (forward_direction) then
-        Res = -Res
-      endif
-    pm_well%heat_flux(1,ibc) = -Res(3)
+      Res = -Res
+      pm_well%heat_flux(1,ibc) = -Res(3)
       call PetUtilVecSVBL(r_p,local_id_dn,Res,ndof,PETSC_FALSE)
     endif
   enddo
@@ -849,13 +838,6 @@ subroutine THWellPerturb(pm_well_base)
     local_id = pm_well%well_cells(i)
     ghosted_id = grid%nL2G(local_id)
     natural_id = grid%nG2A(ghosted_id)
-    call THWellAuxVarPerturb(liquid_pressure,auxvars_well(i), &
-                             natural_id,option)
-  enddo
-
-  auxvars_well => patch%aux%TH%auxvars_well_bc
-  do i = 1, size(auxvars_well)
-    natural_id = -1
     call THWellAuxVarPerturb(liquid_pressure,auxvars_well(i), &
                              natural_id,option)
   enddo
@@ -990,7 +972,7 @@ end subroutine THWellFlux
 
 subroutine THWellFluxDerivative(auxvar_well_up,auxvar_well_dn, &
                                 velocity,dist,area,Res,Jup,Jdn,ndof, &
-                                calculate_derivatives)
+                                calculate_derivatives,is_bc)
   !
   ! Calculates internal flux term for TH well residual and Jacobian
   !
@@ -1006,6 +988,7 @@ subroutine THWellFluxDerivative(auxvar_well_up,auxvar_well_dn, &
   PetscReal :: dist
   PetscReal :: area
   PetscBool :: calculate_derivatives
+  PetscBool :: is_bc
 
   PetscReal :: Res_pert(ndof)
   PetscReal :: Jdum(ndof,ndof), Jdum1(ndof,ndof)
@@ -1016,14 +999,16 @@ subroutine THWellFluxDerivative(auxvar_well_up,auxvar_well_dn, &
                   .not.th_numerical_derivatives)
   if (calculate_derivatives .and. th_numerical_derivatives) then
     Jup = 0.d0
-    do idof = 1, ndof
-      call THWellFlux(auxvar_well_up%auxvar_pert(idof),auxvar_well_dn, &
-                      velocity,dist,area,Res_pert,Jdum,Jdum1,ndof,PETSC_FALSE)
-      do ieq = 1, ndof
-        Jup(ieq,idof) = (Res_pert(ieq) - Res(ieq)) / &
-                        auxvar_well_up%auxvar_pert(idof)%pert
+    if (.not.is_bc) then
+      do idof = 1, ndof
+        call THWellFlux(auxvar_well_up%auxvar_pert(idof),auxvar_well_dn, &
+                        velocity,dist,area,Res_pert,Jdum,Jdum1,ndof,PETSC_FALSE)
+        do ieq = 1, ndof
+          Jup(ieq,idof) = (Res_pert(ieq) - Res(ieq)) / &
+                          auxvar_well_up%auxvar_pert(idof)%pert
+        enddo
       enddo
-    enddo
+    endif
     Jdn = 0.d0
     do idof = 1, ndof
       call THWellFlux(auxvar_well_up,auxvar_well_dn%auxvar_pert(idof), &

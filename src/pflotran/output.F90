@@ -906,6 +906,10 @@ subroutine OutputVariableRead(input,option,output_variable_list)
         output_variable_list%flow_vars = PETSC_FALSE
       case('NO_ENERGY_VARIABLES')
         output_variable_list%energy_vars = PETSC_FALSE
+      case('FLOW_VARIABLES')
+        output_variable_list%flow_vars = PETSC_TRUE
+      case('ENERGY_VARIABLES')
+        output_variable_list%energy_vars = PETSC_TRUE
       case('COORDINATES')
         word = 'X_COORDINATE'
         call OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &

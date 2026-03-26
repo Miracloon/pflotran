@@ -18,8 +18,15 @@ EXTERNAL_FILE heat_pipe_1d.txt
 #=========================== well model =======================================
 WELLBORE_MODEL well
 
+  WELL_GRID
+    WELL_TRAJECTORY
+      SURFACE_ORIGIN         0. 2.5 2.5
+      SEGMENT_DXYZ UNCASED  20. 0.  0.
+    /
+  /
+
   WELL
-    SCENARIO 1
+    SCENARIO 4
     USE_WELL_INDEX
     INLET_TEMPERATURE 5.
     PIPE_INNER_DIAMETER 0.1
@@ -28,15 +35,13 @@ WELLBORE_MODEL well
     PIPE_FLOW_VELOCITY 1.574074d-5 # 1 m/d
   /
 
-  USE_WELL_COUPLER
-
 END
 
 #=========================== numerical methods ================================
 NUMERICAL_METHODS FLOW
 
   NEWTON_SOLVER
-    NUMERICAL_JACOBIAN
+#    NUMERICAL_JACOBIAN
   /
 
 END

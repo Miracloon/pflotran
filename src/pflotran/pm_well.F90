@@ -533,7 +533,7 @@ module PM_Well_class
             PMWellCoaxialCreate, &
             PMWellFlowCreate, &
             PMWellTranCreate, &
-            PMWellVarCreate, &
+            PMWellVarInit, &
             PMWellCastToClosedLoop, &
             PMWellSetupGrid, &
             PMWellReadGrid, &
@@ -586,7 +586,7 @@ subroutine PMWellBaseInit(pm_well)
   nullify(pm_well%realization)
   nullify(pm_well%well_pert)
   pm_well%well_grid => WellGridCreate()
-  call PMWellVarCreate(pm_well%well)
+  call PMWellVarInit(pm_well%well)
 
   nullify(pm_well%flow_condition)
   nullify(pm_well%well_comm%petsc_rank_list)
@@ -871,7 +871,7 @@ end subroutine PMWellTranCreate
 
 ! ************************************************************************** !
 
-subroutine PMWellResCreate(reservoir)
+function PMWellResCreate()
   !
   ! Creates reservoir variables.
   !
@@ -879,6 +879,8 @@ subroutine PMWellResCreate(reservoir)
   ! Date: 03/04/2023
 
   implicit none
+
+  type(well_reservoir_type), pointer :: PMWellResCreate
 
   type(well_reservoir_type), pointer :: reservoir
 
@@ -914,11 +916,13 @@ subroutine PMWellResCreate(reservoir)
   nullify(reservoir%tmp_flow)
   nullify(reservoir%tmp_tran)
 
-end subroutine PMWellResCreate
+  PMWellResCreate => reservoir
+
+end function PMWellResCreate
 
 ! ************************************************************************** !
 
-subroutine PMWellVarCreate(well)
+subroutine PMWellVarInit(well)
   !
   ! Creates well variables.
   !
@@ -994,95 +998,51 @@ subroutine PMWellVarCreate(well)
   nullify(well%phi)
 
   ! create the fluid/liquid objects:
-  allocate(well%liq)
+  well%liq => WellFluidCreate()
   well%liq%ifluid = 1
-  nullify(well%liq%kr)
-  well%liq%den0 = UNINITIALIZED_DOUBLE
-  nullify(well%liq%den)
-  nullify(well%liq%visc)
-  nullify(well%liq%s)
-  nullify(well%liq%xmass)
-  nullify(well%liq%H)
-  nullify(well%liq%Q)
-  well%liq%output_Q = PETSC_FALSE
-  nullify(well%liq%Q_cumulative)
 
   ! create the fluid/gas objects:
-  allocate(well%gas)
+  well%gas => WellFluidCreate()
   well%gas%ifluid = 2
-  nullify(well%gas%kr)
-  well%gas%den0 = UNINITIALIZED_DOUBLE
-  nullify(well%gas%den)
-  nullify(well%gas%visc)
-  nullify(well%gas%s)
-  nullify(well%gas%xmass)
-  nullify(well%gas%H)
-  nullify(well%gas%Q)
-  well%gas%output_Q = PETSC_FALSE
-  nullify(well%gas%Q_cumulative)
 
   ! create the reservoir object
-  allocate(well%reservoir)
-  nullify(well%reservoir%p_l)
-  nullify(well%reservoir%p_g)
-  nullify(well%reservoir%s_l)
-  nullify(well%reservoir%s_g)
-  nullify(well%reservoir%temp)
-  nullify(well%reservoir%mobility_l)
-  nullify(well%reservoir%mobility_g)
-  nullify(well%reservoir%kr_l)
-  nullify(well%reservoir%kr_g)
-  nullify(well%reservoir%den_l)
-  nullify(well%reservoir%den_g)
-  nullify(well%reservoir%visc_l)
-  nullify(well%reservoir%visc_g)
-  nullify(well%reservoir%H_l)
-  nullify(well%reservoir%H_g)
-  nullify(well%reservoir%e_por)
-  nullify(well%reservoir%aqueous_conc)
-  nullify(well%reservoir%aqueous_mass)
-  nullify(well%reservoir%xmass_liq)
-  nullify(well%reservoir%xmass_gas)
-  nullify(well%reservoir%kx)
-  nullify(well%reservoir%ky)
-  nullify(well%reservoir%kz)
-  nullify(well%reservoir%dx)
-  nullify(well%reservoir%dy)
-  nullify(well%reservoir%dz)
-  nullify(well%reservoir%volume)
-
+  well%reservoir => PMWellResCreate()
   ! create the reservoir_save object
-  allocate(well%reservoir_save)
-  nullify(well%reservoir_save%p_l)
-  nullify(well%reservoir_save%p_g)
-  nullify(well%reservoir_save%s_l)
-  nullify(well%reservoir_save%s_g)
-  nullify(well%reservoir_save%temp)
-  nullify(well%reservoir_save%mobility_l)
-  nullify(well%reservoir_save%mobility_g)
-  nullify(well%reservoir_save%kr_l)
-  nullify(well%reservoir_save%kr_g)
-  nullify(well%reservoir_save%den_l)
-  nullify(well%reservoir_save%den_g)
-  nullify(well%reservoir_save%visc_l)
-  nullify(well%reservoir_save%visc_g)
-  nullify(well%reservoir_save%H_l)
-  nullify(well%reservoir_save%H_g)
-  nullify(well%reservoir_save%e_por)
-  nullify(well%reservoir_save%aqueous_conc)
-  nullify(well%reservoir_save%aqueous_mass)
-  nullify(well%reservoir_save%xmass_liq)
-  nullify(well%reservoir_save%xmass_gas)
-  nullify(well%reservoir_save%kx)
-  nullify(well%reservoir_save%ky)
-  nullify(well%reservoir_save%kz)
-  nullify(well%reservoir_save%dx)
-  nullify(well%reservoir_save%dy)
-  nullify(well%reservoir_save%dz)
-  nullify(well%reservoir_save%volume)
+  well%reservoir_save => PMWellResCreate()
 
+end subroutine PMWellVarInit
 
-end subroutine PMWellVarCreate
+! ************************************************************************** !
+
+function WellFluidCreate()
+  !
+  ! Creates well fluid variable.
+  !
+  ! Author: Glenn Hammond
+  ! Date: 03/25/26
+
+  implicit none
+
+  type(well_fluid_type), pointer :: WellFluidCreate
+
+  type(well_fluid_type), pointer :: well_fluid
+
+  allocate(well_fluid)
+  well_fluid%ifluid = UNINITIALIZED_INTEGER
+  nullify(well_fluid%kr)
+  well_fluid%den0 = UNINITIALIZED_DOUBLE
+  nullify(well_fluid%den)
+  nullify(well_fluid%visc)
+  nullify(well_fluid%s)
+  nullify(well_fluid%xmass)
+  nullify(well_fluid%H)
+  nullify(well_fluid%Q)
+  well_fluid%output_Q = PETSC_FALSE
+  nullify(well_fluid%Q_cumulative)
+
+  WellFluidCreate => well_fluid
+
+end function WellFluidCreate
 
 ! ************************************************************************** !
 
@@ -2379,7 +2339,7 @@ subroutine PMWellSetupBase(this)
 
   allocate(this%well_pert(option%nflowdof))
   do k = 1,option%nflowdof
-    call PMWellVarCreate(this%well_pert(k))
+    call PMWellVarInit(this%well_pert(k))
   enddo
 
   option%io_buffer = ' '
@@ -3234,6 +3194,7 @@ subroutine PMWellSetupUShape(this)
 
   select case(option%iflowmode)
     case(TH_MODE)
+      this%well%WI_model = PEACEMAN_NONE
     case default
       call PrintErrMsg(option,'U Shaped wells only supported by TH mode')
   end select
@@ -3786,7 +3747,9 @@ subroutine PMWellReadGrid(well_grid,input,option,keyword,error_string,found)
                                error_string)
         !-----------------------------
           case('RESERVOIR_CONNECTION_REGION')
-            call InputReadWord(input,option,well_grid%connections_region_name,PETSC_TRUE)
+            call InputReadWord(input,option, &
+                               well_grid%connections_region_name, &
+                               PETSC_TRUE)
             well_grid%connect_via_region = PETSC_TRUE
         !-----------------------------
           case('CASING')
@@ -3903,8 +3866,8 @@ subroutine PMWellReadGrid(well_grid,input,option,keyword,error_string,found)
                         temp_casing(nsegments) = PETSC_FALSE
                       case default
                         option%io_buffer = "Error in constructing &
-                            &WELL_TRAJECTORY: please specify &
-                            &whether each segment is CASED or SCREENED/UNCASED."
+                          &WELL_TRAJECTORY: please specify &
+                          &whether each segment is CASED or SCREENED/UNCASED."
                         call PrintErrMsg(option)
                     end select
                     allocate(deviated_well_segment%casing(nsegments))
@@ -4112,6 +4075,8 @@ subroutine PMWellReadGrid(well_grid,input,option,keyword,error_string,found)
                 nullify(deviated_well_segment)
             call InputPopBlock(input,option)
         !-----------------------------
+          case default
+            call InputKeywordUnrecognized(input,word,error_string,option)
         end select
       enddo
       call InputPopBlock(input,option)
@@ -4315,9 +4280,10 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
             end select
             call InputErrorMsg(input,option,'WELL_INDEX_MODEL',error_string)
         !-----------------------------
-          case('INLET_TEMPERATURE','PIPE_INNER_DIAMETER','PIPE_WALL_THICKNESS', &
-               'PIPE_WALL_THERMAL_CONDUCTIVITY','PIPE_FLOW_VELOCITY','SCENARIO', &
-               'USE_WELL_INDEX','INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY')
+          case('INLET_TEMPERATURE','PIPE_INNER_DIAMETER', &
+               'PIPE_WALL_THICKNESS','PIPE_WALL_THERMAL_CONDUCTIVITY', &
+               'PIPE_FLOW_VELOCITY','SCENARIO','USE_WELL_INDEX', &
+               'INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY')
             select type(pm => pm_well)
               class is(pm_well_closed_loop_type)
                 select case(word)

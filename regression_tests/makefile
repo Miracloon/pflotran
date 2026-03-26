@@ -135,6 +135,7 @@ STANDARD_CFG = \
 	surfaceflow/inlinesurface/inlinesurface.cfg \
 	templates/templates.cfg \
 	ufd/ufd.cfg \
+	well_model/heat_pipe/heat_pipe.cfg \
 	well_model/richards/richards.cfg \
 	wipp/nuts/nuts.cfg \
 	wipp/transport/batch/wipp_batch.cfg \
@@ -144,7 +145,6 @@ STANDARD_CFG = \
 	wipp/wipp_flow/gas_generation/gas_generation.cfg \
 	wipp/wipp_flow/input_format/input_format.cfg \
 	wipp/well_model/well.cfg
-#	well_model/heat_pipe/heat_pipe.cfg \
 
 ifneq ($(strip $(HYPRE_LIB)),)
 STANDARD_CFG += \

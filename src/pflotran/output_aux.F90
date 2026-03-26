@@ -1242,6 +1242,11 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
       name = 'Smectite'
       category = OUTPUT_GENERIC
       id = SMECTITE
+    case ('WELL_TEMPERATURE')
+      name = 'Well Temperature'
+      units = 'C'
+      category = OUTPUT_GENERIC
+      id = WELL_TEMPERATURE
     case('ELECTRICAL_CONDUCTIVITY','ELECTRICAL_POTENTIAL', &
          'ELECTRICAL_JACOBIAN','ELECTRICAL_POTENTIAL_DIPOLE', &
          'ARCHIE_CEMENTATION_EXPONENT','ARCHIE_SATURATION_EXPONENT', &
