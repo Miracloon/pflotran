@@ -187,7 +187,7 @@ subroutine PMCGeophysicsStepDT(this,stop_flag)
   PetscLogDouble :: log_start_time
   PetscLogDouble :: log_end_time
   PetscInt :: linear_iterations_in_step
-  PetscReal, parameter :: survey_time_tol = 1.d-3
+  PetscReal, parameter :: survey_time_tol = 1.d-6
   PetscBool :: skip_survey
   PetscErrorCode :: ierr
 
@@ -205,16 +205,9 @@ subroutine PMCGeophysicsStepDT(this,stop_flag)
   skip_survey = PETSC_TRUE
   if (pm_ert%waypoint_list%num_waypoints > 0) then
     if (associated(this%cur_waypoint)) then
-      if (timestepper%target_time <= 2.d0*survey_time_tol) then
-        write(option%io_buffer,'("SURVEY_TIMES matching tolerance is ",1pe12.5,&
-              &", but target_time=",1pe12.5," <= 2*tolerance=",1pe12.5, &
-              &". Please check time stepping and survey times.")') &
-          survey_time_tol,timestepper%target_time,2.d0*survey_time_tol
-        call PrintErrMsg(option)
-      endif
       ! approximately equal within survey time tolerance
-      if (EqualTol(this%cur_waypoint%time,timestepper%target_time, &
-                   survey_time_tol)) then
+      if (dabs(this%cur_waypoint%time-timestepper%target_time) / &
+          this%cur_waypoint%time < survey_time_tol) then
         skip_survey = PETSC_FALSE
         this%cur_waypoint => this%cur_waypoint%next
       endif
