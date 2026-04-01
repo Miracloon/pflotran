@@ -40,7 +40,7 @@ subroutine OutputVTK(realization_base)
   class(realization_base_type) :: realization_base
 
   character(len=MAXSTRINGLENGTH) :: filename
-  character(len=MAXWORDLENGTH) :: word
+  character(len=MAXSTRINGLENGTH) :: string
   type(grid_type), pointer :: grid
   type(option_type), pointer :: option
   type(discretization_type), pointer :: discretization
@@ -95,13 +95,13 @@ subroutine OutputVTK(realization_base)
     call OutputGetVariableArray(realization_base,global_vec,cur_variable)
     call DiscretizationGlobalToNatural(discretization,global_vec, &
                                         natural_vec,ONEDOF)
-    word = StringSwapChar(OutputVariableGetName(cur_variable)," ","_")
+    string = StringSwapChar(OutputVariableGetName(cur_variable)," ","_")
     if (cur_variable%iformat == 0) then
       call WriteVTKDataSetFromVec(OUTPUT_UNIT,realization_base, &
-        word,natural_vec,VTK_REAL)
+        string,natural_vec,VTK_REAL)
     else
       call WriteVTKDataSetFromVec(OUTPUT_UNIT,realization_base, &
-        word,natural_vec,VTK_INTEGER)
+        string,natural_vec,VTK_INTEGER)
     endif
     cur_variable => cur_variable%next
   enddo
@@ -450,13 +450,14 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
   PetscInt :: fid
   class(realization_base_type) :: realization_base
   PetscReal :: array(:)
-  character(len=MAXWORDLENGTH) :: dataset_name
+  character(len=*) :: dataset_name
   PetscInt :: datatype
   PetscInt :: size_flag ! if size_flag /= 0, use size_flag as the local size
 
   type(grid_type), pointer :: grid
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
+  character(len=MAXSTRINGLENGTH) :: string
   PetscInt :: i
   PetscInt :: max_proc, max_proc_prefetch
   PetscMPIInt :: iproc_mpi, recv_size_mpi
@@ -519,11 +520,13 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
   ! communicate data to processor 0, round robin style
   if (OptionIsIORank(option)) then
 
+    string = 'SCALARS ' // trim(dataset_name)
     if (datatype == VTK_INTEGER) then
-      write(fid,'(''SCALARS '',a20,'' int 1'')') dataset_name
+      string = trim(string) // ' int 1'
     else
-      write(fid,'(''SCALARS '',a20,'' float 1'')') dataset_name
+      string = trim(string) // ' float 1'
     endif
+    write(fid,'(a)') trim(string)
 
     write(fid,'(''LOOKUP_TABLE default'')')
 
