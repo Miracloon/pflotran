@@ -87,6 +87,9 @@ subroutine THWellSetup(pm_well_base,realization)
 
   select case(grid%itype)
     case(STRUCTURED_GRID)
+      nx = grid%structured_grid%nx
+      ny = grid%structured_grid%ny
+      nz = grid%structured_grid%nz
     case default
       if (pm_well%iscenario /= 4) then
         option%io_buffer = 'THWell currently supports only structured grids.'
@@ -142,9 +145,6 @@ subroutine THWellSetup(pm_well_base,realization)
 
   pipe_cross_sectional_area = PI*(0.5d0*pm_well%pipe_inner_diameter)**2
 
-  nx = grid%structured_grid%nx
-  ny = grid%structured_grid%ny
-  nz = grid%structured_grid%nz
   select case(pm_well%iscenario)
     case(1)
       num_well_cells = nx
