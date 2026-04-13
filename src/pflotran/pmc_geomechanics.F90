@@ -274,6 +274,15 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   massbal_plot_flag = PETSC_FALSE
   conserv_plot_flag = PETSC_FALSE
 
+  ! jaa: assignment of target time and dt here before calling
+  ! SetTargetTime ensures snapshot_plot_flag is set correctly
+  ! especially for cases when xmf output is periodic
+  select case(this%option%geomechanics%split_scheme)
+    case(GEOMECH_FIXED_STRAIN_SPLIT, GEOMECH_FIXED_STRESS_SPLIT)
+      this%timestepper%target_time = this%option%time
+      this%timestepper%dt = this%option%flow_dt
+  end select
+
   call this%timestepper%SetTargetTime(sync_time,this%option,local_stop_flag, &
                                       sync_flag, &
                                       snapshot_plot_flag, &
