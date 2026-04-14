@@ -1,0 +1,22 @@
+#Description: uniaxial strain with checkpoint/restart (HDF5 format)
+
+SIMULATION
+  SIMULATION_TYPE GEOMECHANICS_SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+    /
+    GEOMECHANICS_SUBSURFACE geomech
+      OPTIONS
+        FLOW_COUPLING ONE_WAY_COUPLED
+      /
+    /
+  /
+  CHECKPOINT
+    TIMES d 2.0d0
+    FORMAT HDF5
+  /
+END
+
+EXTERNAL_FILE uniaxial_strain_restart_common.txt
+
