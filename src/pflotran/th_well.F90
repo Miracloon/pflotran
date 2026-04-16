@@ -43,6 +43,7 @@ subroutine THWellSetup(pm_well_base,realization)
   use Grid_module
   use Matrix_Zeroing_module
   use String_module
+  use Grid_Unstructured_Aux_module, only : UCellGetApproxDXYZ
 
   implicit none
 
@@ -402,12 +403,22 @@ subroutine THWellSetup(pm_well_base,realization)
                              pipe_cross_sectional_area
     surface_area = segment_length * pm_well%pipe_inner_diameter * PI
     rock_thermal_conductivity = th_parameter%ckwet(patch%cct_id(ghosted_id))
+    select case(grid%itype)
+      case(STRUCTURED_GRID)
+        dx = grid%structured_grid%dx(ghosted_id)
+        dy = grid%structured_grid%dy(ghosted_id)
+        dz = grid%structured_grid%dz(ghosted_id)
+      case(IMPLICIT_UNSTRUCTURED_GRID)
+        call UCellGetApproxDXYZ(grid%unstructured_grid,ghosted_id, &
+                                option,dx,dy,dz)
+      case default
+        option%io_buffer = 'Unsupported grid type in THWellSetup.'
+        call PrintErrMsg(option)
+    end select
     call THWellWI(rock_thermal_conductivity, &
                   rock_thermal_conductivity, &
                   rock_thermal_conductivity, &
-                  grid%structured_grid%dx(ghosted_id), &
-                  grid%structured_grid%dy(ghosted_id), &
-                  grid%structured_grid%dz(ghosted_id), &
+                  dx,dy,dz, &
                   len_(1,ghosted_id), &
                   len_(2,ghosted_id), &
                   len_(3,ghosted_id), &

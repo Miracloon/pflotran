@@ -184,7 +184,8 @@ module Grid_Unstructured_Aux_module
             UGridCalculateDist, &
             UGridExplicitDestroy, &
             UGridAddWellCells, &
-            UCellPrintCellInfo
+            UCellPrintCellInfo, &
+            UCellGetApproxDXYZ
 
 contains
 
@@ -2480,5 +2481,43 @@ subroutine UCellPrintCellInfo(ugrid,ghosted_id,natural_id,option)
   enddo
 
 end subroutine UCellPrintCellInfo
+
+! ************************************************************************** !
+
+subroutine UCellGetApproxDXYZ(ugrid,ghosted_id,option,dx,dy,dz)
+  !
+  ! Returns the approximate dx, dy, dz for an unstructured cell
+  !
+  ! Author: Glenn Hammond
+  ! Date: 04/15/26
+  !
+  use Option_module
+  use String_module
+
+  type(grid_unstructured_type) :: ugrid
+  PetscInt :: ghosted_id
+  type(option_type) :: option
+  PetscReal :: dx
+  PetscReal :: dy
+  PetscReal :: dz
+
+  PetscInt :: i, j
+  PetscReal :: max_(3), min_(3), coord(3)
+
+  min_(:) = 1.d20
+  max_(:) = -1.d20
+  do i = 1, ugrid%cell_vertices(0,ghosted_id)
+    coord = GeomGetCoordinatesFromPoint3D( &
+              ugrid%vertices(ugrid%cell_vertices(i,ghosted_id)))
+    do j = 1, 3
+      max_(j) = max(coord(j),max_(j))
+      min_(j) = min(coord(j),min_(j))
+    enddo
+  enddo
+  dx = max_(1) - min_(1)
+  dy = max_(2) - min_(2)
+  dz = max_(3) - min_(3)
+
+end subroutine UCellGetApproxDXYZ
 
 end module Grid_Unstructured_Aux_module
