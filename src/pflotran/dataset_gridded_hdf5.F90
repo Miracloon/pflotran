@@ -104,20 +104,27 @@ subroutine DatasetGriddedHDF5Prune(this)
   ! Author: Glenn Hammond
   ! Date: 03/27/25
 
+  use Dataset_Base_class
+
   implicit none
 
   class(dataset_gridded_hdf5_type), pointer :: this
 
+  class(dataset_base_type), pointer :: next
   character(len=MAXSTRINGLENGTH) :: dataset_name
   character(len=MAXSTRINGLENGTH) :: filename
 
   if (.not.associated(this)) return
   filename = this%filename
   dataset_name = this%name
+  ! the pointer to next gets reinitialized in DatasetGriddedHDF5Init(), but
+  ! we want to preserve the linkage
+  next => this%next
   call DatasetGriddedHDF5Strip(this)
   call DatasetGriddedHDF5Init(this)
   this%filename = filename
   this%name = trim(dataset_name)
+  this%next => next
 
 end subroutine DatasetGriddedHDF5Prune
 
