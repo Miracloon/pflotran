@@ -2151,7 +2151,9 @@ subroutine ConditionControlMapDatasetToVec(realization,dataset,idof, &
   use Realization_Subsurface_class
   use Option_module
   use Field_module
+  use Grid_module
   use Dataset_Common_HDF5_class
+  use Dataset_Gridded_HDF5_class
   use Dataset_Base_class
   use HDF5_module
   use Discretization_module
@@ -2166,16 +2168,33 @@ subroutine ConditionControlMapDatasetToVec(realization,dataset,idof, &
   PetscInt :: vec_type
 
   type(field_type), pointer :: field
+  type(grid_type), pointer :: grid
   type(option_type), pointer :: option
   character(len=MAXSTRINGLENGTH) :: string, string2
+  PetscInt :: local_id
+  PetscInt :: ghosted_id
+  PetscReal, pointer :: vec_ptr(:)
   PetscErrorCode :: ierr
 
   field => realization%field
+  grid => realization%patch%grid
   option => realization%option
 
   call VecZeroEntries(field%work,ierr);CHKERRQ(ierr)
   if (associated(dataset)) then
     select type(dataset)
+      ! dataset_gridded_hdf5_type has to come first as it is a daughter of
+      ! dataset_common_hdf5_type
+      class is (dataset_gridded_hdf5_type)
+        call DatasetGriddedHDF5Load(dataset,option)
+        call VecGetArray(field%work,vec_ptr,ierr);CHKERRQ(ierr)
+        do local_id = 1, grid%nlmax
+          ghosted_id = grid%nL2G(local_id)
+          call DatasetGriddedHDF5InterpolateReal(dataset, &
+                   grid%x(ghosted_id),grid%y(ghosted_id),grid%z(ghosted_id), &
+                   vec_ptr(local_id),option)
+        enddo
+        call VecRestoreArray(field%work,vec_ptr,ierr);CHKERRQ(ierr)
       class is (dataset_common_hdf5_type)
         string = '' ! group name
         ! have to copy to string2 due to mismatch in string size
@@ -2184,21 +2203,22 @@ subroutine ConditionControlMapDatasetToVec(realization,dataset,idof, &
                                           dataset%filename, &
                                           string,string2, &
                                           dataset%realization_dependent)
-        if (vec_type == GLOBAL) then
-          call VecStrideScatter(field%work,idof-1,mdof_vec,INSERT_VALUES, &
-                                ierr);CHKERRQ(ierr)
-        else
-          call DiscretizationGlobalToLocal(realization%discretization, &
-                                           field%work, &
-                                           field%work_loc,ONEDOF)
-          call VecStrideScatter(field%work_loc,idof-1,mdof_vec,INSERT_VALUES, &
-                                ierr);CHKERRQ(ierr)
-        endif
       class default
         option%io_buffer = 'Dataset "' // trim(dataset%name) // &
           '" not supported in ConditionControlMapDatasetToVec.'
         call PrintErrMsg(option)
     end select
+
+    if (vec_type == GLOBAL) then
+      call VecStrideScatter(field%work,idof-1,mdof_vec,INSERT_VALUES, &
+                            ierr);CHKERRQ(ierr)
+    else
+      call DiscretizationGlobalToLocal(realization%discretization, &
+                                       field%work, &
+                                       field%work_loc,ONEDOF)
+      call VecStrideScatter(field%work_loc,idof-1,mdof_vec,INSERT_VALUES, &
+                            ierr);CHKERRQ(ierr)
+    endif
   endif
 
 end subroutine ConditionControlMapDatasetToVec
