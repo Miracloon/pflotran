@@ -315,13 +315,13 @@ subroutine InitSubsurfGeomechReadInput(geomech,geomech_solver, &
                                         &after coupling timestep size should be "AT".'
                       call PrintErrMsg(option)
                   endif
-                  if (.NOT.ASSOCIATED(waypoint_list_dt_coupling)) then
+                  if (.not.associated(waypoint_list_dt_coupling)) then
                       waypoint_list_dt_coupling => WaypointListCreate()
                   endif
                   call WaypointInsertInList(waypoint, &
                                             waypoint_list_dt_coupling, &
                                             option)
-                  if (.NOT.waypoint_list_dt_coupling%first%time == 0.0) then
+                  if (waypoint_list_dt_coupling%first%time > 0.d0) then
                       option%io_buffer = 'First time after keyword "AT" under &
                                          &"COUPLING_TIMESTEP_SIZE" must be zero (0.d0).'
                       call PrintErrMsg(option)
