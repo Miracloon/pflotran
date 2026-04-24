@@ -1069,7 +1069,16 @@ subroutine SolverReadNewtonSelectCase(solver,input,keyword,found, &
         case('TRUST_REGION')
           solver%snes_type = SNESNEWTONTRDC
         case('NTRDC','NEWTONTRDC')
-          option%flow%using_newtontrdc = PETSC_TRUE
+          select case(solver%itype)
+            case(TRANSPORT_CLASS)
+              option%transport%using_newtontrdc = PETSC_TRUE
+            case(FLOW_CLASS)
+              option%flow%using_newtontrdc = PETSC_TRUE
+            case default
+              option%io_buffer = 'NTRDC is only supported for FLOW or &
+                &TRANSPORT class.'
+              call PrintErrMsg(option)
+          end select
           solver%snes_type = SNESNEWTONTRDC
           string = trim(prefix) // 'snes_trdc_use_cauchy'
           call PetscOptionsSetValue(PETSC_NULL_OPTIONS, &
@@ -1080,7 +1089,16 @@ subroutine SolverReadNewtonSelectCase(solver,input,keyword,found, &
 !                                    trim(string),trim('dogleg'), &
 !                                    ierr);CHKERRQ(ierr)
         case('NTR','NEWTONTR')
-          option%flow%using_newtontrdc = PETSC_TRUE
+          select case(solver%itype)
+            case(TRANSPORT_CLASS)
+              option%transport%using_newtontrdc = PETSC_TRUE
+            case(FLOW_CLASS)
+              option%flow%using_newtontrdc = PETSC_TRUE
+            case default
+              option%io_buffer = 'NTR is only supported for FLOW or &
+                &TRANSPORT class.'
+              call PrintErrMsg(option)
+          end select
           solver%snes_type = SNESNEWTONTRDC
           string = trim(prefix) // 'snes_trdc_use_cauchy'
           call PetscOptionsSetValue(PETSC_NULL_OPTIONS, &

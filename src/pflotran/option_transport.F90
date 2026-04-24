@@ -41,6 +41,8 @@ module Option_Transport_module
     PetscBool :: couple_co2
     PetscBool :: couple_co2_salinity
 
+    PetscBool :: using_newtontrdc  ! transport needs a subiteration flag
+
     PetscInt :: nphase
 
   end type transport_option_type
@@ -144,6 +146,8 @@ subroutine OptionTransportInitRealization(option)
   option%force_decouple_co2 = PETSC_FALSE
   option%couple_co2 = PETSC_FALSE
   option%couple_co2_salinity = PETSC_FALSE
+
+  option%using_newtontrdc = PETSC_FALSE
 
   option%tran_weight_t0 = 0.d0
   option%tran_weight_t1 = 0.d0

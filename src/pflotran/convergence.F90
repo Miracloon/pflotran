@@ -12,6 +12,16 @@ module Convergence_module
 
   private
 
+  ! NTRDC trust-region sub-iteration tracking (per SNES solve).
+  ! Reset on i_iteration == 0 inside ConvergenceTest. Used to suppress
+  ! spurious reason=10/11 during TR reject-and-shrink and to cut the
+  ! timestep if a single Newton iteration burns more than
+  ! NTRDC_SUB_ITER_LIMIT TR retries.
+  ! Author: Heeho Park
+  PetscInt, save :: ntrdc_prev_iter_num = -1
+  PetscInt, save :: ntrdc_sub_iter_count = 0
+  PetscInt, parameter :: NTRDC_SUB_ITER_LIMIT = 20
+
   type, public :: convergence_context_type
     type(solver_type), pointer :: solver
     type(option_type), pointer :: option
@@ -132,6 +142,10 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
 
   PetscInt :: sec_reason
 
+  ! NTRDC flags (Heeho)
+  PetscBool :: rho_flag
+  PetscBool :: already_converged
+
 ! From PETSC_DIR/include/petscsnes.h
 !typedef enum {/* converged */
 !              SNES_CONVERGED_FNORM_ABS         =  2, /* ||F|| < atol */
@@ -174,6 +188,28 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
   call SNESConvergedDefault(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
                             0,ierr);CHKERRQ(ierr)
 
+  ! NTRDC flags: track sub-iteration retries at current
+  ! Newton iterate and query rho_flag so downstream convergence criteria
+  ! can suppress spurious "converged" declarations on rejected TR steps.
+  ! Author: Heeho Park
+  rho_flag = PETSC_TRUE
+  if (option%flow%using_newtontrdc .or. &
+      option%transport%using_newtontrdc) then
+    if (solver%snes_type == SNESNEWTONTRDC) then
+      if (i_iteration == 0) then
+        ntrdc_prev_iter_num = -1
+        ntrdc_sub_iter_count = 0
+      endif
+      call SNESNewtonTRDCGetRhoFlag(snes_,rho_flag,ierr);CHKERRQ(ierr)
+      if (ntrdc_prev_iter_num == i_iteration) then
+        ntrdc_sub_iter_count = ntrdc_sub_iter_count + 1
+      else
+        ntrdc_sub_iter_count = 0
+      endif
+      ntrdc_prev_iter_num = i_iteration
+    endif
+  endif
+
   if (option%convergence /= CONVERGENCE_CONVERGED .and. reason%v == -9) then
     write(out_string,'(i3," 2r:",es9.2," 2x:",es9.2," 2u:",es9.2, &
           & " -diverged")') i_iteration, fnorm, xnorm, unorm
@@ -211,6 +247,9 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
     option%converged = PETSC_FALSE
   endif
 
+  ! did the process model already set a convergence decision upstream?
+  already_converged = (option%convergence /= CONVERGENCE_OFF)
+
   if (option%convergence /= CONVERGENCE_OFF) then
     select case(option%convergence)
       case(CONVERGENCE_CUT_TIMESTEP)
@@ -245,14 +284,15 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
       inorm_update = 0.d0
     endif
 
-    if (inorm_residual < solver%newton_inf_res_tol) then
+    if (inorm_residual < solver%newton_inf_res_tol .and. rho_flag) then
       reason%v = 10
     else
 !      if (reason > 0 .and. inorm_residual > 100.d0*solver%newton_inf_res_tol) &
 !        reason = 0
     endif
 
-    if (inorm_update < solver%newton_inf_upd_tol .and. i_iteration > 0) then
+    if (inorm_update < solver%newton_inf_upd_tol .and. i_iteration > 0 .and. &
+        rho_flag) then
       reason%v = 11
     endif
 
@@ -275,6 +315,15 @@ subroutine ConvergenceTest(snes_,i_iteration,xnorm,unorm,fnorm,reason, &
     ! force the minimum number of iterations
     if (i_iteration < solver%newton_min_iterations .and. reason%v /= -88) then
         reason%v = 0
+    endif
+
+    ! NTRDC safety net - cut timestep if stuck retrying the sub-iteration
+    ! under the same iteration
+    if ((option%flow%using_newtontrdc .or. &
+         option%transport%using_newtontrdc) .and. &
+        ntrdc_sub_iter_count > NTRDC_SUB_ITER_LIMIT .and. &
+        .not. already_converged) then
+      reason%v = -88
     endif
 
     if (solver%print_convergence) then
