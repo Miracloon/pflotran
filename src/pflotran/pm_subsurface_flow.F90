@@ -766,6 +766,10 @@ subroutine PMSubsurfaceFlowInitializeTimestepB(this)
     endif
   endif
 
+  if (this%option%flow%update_flow_perm_from_por) then
+    call RealizationUpdatePermFromPor(this%realization)
+  endif
+
   if (this%option%ngeomechdof > 0) then
 #ifdef GEOMECH_DEBUG
     print *, 'PMSubsurfaceFlowInitializeTimestepB'

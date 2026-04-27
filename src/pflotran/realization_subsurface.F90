@@ -84,6 +84,7 @@ module Realization_Subsurface_class
             RealizationUpdatePropertiesTS, &
             RealizationUpdatePropertiesNI, &
             RealizationUpdateMineralPorosity, &
+            RealizationUpdatePermFromPor, &
             RealizationCountCells, &
             RealizationPrintGridStatistics, &
             RealizationPassPtrsToPatches, &
@@ -1954,10 +1955,7 @@ subroutine RealizationUpdatePropertiesTS(realization)
   use Reaction_Aux_module
   use Reactive_Transport_Aux_module
   use Reaction_Mineral_module
-  use Variables_module, only : POROSITY, TORTUOSITY, PERMEABILITY_X, &
-                               PERMEABILITY_Y, PERMEABILITY_Z, &
-                               PERMEABILITY_XY, PERMEABILITY_XZ, &
-                               PERMEABILITY_YZ
+  use Variables_module, only : POROSITY, TORTUOSITY
 
   implicit none
 
@@ -2021,14 +2019,6 @@ subroutine RealizationUpdatePropertiesTS(realization)
 
     call VecRestoreArrayRead(field%porosity0,porosity0_p, &
                                 ierr);CHKERRQ(ierr)
-
-!geh:remove
-    call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 TORTUOSITY,ZERO_INTEGER)
-    call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                    field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 TORTUOSITY,ZERO_INTEGER)
   endif
 
   if (reaction%update_tortuosity) then
@@ -2109,44 +2099,8 @@ subroutine RealizationUpdatePropertiesTS(realization)
     call VecRestoreArrayRead(field%porosity0,porosity0_p, &
                                 ierr);CHKERRQ(ierr)
 
-    call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
-    call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                    field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
-    call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
-    call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                    field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
-    call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
-    call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                    field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
-    if (option%flow%full_perm_tensor) then
-      call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_XY,ZERO_INTEGER)
-      call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                      field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_XY,ZERO_INTEGER)
-      call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_XZ,ZERO_INTEGER)
-      call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                      field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_XZ,ZERO_INTEGER)
-      call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_YZ,ZERO_INTEGER)
-      call DiscretizationLocalToLocal(discretization,field%work_loc, &
-                                      field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                   PERMEABILITY_YZ,ZERO_INTEGER)
-    endif
+    call MaterialCommunicatePerms(realization%comm1,patch%aux%Material, &
+                                  field%work_loc,option)
   endif
 
   ! perform check to ensure that porosity is bounded between 0 and 1
@@ -2163,6 +2117,108 @@ subroutine RealizationUpdatePropertiesTS(realization)
   endif
 
 end subroutine RealizationUpdatePropertiesTS
+
+! ************************************************************************** !
+
+subroutine RealizationUpdatePermFromPor(realization)
+  !
+  ! Updates permeability when solely a function of porosity
+  !
+  ! Author: Glenn Hammond
+  ! Date: 04/27/26
+  !
+  use Field_module
+  use Grid_module
+  use Material_Aux_module
+  use Reactive_Transport_Aux_module
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+
+  type(option_type), pointer :: option
+  type(patch_type), pointer :: patch
+  type(field_type), pointer :: field
+  type(grid_type), pointer :: grid
+  type(material_property_ptr_type), pointer :: material_property_array(:)
+  type(material_auxvar_type), pointer :: material_auxvars(:)
+
+  PetscInt :: local_id, ghosted_id
+  PetscInt :: imat
+  PetscReal :: scale
+  PetscReal, pointer :: porosity0_p(:)
+  PetscReal, pointer :: perm0_xx_p(:), perm0_yy_p(:), perm0_zz_p(:)
+  PetscReal, pointer :: perm0_xy_p(:), perm0_xz_p(:), perm0_yz_p(:)
+  PetscReal :: porosity
+  PetscReal :: critical_porosity
+  PetscErrorCode :: ierr
+
+  option => realization%option
+  patch => realization%patch
+  field => realization%field
+  grid => patch%grid
+  material_property_array => patch%material_property_array
+  material_auxvars => patch%aux%Material%auxvars
+
+  if (option%flow%update_flow_perm_from_por) then
+    call VecGetArrayRead(field%perm0_xx,perm0_xx_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%perm0_zz,perm0_zz_p,ierr);CHKERRQ(ierr)
+    call VecGetArrayRead(field%perm0_yy,perm0_yy_p,ierr);CHKERRQ(ierr)
+    if (option%flow%full_perm_tensor) then
+      call VecGetArrayRead(field%perm0_xy,perm0_xy_p,ierr);CHKERRQ(ierr)
+      call VecGetArrayRead(field%perm0_xz,perm0_xz_p,ierr);CHKERRQ(ierr)
+      call VecGetArrayRead(field%perm0_yz,perm0_yz_p,ierr);CHKERRQ(ierr)
+    endif
+    call VecGetArrayRead(field%porosity0,porosity0_p,ierr);CHKERRQ(ierr)
+    do local_id = 1, grid%nlmax
+      ghosted_id = grid%nL2G(local_id)
+      imat = patch%imat(ghosted_id)
+      critical_porosity = material_property_array(imat)%ptr% &
+                            permeability_crit_por
+      porosity = material_auxvars(ghosted_id)%porosity
+      scale = 0.d0
+      if (porosity > critical_porosity .and. &
+          porosity0_p(local_id) > critical_porosity) then
+        scale = ((porosity - critical_porosity) / &
+                 (porosity0_p(local_id) - critical_porosity)) ** &
+                material_property_array(imat)%ptr%permeability_pwr
+      endif
+      scale = max(material_property_array(imat)%ptr% &
+                    permeability_min_scale_fac,scale)
+      material_auxvars(ghosted_id)%permeability(perm_xx_index) = &
+          perm0_xx_p(local_id)*scale
+      material_auxvars(ghosted_id)%permeability(perm_yy_index) = &
+          perm0_yy_p(local_id)*scale
+      material_auxvars(ghosted_id)%permeability(perm_zz_index) = &
+          perm0_zz_p(local_id)*scale
+      if (option%flow%full_perm_tensor) then
+        material_auxvars(ghosted_id)%permeability(perm_xy_index) = &
+          perm0_xy_p(local_id)*scale
+        material_auxvars(ghosted_id)%permeability(perm_xz_index) = &
+          perm0_xz_p(local_id)*scale
+        material_auxvars(ghosted_id)%permeability(perm_yz_index) = &
+          perm0_yz_p(local_id)*scale
+      endif
+    enddo
+    call VecRestoreArrayRead(field%perm0_xx,perm0_xx_p,ierr);CHKERRQ(ierr)
+    call VecRestoreArrayRead(field%perm0_zz,perm0_zz_p,ierr);CHKERRQ(ierr)
+    call VecRestoreArrayRead(field%perm0_yy,perm0_yy_p,ierr);CHKERRQ(ierr)
+    if (option%flow%full_perm_tensor) then
+      call VecRestoreArrayRead(field%perm0_xy,perm0_xy_p, &
+                                  ierr);CHKERRQ(ierr)
+      call VecRestoreArrayRead(field%perm0_xz,perm0_xz_p, &
+                                  ierr);CHKERRQ(ierr)
+      call VecRestoreArrayRead(field%perm0_yz,perm0_yz_p, &
+                                  ierr);CHKERRQ(ierr)
+    endif
+    call VecRestoreArrayRead(field%porosity0,porosity0_p, &
+                                ierr);CHKERRQ(ierr)
+
+    call MaterialCommunicatePerms(realization%comm1,patch%aux%Material, &
+                                  field%work_loc,option)
+  endif
+
+end subroutine RealizationUpdatePermFromPor
 
 ! ************************************************************************** !
 

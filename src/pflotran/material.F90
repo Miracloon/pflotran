@@ -144,6 +144,7 @@ module Material_module
             MaterialSetAuxVarVecLoc, &
             MaterialGetAuxVarVecLoc, &
             MaterialAuxVarCommunicate, &
+            MaterialCommunicatePerms, &
             MaterialPropertyRead, &
             MaterialInitAuxIndices, &
             MaterialAssignPropertyToAux, &
@@ -2430,6 +2431,46 @@ subroutine MaterialAuxVarCommunicate(comm,Material,vec_loc,ivar,isubvar)
   call MaterialSetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
 
 end subroutine MaterialAuxVarCommunicate
+
+! ************************************************************************** !
+
+subroutine MaterialCommunicatePerms(comm,Material,vec_loc,option)
+  !
+  ! Updates the ghost values of the permeability auxiliary variables.
+  !
+  ! Author: Glenn Hammond
+  ! Date: 04/27/26
+  !
+
+  use Communicator_Base_class
+  use Option_module
+  use Variables_module, only : &
+    PERMEABILITY_X, PERMEABILITY_Y, PERMEABILITY_Z, &
+    PERMEABILITY_XY, PERMEABILITY_XZ, PERMEABILITY_YZ
+
+  implicit none
+
+  class(communicator_type), pointer :: comm
+  type(material_type) :: Material
+  Vec :: vec_loc
+  type(option_type) :: option
+
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                 PERMEABILITY_X,ZERO_INTEGER)
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                 PERMEABILITY_Y,ZERO_INTEGER)
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                 PERMEABILITY_Z,ZERO_INTEGER)
+  if (option%flow%full_perm_tensor) then
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                   PERMEABILITY_XY,ZERO_INTEGER)
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                   PERMEABILITY_XZ,ZERO_INTEGER)
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
+                                   PERMEABILITY_YZ,ZERO_INTEGER)
+  endif
+
+end subroutine MaterialCommunicatePerms
 
 ! ************************************************************************** !
 
