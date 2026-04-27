@@ -1428,8 +1428,13 @@ subroutine FactorySubsurfReadInput(simulation,input)
 
 !......................
 
+      case('UPDATE_FLOW_PERM_FROM_POR')
+        option%flow%update_flow_perm_from_por = PETSC_TRUE
+
+!......................
+
       case('UPDATE_FLOW_PERMEABILITY')
-        option%flow%update_flow_perm = PETSC_TRUE
+        option%flow%update_flow_perm_from_pres = PETSC_TRUE
 
 !......................
 

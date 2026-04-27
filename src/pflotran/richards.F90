@@ -1099,7 +1099,7 @@ subroutine RichardsUpdateSolutionPatch(realization)
   richards_ts_cut_count = 0
   richards_ni_count = 0
 
-  if (realization%option%flow%update_flow_perm) then
+  if (realization%option%flow%update_flow_perm_from_pres) then
 !TODO(geh): this is in the wrong place
     call RichardsUpdatePermPatch(realization)
   endif

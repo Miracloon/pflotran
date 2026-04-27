@@ -39,7 +39,8 @@ module Option_Flow_module
     PetscBool :: steady_state
 
     ! If true, permeability changes due to pressure
-    PetscBool :: update_flow_perm
+    PetscBool :: update_flow_perm_from_pres
+    PetscBool :: update_flow_perm_from_por
     ! Type of averaging scheme for relative permeability
     PetscInt :: rel_perm_aveg
     ! For WIPP_type pc-sat characteristic curves that use Pct
@@ -167,7 +168,8 @@ subroutine OptionFlowInitRealization(option)
   option%write_co2data_dat = PETSC_FALSE
 
   option%set_secondary_init_temp = PETSC_FALSE
-  option%update_flow_perm = PETSC_FALSE
+  option%update_flow_perm_from_pres = PETSC_FALSE
+  option%update_flow_perm_from_por = PETSC_FALSE
   option%rel_perm_aveg = UPWIND
   option%pct_updated = PETSC_FALSE
   option%inline_surface_flow           = PETSC_FALSE
