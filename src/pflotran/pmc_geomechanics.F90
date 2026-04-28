@@ -255,8 +255,13 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   class(pm_base_type), pointer :: cur_pm
   PetscReal :: geomech_target_time
   PetscReal :: geomech_dt
+  PetscErrorCode :: ierr
 
   if (stop_flag == TS_STOP_FAILURE) return
+
+  if (this%stage /= 0) then
+    call PetscLogStagePush(this%stage,ierr);CHKERRQ(ierr)
+  endif
 
   call this%PrintHeader()
   this%option%io_buffer = trim(this%name) // ':' // trim(this%pm_list%name)
@@ -389,6 +394,10 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
   end select
 
   stop_flag = max(stop_flag,local_stop_flag)
+
+  if (this%stage /= 0) then
+    call PetscLogStagePop(ierr);CHKERRQ(ierr)
+  endif
 
 end subroutine PMCGeomechanicsRunToTime
 
