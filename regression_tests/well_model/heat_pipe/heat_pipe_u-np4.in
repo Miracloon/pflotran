@@ -1,0 +1,70 @@
+#Description: U-path closed-loop heat pipe on 5x1x5 unstructured mesh (np=4)
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE TH
+    /
+    WELL_MODEL well
+      TYPE CLOSED_LOOP_U_SHAPE
+    END
+  /
+END
+
+SUBSURFACE
+
+#===================== Discretization =========================================
+GRID
+  TYPE UNSTRUCTURED heat_pipe_u_5x1x5.ugi
+END
+
+#=========================== well model =======================================
+WELLBORE_MODEL well
+
+  WELL_GRID
+    WELL_TRAJECTORY
+      SURFACE_ORIGIN         1.5  0.5  5.
+      SEGMENT_DXYZ   CASED   0.   0.  -3.
+      SEGMENT_DXYZ UNCASED   2.   0.   0.
+      SEGMENT_DXYZ   CASED   0.   0.   3.
+    /
+  /
+
+  WELL
+    USE_WELL_INDEX
+    INLET_TEMPERATURE 5.
+    PIPE_INNER_DIAMETER 0.1
+    PIPE_WALL_THICKNESS 5.d-3
+    PIPE_WALL_THERMAL_CONDUCTIVITY 40.
+    PIPE_FLOW_VELOCITY 2. m/d
+  /
+
+END
+
+# Path length = 8 m; t = L/v = 4 d for one pipe volume
+TIME
+  FINAL_TIME 4. d
+  INITIAL_TIMESTEP_SIZE 0.25 d
+  MAXIMUM_TIMESTEP_SIZE 0.25 d
+END
+
+EXTERNAL_FILE heat_pipe_common.txt
+
+#=========================== regression =======================================
+! Pipe: 17,8,19 (legs z=3.5, bottom mid); matrix: 11,23,15 (nat=i+(k-1)*5)
+REGRESSION
+  VARIABLES
+    TEMPERATURE
+    WELL_TEMPERATURE
+  /
+  CELL_IDS
+    17
+    8
+    19
+    11
+    23
+    15
+  /
+END
+
+END_SUBSURFACE

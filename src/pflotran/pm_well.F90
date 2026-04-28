@@ -498,12 +498,12 @@ module PM_Well_class
   ! Closed Loop Well Model
   type, public, extends(pm_well_implicit_type) :: pm_well_closed_loop_type
       ! Placeholder for now
-    PetscInt :: iscenario
     PetscInt :: nusselt_mode
     PetscBool :: use_well_index
     PetscBool :: use_nusselt_entrance_factor
     PetscBool :: setup_complete
-    PetscInt, pointer :: well_cells(:)
+    PetscInt, pointer :: well_cells_ghosted(:)
+    PetscInt, pointer :: well_cells_bc_type(:)
     PetscReal :: inlet_temperature
     PetscReal :: nusselt_laminar
     PetscReal :: nusselt_z_ref
@@ -736,7 +736,6 @@ function PMWellUShapeCreate()
   pm_well%well%well_model_type = WELL_MODEL_U_SHAPE
   pm_well%flow_coupling = FULLY_IMPLICIT_WELL
 
-  pm_well%iscenario = UNINITIALIZED_INTEGER
   pm_well%nusselt_mode = TH_WELL_NUSSELT_ZHANG_2015
   pm_well%use_well_index = PETSC_FALSE
   pm_well%use_nusselt_entrance_factor = PETSC_FALSE
@@ -751,7 +750,8 @@ function PMWellUShapeCreate()
   pm_well%insulator_thermal_conductivity = UNINITIALIZED_DOUBLE
   pm_well%flow_velocity = UNINITIALIZED_DOUBLE
   pm_well%heat_flux = 0.d0
-  nullify(pm_well%well_cells)
+  nullify(pm_well%well_cells_ghosted)
+  nullify(pm_well%well_cells_bc_type)
   nullify(pm_well%connection_set)
   nullify(pm_well%bc_connection_set)
   nullify(pm_well%matrix_zeroing)
@@ -1128,6 +1128,9 @@ subroutine PMWellSetupGrid(this,realization,option)
   PetscReal, allocatable :: collect_y_temp(:)
   PetscReal, allocatable :: collect_z_temp(:)
   PetscInt, allocatable :: temp_repeated_list(:), collect_rank(:)
+  PetscInt, allocatable :: collect_path_index(:)
+  PetscInt, allocatable :: temp_path_index(:)
+  PetscInt, allocatable :: path_order(:)
   PetscInt :: cur_id, cum_z_int, cur_cum_z_int
   PetscInt :: repeated
   PetscInt :: num_entries
@@ -1139,6 +1142,7 @@ subroutine PMWellSetupGrid(this,realization,option)
   PetscInt :: nsegments, nsegments_save
   PetscInt :: k, i, j
   PetscInt :: local_index
+  PetscInt :: iswap
   PetscReal :: ds
   PetscReal, allocatable :: well_trajectory(:,:), temp_trajectory(:,:)
   PetscBool, allocatable :: well_casing(:), temp_casing(:)
@@ -1154,12 +1158,14 @@ subroutine PMWellSetupGrid(this,realization,option)
   PetscReal :: progress, well_length
   PetscErrorCode :: ierr
   PetscBool :: find_segments
+  PetscBool :: swapped
   PetscReal, parameter :: epsilon = 1.d-10
 
   PetscInt :: iconn
   PetscInt :: num_connections
   PetscInt :: closest_k
   type(point3d_type) :: temp_p_3d
+  type(point3d_type) :: temp_point
 
   find_segments = PETSC_TRUE
   num_entries = 10000
@@ -1411,6 +1417,7 @@ subroutine PMWellSetupGrid(this,realization,option)
     allocate(temp_y(nsegments))
     allocate(temp_z(nsegments))
     allocate(temp_casing(nsegments))
+    allocate(temp_path_index(nsegments))
     temp_id_list = UNINITIALIZED_INTEGER
     temp_dx = UNINITIALIZED_DOUBLE
     temp_dy = UNINITIALIZED_DOUBLE
@@ -1418,6 +1425,7 @@ subroutine PMWellSetupGrid(this,realization,option)
     temp_x = -MAX_DOUBLE
     temp_y =-MAX_DOUBLE
     temp_z = -MAX_DOUBLE
+    temp_path_index = UNINITIALIZED_INTEGER
 
     k = 0
     j = 0
@@ -1451,6 +1459,7 @@ subroutine PMWellSetupGrid(this,realization,option)
           k = 1
           temp_id_list(k) = local_id
           temp_casing(k) = well_casing(j)
+          temp_path_index(k) = j
           dh_x = dummy_h%x
           dh_y = dummy_h%y
           dh_z = dummy_h%z
@@ -1478,11 +1487,13 @@ subroutine PMWellSetupGrid(this,realization,option)
           dh_y = well_trajectory(j,2)
           dh_z = well_trajectory(j,3)
           temp_casing(k) = well_casing(j)
+          temp_path_index(k) = j
           ! Don't count off-process cell ID's, but still compute
           ! where the change from on- to off- process occurs.
           if (Uninitialized(cur_id)) then
             k = k - 1
             temp_id_list(k) = temp_id_list(k+1)
+            temp_path_index(k) = temp_path_index(k+1)
           endif
           cur_id = local_id
         endif
@@ -1525,6 +1536,7 @@ subroutine PMWellSetupGrid(this,realization,option)
           temp_y(k) = dummy_h%y
           temp_z(k) = dummy_h%z
           temp_id_list(k) = local_id
+          temp_path_index(k) = j
         endif
 
       enddo
@@ -1538,15 +1550,19 @@ subroutine PMWellSetupGrid(this,realization,option)
 
     well_grid%nsegments = k
 
-    ! Num local number of segments across processes,
-    ! sorted well nodes by z-location in ascending order.
+    ! Gather local segments from all ranks, then order by path index so
+    ! segment 1..N follow the trajectory (required for closed-loop BCs when
+    ! sort=FALSE). If well_grid%sort, re-order bottom-to-top in z afterward
+    ! for hydrostatic models that integrate from the bottom.
     call MPI_Allreduce(well_grid%nsegments,nsegments,ONE_INTEGER_MPI, &
                        MPI_INTEGER,MPI_SUM,option%mycomm,ierr);CHKERRQ(ierr)
     allocate(well_nodes(nsegments))
+    allocate(path_order(nsegments))
     allocate(collect_x_temp(nsegments*option%comm%size))
     allocate(collect_y_temp(nsegments*option%comm%size))
     allocate(collect_z_temp(nsegments*option%comm%size))
     allocate(collect_rank(nsegments*option%comm%size))
+    allocate(collect_path_index(nsegments*option%comm%size))
     collect_x_temp = -MAX_DOUBLE
     collect_x_temp(nsegments*option%myrank+1:nsegments*option%myrank+k) = &
               temp_x(1:well_grid%nsegments)
@@ -1559,6 +1575,10 @@ subroutine PMWellSetupGrid(this,realization,option)
     collect_rank = UNINITIALIZED_INTEGER
     collect_rank(nsegments*option%myrank+1:nsegments*option%myrank+k) = &
               option%myrank
+    collect_path_index = UNINITIALIZED_INTEGER
+    collect_path_index(nsegments*option%myrank+1: &
+                       nsegments*option%myrank+k) = &
+              temp_path_index(1:well_grid%nsegments)
     call MPI_Allreduce(MPI_IN_PLACE,collect_x_temp, &
                        nsegments*option%comm%size,MPI_DOUBLE_PRECISION, &
                        MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
@@ -1571,13 +1591,15 @@ subroutine PMWellSetupGrid(this,realization,option)
     call MPI_Allreduce(MPI_IN_PLACE,collect_rank, &
                        nsegments*option%comm%size,MPI_INTEGER, &
                        MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
-    ! MAN: not sure if getting the ordering exactly right for all possible
-    ! cases is strictly necessary for hydrostatic well model, but should try.
+    call MPI_Allreduce(MPI_IN_PLACE,collect_path_index, &
+                       nsegments*option%comm%size,MPI_INTEGER, &
+                       MPI_MAX,option%mycomm,ierr);CHKERRQ(ierr)
     k = 0
     well_nodes(:)%id = UNINITIALIZED_INTEGER
     well_nodes(:)%x = UNINITIALIZED_DOUBLE
     well_nodes(:)%y = UNINITIALIZED_DOUBLE
     well_nodes(:)%z = UNINITIALIZED_DOUBLE
+    path_order = UNINITIALIZED_INTEGER
     do j = 1,nsegments*option%comm%size
       if (collect_z_temp(j) > -1.d19) then
         k = k + 1
@@ -1585,8 +1607,35 @@ subroutine PMWellSetupGrid(this,realization,option)
         well_nodes(k)%x = collect_x_temp(j)
         well_nodes(k)%y = collect_y_temp(j)
         well_nodes(k)%z = collect_z_temp(j)
+        path_order(k) = collect_path_index(j)
       endif
     enddo
+    ! Restore trajectory / SEGMENT_LIST order (not rank packing).
+    do
+      swapped = PETSC_FALSE
+      do i = 1, k-1
+        if (path_order(i) > path_order(i+1)) then
+          iswap = path_order(i)
+          path_order(i) = path_order(i+1)
+          path_order(i+1) = iswap
+          temp_point%id = well_nodes(i)%id
+          temp_point%x = well_nodes(i)%x
+          temp_point%y = well_nodes(i)%y
+          temp_point%z = well_nodes(i)%z
+          well_nodes(i)%id = well_nodes(i+1)%id
+          well_nodes(i)%x = well_nodes(i+1)%x
+          well_nodes(i)%y = well_nodes(i+1)%y
+          well_nodes(i)%z = well_nodes(i+1)%z
+          well_nodes(i+1)%id = temp_point%id
+          well_nodes(i+1)%x = temp_point%x
+          well_nodes(i+1)%y = temp_point%y
+          well_nodes(i+1)%z = temp_point%z
+          swapped = PETSC_TRUE
+        endif
+      enddo
+      if (.not.swapped) exit
+    enddo
+    ! Hydrostatic (and similar): bottom-to-top in z after path assembly.
     if (well_grid%sort) then
       dim = 'z'
       call UtilitySortArray(well_nodes,dim)
@@ -1706,6 +1755,9 @@ subroutine PMWellSetupGrid(this,realization,option)
     if (allocated(collect_x_temp)) deallocate(collect_x_temp)
     if (allocated(collect_y_temp)) deallocate(collect_y_temp)
     if (allocated(collect_z_temp)) deallocate(collect_z_temp)
+    if (allocated(collect_path_index)) deallocate(collect_path_index)
+    if (allocated(temp_path_index)) deallocate(temp_path_index)
+    if (allocated(path_order)) deallocate(path_order)
     if (allocated(temp_dx)) deallocate(temp_dx)
     if (allocated(temp_dy)) deallocate(temp_dy)
     if (allocated(temp_dz)) deallocate(temp_dz)
@@ -3214,19 +3266,16 @@ subroutine PMWellSetupUShape(this)
   ! do not sort in Z direction because the U is not unidirectional
   this%well_grid%sort = PETSC_FALSE
 
-  select case(this%iscenario)
-    case(4)
-      call PMWellSetupBase(this)
-      if (.not.associated(this%well_grid)) then
-        option%io_buffer = 'A WELL_GRID block must be included in the input deck.'
-        call PrintErrMsg(option)
-      endif
-      if (.not.associated(this%well_grid%deviated_well_segment_list)) then
-        option%io_buffer = 'A WELL_TRAJECTORY block must be included within the &
-          &WELL_GRID block in the input deck.'
-        call PrintErrMsg(option)
-      endif
-  end select
+  call PMWellSetupBase(this)
+  if (.not.associated(this%well_grid)) then
+    option%io_buffer = 'A WELL_GRID block must be included in the input deck.'
+    call PrintErrMsg(option)
+  endif
+  if (.not.associated(this%well_grid%deviated_well_segment_list)) then
+    option%io_buffer = 'A WELL_TRAJECTORY block must be included within the &
+      &WELL_GRID block in the input deck.'
+    call PrintErrMsg(option)
+  endif
 
 
 #if 0
@@ -4295,16 +4344,13 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
         !-----------------------------
           case('INLET_TEMPERATURE','PIPE_INNER_DIAMETER', &
                'PIPE_WALL_THICKNESS','PIPE_WALL_THERMAL_CONDUCTIVITY', &
-               'PIPE_FLOW_VELOCITY','SCENARIO','USE_WELL_INDEX', &
+               'PIPE_FLOW_VELOCITY','USE_WELL_INDEX', &
                'INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY', &
                'NUSSELT_MODE','NUSSELT_LAMINAR','NUSSELT_Z_REF', &
                'USE_NUSSELT_ENTRANCE_FACTOR')
             select type(pm => pm_well)
               class is(pm_well_closed_loop_type)
                 select case(word)
-                  case('SCENARIO')
-                    call InputReadInt(input,option,pm%iscenario)
-                    call InputErrorMsg(input,option,word,error_string)
                   case('NUSSELT_MODE')
                     call InputReadWord(input,option,word,PETSC_TRUE)
                     select case(word)
@@ -4353,6 +4399,9 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
                   case('PIPE_FLOW_VELOCITY')
                     call InputReadDouble(input,option,pm%flow_velocity)
                     call InputErrorMsg(input,option,word,error_string)
+                    call InputReadAndConvertUnits(input,pm%flow_velocity, &
+                           'm/s',trim(error_string)//',PIPE_FLOW_VELOCITY', &
+                           option)
                 end select
               class default
                 option%io_buffer = &
@@ -11270,7 +11319,8 @@ subroutine PMWellDestroyUShape(this)
   class(pm_well_u_shape_type) :: this
 
   call PMWellDestroyBase(this)
-  call DeallocateArray(this%well_cells)
+  call DeallocateArray(this%well_cells_ghosted)
+  call DeallocateArray(this%well_cells_bc_type)
   call MatrixZeroingDestroy(this%matrix_zeroing)
   call ConnectionDestroy(this%connection_set)
   call ConnectionDestroy(this%bc_connection_set)

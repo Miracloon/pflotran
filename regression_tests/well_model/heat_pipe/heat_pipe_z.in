@@ -1,0 +1,79 @@
+#Description: Z-path closed-loop heat pipe on 9x1x9 structured grid (serial)
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE TH
+    /
+    WELL_MODEL well
+      TYPE CLOSED_LOOP_U_SHAPE
+    END
+  /
+END
+
+SUBSURFACE
+
+#===================== Discretization =========================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 9 1 9
+  BOUNDS
+     0.d0  0.d0  0.d0
+     9.d0  1.d0  9.d0
+  /
+END
+
+#=========================== well model =======================================
+WELLBORE_MODEL well
+
+  WELL_GRID
+    WELL_TRAJECTORY
+      SURFACE_ORIGIN         1.5  0.5  9.
+      SEGMENT_DXYZ   CASED   0.   0.  -7.
+      SEGMENT_DXYZ UNCASED   2.   0.   0.
+      SEGMENT_DXYZ UNCASED   0.   0.   6.
+      SEGMENT_DXYZ UNCASED   2.   0.   0.
+      SEGMENT_DXYZ UNCASED   0.   0.  -6.
+      SEGMENT_DXYZ UNCASED   2.   0.   0.
+      SEGMENT_DXYZ   CASED   0.   0.   7.
+    /
+  /
+
+  WELL
+    USE_WELL_INDEX
+    INLET_TEMPERATURE 5.
+    PIPE_INNER_DIAMETER 0.1
+    PIPE_WALL_THICKNESS 5.d-3
+    PIPE_WALL_THERMAL_CONDUCTIVITY 40.
+    PIPE_FLOW_VELOCITY 2. m/d
+  /
+
+END
+
+# Path length = 32 m; t = L/v = 16 d for one pipe volume
+TIME
+  FINAL_TIME 16. d
+  INITIAL_TIMESTEP_SIZE 0.5 d
+  MAXIMUM_TIMESTEP_SIZE 0.5 d
+END
+
+EXTERNAL_FILE heat_pipe_common.txt
+
+#=========================== regression =======================================
+REGRESSION
+  VARIABLES
+    TEMPERATURE
+    WELL_TEMPERATURE
+  /
+  ! Pipe 1/4,1/2,3/4: 12,68,16; matrix mid-depth: 37,41,45 (nat=i+(k-1)*9)
+  CELL_IDS
+    12
+    68
+    16
+    37
+    41
+    45
+  /
+END
+
+END_SUBSURFACE

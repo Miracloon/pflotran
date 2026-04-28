@@ -1,4 +1,4 @@
-#Description: test problem for 1D geothermal heat pipe
+#Description: 1D heat pipe via WELL_TRAJECTORY; no well index (fluid+wall only)
 SIMULATION
   SIMULATION_TYPE SUBSURFACE
   PROCESS_MODELS
@@ -20,18 +20,16 @@ WELLBORE_MODEL well
 
   WELL_GRID
     WELL_TRAJECTORY
-      SURFACE_ORIGIN         0. 2.5 2.5
-      SEGMENT_DXYZ UNCASED  20. 0.  0.
+      SURFACE_ORIGIN         0.  2.5  2.5
+      SEGMENT_DXYZ UNCASED  20.  0.   0.
     /
   /
 
   WELL
-    SCENARIO 4
-    USE_WELL_INDEX
     INLET_TEMPERATURE 5.
     PIPE_INNER_DIAMETER 0.1
-    PIPE_WALL_THICKNESS 0. # placeholder
-    PIPE_WALL_THERMAL_CONDUCTIVITY 0. # placeholder
+    PIPE_WALL_THICKNESS 5.d-3
+    PIPE_WALL_THERMAL_CONDUCTIVITY 40.
     PIPE_FLOW_VELOCITY 1.574074d-5 # 1 m/d
   /
 
