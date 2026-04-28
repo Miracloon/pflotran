@@ -1692,7 +1692,7 @@ subroutine InitSubsurfGeomechSetupPMC(simulation,pm_geomech, &
   timestepper%solver => pm_geomech%solver
 
   ! set up logging stage
-  string = trim(pmc_geomech%name) // 'Geomechanics'
+  string = trim(pm_geomech%name) // 'Geomechanics'
   call LoggingCreateStage(string,pmc_geomech%stage)
 
   string = 'GEOMECHANICS'
