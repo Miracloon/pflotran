@@ -1400,7 +1400,7 @@ function THWellComputeConvCoefficient(auxvar_well,pm_well)
   !Compute Prandtl number
   prandtl = THWellComputePrandtlNumber(heat_capacity,viscosity,thermal_cond)
   !Compute Nusselt number
-  nusselt = THWellComputeNusseltNumber(reynolds,prandtl)
+  nusselt = THWellComputeNusseltNumber(reynolds,prandtl,pm_well)
 
   if (pipe_diameter > 0.d0) then
     THWellComputeConvCoefficient = nusselt * thermal_cond / pipe_diameter
@@ -1465,9 +1465,9 @@ end function THWellComputePrandtlNumber
 
 ! ************************************************************************** !
 
-function THWellComputeNusseltNumber(reynolds,prandtl)
+function THWellComputeNusseltNumber(reynolds,prandtl,pm_well)
   !
-  ! Computes Nusselt number using appropriate correlation
+  ! Computes Nusselt number using the configured correlation
   !
   ! Author: Piyoosh Jaysaval
   ! Date: 02/18/26
@@ -1476,24 +1476,76 @@ function THWellComputeNusseltNumber(reynolds,prandtl)
 
   PetscReal :: reynolds
   PetscReal :: prandtl
+  class(pm_well_closed_loop_type) :: pm_well
   PetscReal :: THWellComputeNusseltNumber
 
-  !TODO: maybe add OGS approach OR Gnielinski correlation?
-  if (reynolds > 2300.d0) then
-    ! turbulent flow,
-    ! Zhang et al. 2015. "The analytical solution of the water-rock heat
-    ! transfer coefficient and sensitivity analyses of parameters."
-    ! Proceedings World Geothermal Congress 2015, Melbourne, Australia,
-    ! 19-25, April 2015, pg 6
-    THWellComputeNusseltNumber = 8.7d-5 * (reynolds**0.92d0) * &
-                                 (prandtl**1.89d0)
-  elseif (reynolds > 0.d0) then
-    ! Laminar flow - use Nu = 4.36 for constant heat flux boundary condition
-    ! (Nu = 3.66 for constant wall temperature)
-    THWellComputeNusseltNumber = 4.36d0
-  else
-    THWellComputeNusseltNumber = 0.d0
-  endif
+  PetscReal :: xi
+  PetscReal :: entrance
+  PetscReal :: nu_lam
+  PetscReal :: nu_turb
+  PetscReal :: nu_at_1e4
+  PetscReal :: gamma
+  PetscReal :: zref
+  PetscReal :: r_pi
+
+  nu_lam = pm_well%nusselt_laminar
+
+  select case(pm_well%nusselt_mode)
+    case(TH_WELL_NUSSELT_LAMINAR)
+      THWellComputeNusseltNumber = nu_lam
+    case(TH_WELL_NUSSELT_CHEN_2021)
+      if (reynolds <= 0.d0) then
+        THWellComputeNusseltNumber = 0.d0
+        return
+      endif
+
+      xi = (1.8d0 * log(max(reynolds,1.d0)) - 1.5d0)**(-2.d0)
+      if (pm_well%use_nusselt_entrance_factor) then
+        zref = max(pm_well%nusselt_z_ref,1.d-10)
+        r_pi = 0.5d0 * pm_well%pipe_inner_diameter
+        entrance = 1.d0 + (r_pi/zref)**(2.d0/3.d0)
+      else
+        entrance = 1.d0
+      endif
+
+      nu_turb = ((xi/8.d0) * reynolds * prandtl) / &
+                (1.d0 + 12.7d0 * sqrt(xi/8.d0) * (prandtl**(2.d0/3.d0)-1.d0))
+      nu_turb = nu_turb * entrance
+
+      if (reynolds < 2300.d0) then
+        THWellComputeNusseltNumber = nu_lam
+      elseif (reynolds > 10000.d0) then
+        THWellComputeNusseltNumber = nu_turb
+      else
+        gamma = (reynolds - 2300.d0) / (10000.d0 - 2300.d0)
+        gamma = min(1.d0,max(0.d0,gamma))
+        nu_at_1e4 = ((0.0308d0/8.d0) * 1.d4 * prandtl) / &
+                    (1.d0 + 12.7d0 * sqrt(0.0308d0/8.d0) * &
+                    (prandtl**(2.d0/3.d0)-1.d0))
+        nu_at_1e4 = nu_at_1e4 * entrance
+        THWellComputeNusseltNumber = (1.d0-gamma) * nu_lam + gamma * nu_at_1e4
+      endif
+    case(TH_WELL_NUSSELT_ZHANG_2015)
+      ! Zhang et al. (2015) correlation remains the default.
+      if (reynolds > 2300.d0) then
+        ! turbulent flow,
+        ! Zhang et al. 2015. "The analytical solution of the water-rock heat
+        ! transfer coefficient and sensitivity analyses of parameters."
+        ! Proceedings World Geothermal Congress 2015, Melbourne, Australia,
+        ! 19-25, April 2015, pg 6
+        THWellComputeNusseltNumber = 8.7d-5 * (reynolds**0.92d0) * &
+                                     (prandtl**1.89d0)
+      elseif (reynolds > 0.d0) then
+        ! Laminar flow - use Nu = 4.36 for constant heat flux boundary condition
+        ! (Nu = 3.66 for constant wall temperature)
+        THWellComputeNusseltNumber = nu_lam
+      else
+        THWellComputeNusseltNumber = 0.d0
+      endif
+    case default
+      ! Default to laminar value if unknown mode
+      THWellComputeNusseltNumber = nu_lam
+  end select
 
 end function THWellComputeNusseltNumber
 

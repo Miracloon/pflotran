@@ -68,6 +68,11 @@ module PM_Well_class
   PetscInt, parameter, public :: QUASI_IMPLICIT_WELL = TWO_INTEGER
   PetscInt, parameter, public :: SEQUENTIAL_WELL = THREE_INTEGER
 
+  ! Closed-loop well Nusselt correlation options
+  PetscInt, parameter, public :: TH_WELL_NUSSELT_ZHANG_2015 = 1
+  PetscInt, parameter, public :: TH_WELL_NUSSELT_LAMINAR = 2
+  PetscInt, parameter, public :: TH_WELL_NUSSELT_CHEN_2021 = 3
+
 
   type, public :: well_reservoir_type
     ! reservoir liquid pressure [Pa]
@@ -494,10 +499,14 @@ module PM_Well_class
   type, public, extends(pm_well_implicit_type) :: pm_well_closed_loop_type
       ! Placeholder for now
     PetscInt :: iscenario
+    PetscInt :: nusselt_mode
     PetscBool :: use_well_index
+    PetscBool :: use_nusselt_entrance_factor
     PetscBool :: setup_complete
     PetscInt, pointer :: well_cells(:)
     PetscReal :: inlet_temperature
+    PetscReal :: nusselt_laminar
+    PetscReal :: nusselt_z_ref
     PetscReal :: pipe_inner_diameter
     PetscReal :: pipe_wall_thickness
     PetscReal :: pipe_wall_thermal_conductivity
@@ -728,9 +737,13 @@ function PMWellUShapeCreate()
   pm_well%flow_coupling = FULLY_IMPLICIT_WELL
 
   pm_well%iscenario = UNINITIALIZED_INTEGER
+  pm_well%nusselt_mode = TH_WELL_NUSSELT_ZHANG_2015
   pm_well%use_well_index = PETSC_FALSE
+  pm_well%use_nusselt_entrance_factor = PETSC_FALSE
   pm_well%setup_complete = PETSC_FALSE
   pm_well%inlet_temperature = UNINITIALIZED_DOUBLE
+  pm_well%nusselt_laminar = 4.36d0
+  pm_well%nusselt_z_ref = 1.d0
   pm_well%pipe_inner_diameter = UNINITIALIZED_DOUBLE
   pm_well%pipe_wall_thickness = UNINITIALIZED_DOUBLE
   pm_well%pipe_wall_thermal_conductivity = UNINITIALIZED_DOUBLE
@@ -4283,15 +4296,41 @@ subroutine PMWellReadWell(pm_well,input,option,keyword,error_string,found)
           case('INLET_TEMPERATURE','PIPE_INNER_DIAMETER', &
                'PIPE_WALL_THICKNESS','PIPE_WALL_THERMAL_CONDUCTIVITY', &
                'PIPE_FLOW_VELOCITY','SCENARIO','USE_WELL_INDEX', &
-               'INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY')
+               'INSULATOR_THICKNESS','INSULATOR_THERMAL_CONDUCTIVITY', &
+               'NUSSELT_MODE','NUSSELT_LAMINAR','NUSSELT_Z_REF', &
+               'USE_NUSSELT_ENTRANCE_FACTOR')
             select type(pm => pm_well)
               class is(pm_well_closed_loop_type)
                 select case(word)
                   case('SCENARIO')
                     call InputReadInt(input,option,pm%iscenario)
                     call InputErrorMsg(input,option,word,error_string)
+                  case('NUSSELT_MODE')
+                    call InputReadWord(input,option,word,PETSC_TRUE)
+                    select case(word)
+                      case('ZHANG_2015')
+                        pm%nusselt_mode = TH_WELL_NUSSELT_ZHANG_2015
+                      case('LAMINAR')
+                        pm%nusselt_mode = TH_WELL_NUSSELT_LAMINAR
+                      case('CHEN_2021')
+                        pm%nusselt_mode = TH_WELL_NUSSELT_CHEN_2021
+                      case default
+                        option%io_buffer = 'Unrecognized option for &
+                        &NUSSELT_MODE in the ' // trim(error_string) // ' block&
+                        &. Valid values are ZHANG_2015, LAMINAR, CHEN_2021.'
+                        call PrintErrMsg(option)
+                    end select
+                    call InputErrorMsg(input,option,'NUSSELT_MODE',error_string)
+                  case('NUSSELT_LAMINAR')
+                    call InputReadDouble(input,option,pm%nusselt_laminar)
+                    call InputErrorMsg(input,option,word,error_string)
+                  case('NUSSELT_Z_REF')
+                    call InputReadDouble(input,option,pm%nusselt_z_ref)
+                    call InputErrorMsg(input,option,word,error_string)
                   case('USE_WELL_INDEX')
                     pm%use_well_index = PETSC_TRUE
+                  case('USE_NUSSELT_ENTRANCE_FACTOR')
+                    pm%use_nusselt_entrance_factor = PETSC_TRUE
                   case('INLET_TEMPERATURE')
                     call InputReadDouble(input,option,pm%inlet_temperature)
                     call InputErrorMsg(input,option,word,error_string)
