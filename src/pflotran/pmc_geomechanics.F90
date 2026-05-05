@@ -263,7 +263,6 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
     call PetscLogStagePush(this%stage,ierr);CHKERRQ(ierr)
   endif
 
-  call this%PrintHeader()
   this%option%io_buffer = trim(this%name) // ':' // trim(this%pm_list%name)
   call PrintVerboseMsg(this%option)
 
@@ -313,7 +312,7 @@ recursive subroutine PMCGeomechanicsRunToTime(this,sync_time,stop_flag)
       this%option%time = this%timestepper%target_time-this%timestepper%dt
   end select
 
-  call this%timestepper%StepDT(this%pm_list,local_stop_flag)
+  call this%StepDT(local_stop_flag)
 
   ! Have to loop over all process models coupled in this object and update
   ! the time step size.  Still need code to force all process models to
