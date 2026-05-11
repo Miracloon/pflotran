@@ -661,6 +661,7 @@ subroutine PMCGeomechanicsSetAuxData(this)
           endif
 
           do local_id = 1, grid%nlmax
+            ghosted_id = grid%nL2G(local_id)
             do i = 1, SIX_INTEGER
               local_stress(i) = stress_p((local_id - 1)*SIX_INTEGER + i)
               local_strain(i) = strain_p((local_id - 1)*SIX_INTEGER + i)
@@ -674,14 +675,14 @@ subroutine PMCGeomechanicsSetAuxData(this)
             ! Update porosity based on stress/strain
             call GeomechanicsSubsurfacePropsPoroEvaluate( &
                   grid, &
-                  pmc%subsurf_realization%patch%aux%Material%auxvars(local_id), &
+                  pmc%subsurf_realization%patch%aux%Material%auxvars(ghosted_id), &
                   por0_p(local_id),local_stress,local_strain,local_pressure, &
                   por_new,option)
             por_p(local_id) = por_new
             ! Update permeability based on stress/strain
             call GeomechanicsSubsurfacePropsPermEvaluate( &
                   grid, &
-                  pmc%subsurf_realization%patch%aux%Material%auxvars(local_id), &
+                  pmc%subsurf_realization%patch%aux%Material%auxvars(ghosted_id), &
                   perm0_p(local_id),local_stress,local_strain,local_pressure, &
                   perm_new,option)
             perm_p(local_id) = perm_new
@@ -690,10 +691,9 @@ subroutine PMCGeomechanicsSetAuxData(this)
             case(GEOMECH_FIXED_STRESS_SPLIT)
               ! ID's are registered in factory_subsurface.F90
               ! (lookups hoisted before loop)
-              ghosted_id = grid%nL2G(local_id)
               global_auxvar => global_auxvars(ghosted_id)
               imat = pmc%subsurf_realization%patch%aux%Material% &
-                     auxvars(local_id)%id
+                     auxvars(ghosted_id)%id
               ! calc volumetric strain
               strain_vol = local_strain(1) + local_strain(2) + local_strain(3)
 
@@ -701,12 +701,12 @@ subroutine PMCGeomechanicsSetAuxData(this)
                 global_auxvar%parameters(press_0_id) = local_pressure
                 global_auxvar%parameters(flow_porosity_id) = &
                  pmc%subsurf_realization%patch%aux%Material% &
-                  auxvars(local_id)%porosity_0
+                  auxvars(ghosted_id)%porosity_0
                 global_auxvar%parameters(strainv_0_id) = 0.d0
                 global_auxvar%parameters(strainv_id) = 0.d0
                 global_auxvar%parameters(id_porosity_mech) = &
                   pmc%subsurf_realization%patch%aux%Material% &
-                  auxvars(local_id)%porosity_0
+                  auxvars(ghosted_id)%porosity_0
 
               else ! after initial solve
                 if (this%timestepper%steps == 0) then ! at init
@@ -714,10 +714,10 @@ subroutine PMCGeomechanicsSetAuxData(this)
                   global_auxvar%parameters(strainv_id) = strain_vol
                   global_auxvar%parameters(flow_porosity_id) = &
                     pmc%subsurf_realization%patch%aux%Material% &
-                    auxvars(local_id)%porosity_0
+                    auxvars(ghosted_id)%porosity_0
                   global_auxvar%parameters(id_porosity_mech) = &
                     pmc%subsurf_realization%patch%aux%Material% &
-                    auxvars(local_id)%porosity_0
+                    auxvars(ghosted_id)%porosity_0
                   if (this%option%iflowmode == TH_MODE) then
                     global_auxvar%parameters(temp_0_id) = local_temp
                   endif
