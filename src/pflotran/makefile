@@ -180,7 +180,7 @@ ifdef ug_mpi_scatter_ghost
 endif
 
 ifdef have_hdf5
-LIBS +=  -L${HDF5_LIB} -lhdf5_fortran -lhdf5 -lz
+  LIBS +=  -L${HDF5_LIB} -lhdf5_hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz
 endif
 
 # Set this accordingly on your platform
