@@ -331,6 +331,9 @@ subroutine EOSWaterInit()
   quadratic_reference_density = UNINITIALIZED_DOUBLE
   quadratic_reference_pressure = UNINITIALIZED_DOUBLE
   quadratic_wat_compressibility = UNINITIALIZED_DOUBLE
+  linear_reference_density = UNINITIALIZED_DOUBLE
+  linear_reference_pressure = UNINITIALIZED_DOUBLE
+  linear_water_compressibility = UNINITIALIZED_DOUBLE
   halite_saturated_brine = PETSC_FALSE
 
   ! standard versions
