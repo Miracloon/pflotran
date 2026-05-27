@@ -1694,6 +1694,7 @@ subroutine OutputGetExplicitDensity(realization_base,count,vec_proc, &
         end select
 
         if (is_flowing) then
+          upweight = 0.5
           if (global_auxvar(ghosted_id_up)%sat(1) <eps) then
             upweight = 0.d0
           else if (global_auxvar(ghosted_id_dn)%sat(1) <eps) then
