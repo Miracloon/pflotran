@@ -3818,6 +3818,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   PetscReal, pointer :: darcy(:), area(:)
   PetscInt, pointer :: nat_ids_up(:),nat_ids_dn(:)
   PetscReal, pointer :: density_kg(:)
+  PetscBool :: write_cells_and_area
   Vec :: vec_proc
   PetscBool :: output_density
 
@@ -3827,6 +3828,11 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
 
   option => realization_base%option
   output_option => realization_base%output_option
+
+  write_cells_and_area = PETSC_FALSE
+  if (output_option%plot_number == 0) then
+    write_cells_and_area = PETSC_TRUE
+  endif
 
   ! output of density only supported for Richards and TH
   output_density = PETSC_FALSE
@@ -3866,18 +3872,20 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
     option%io_buffer = 'Could not create dataspace for ' // trim(string)
     call PrintErrMsg(option)
   endif
-  call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
-                         "Cell1", nat_ids_up, option)
-  call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
-                         "Cell2", nat_ids_dn, option)
+  if (write_cells_and_area) then
+    call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
+                          "Cell1", nat_ids_up, option)
+    call OutputHDF5WriteGrid_Int(grp_conn_id, dataspace_id, dims, &
+                          "Cell2", nat_ids_dn, option)
+    call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
+                            "Area", area, option)
+  endif
   call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
                            "Flux", darcy, option)
   if (output_density) then
     call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
                              "Density", density_kg, option)
   endif
-  call OutputHDF5WriteGrid_Real8(grp_conn_id, dataspace_id, dims, &
-                           "Area", area, option)
   call h5sclose_f(dataspace_id, error)
   call HDF5GroupClose(grp_conn_id, option)
   call HDF5GroupClose(grp_dom_id, option)
