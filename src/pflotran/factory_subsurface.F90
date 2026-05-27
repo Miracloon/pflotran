@@ -213,8 +213,11 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
       option%nphase = 2
       option%nflowdof = 3
       option%nflowspec = 2
-      co2_sw_itable = 2 ! read CO2DATA0.dat
-!     co2_sw_itable = 1 ! create CO2 database: co2data.dat
+      if (option%flow%write_co2data_dat) then
+        co2_sw_itable = 1 ! create CO2 database: co2data.dat
+      else
+        co2_sw_itable = 2 ! read CO2DATA0.dat
+      endif
       option%flow%isothermal = PETSC_FALSE
       option%water_id = 1
       option%air_id = 2

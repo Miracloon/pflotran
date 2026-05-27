@@ -33,6 +33,7 @@ module Option_Flow_module
     PetscBool :: store_state_variables_in_global
     PetscBool :: isothermal
     PetscBool :: disable_capillarity
+    PetscBool :: write_co2data_dat
 
     PetscBool :: full_perm_tensor
     PetscBool :: steady_state
@@ -157,12 +158,13 @@ subroutine OptionFlowInitRealization(option)
   option%sat_pres_depends_on_salinity = PETSC_FALSE
   option%quasi_3d = PETSC_FALSE
   option%numerical_derivatives = PETSC_FALSE
-  option%numerical_derivatives_compare = petsc_false
+  option%numerical_derivatives_compare = PETSC_FALSE
   option%only_energy_eq = PETSC_FALSE
   option%full_perm_tensor = PETSC_FALSE
   option%store_state_variables_in_global = PETSC_FALSE
   option%isothermal = PETSC_FALSE
   option%disable_capillarity = PETSC_FALSE
+  option%write_co2data_dat = PETSC_FALSE
 
   option%set_secondary_init_temp = PETSC_FALSE
   option%update_flow_perm = PETSC_FALSE

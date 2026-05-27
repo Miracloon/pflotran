@@ -111,6 +111,8 @@ subroutine PMMphaseReadSimOptionsBlock(this,input)
     if (found) cycle
 
     select case(trim(word))
+      case('WRITE_CO2DATA_DAT')
+        option%flow%write_co2data_dat = PETSC_TRUE
       case default
         call InputKeywordUnrecognized(input,word,error_string,option)
     end select
