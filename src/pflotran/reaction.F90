@@ -6610,7 +6610,7 @@ subroutine RTSetPlotVariables(list,reaction,option,time_unit)
   endif
 
   if (reaction%print%electrical_conductivity) then
-    name = 'Electrical Conductivity'
+    name = 'Aqueous Electrical Conductivity'
     units = 'S/m'
     call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                  AQUEOUS_ELECTRICAL_CONDUCTIVITY)
