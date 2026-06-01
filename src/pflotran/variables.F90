@@ -231,5 +231,6 @@ module Variables_module
   PetscInt, parameter, public :: SUM_MINERAL_VOLUME_FRACTION = 176
   PetscInt, parameter, public :: IONIC_STRENGTH              = 177
   PetscInt, parameter, public :: AQUEOUS_ELECTRICAL_CONDUCTIVITY = 178
+  PetscInt, parameter, public :: FLUID_ELECTRICAL_CONDUCTIVITY = 179
 
 end module Variables_module

@@ -803,7 +803,7 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
            'ELECTRICAL_JACOBIAN','ELECTRICAL_POTENTIAL_DIPOLE', &
            'MATERIAL_ELECTRICAL_CONDUCTIVITY', &
            'SURFACE_ELECTRICAL_CONDUCTIVITY', &
-           'WAXMAN_SMITS_CLAY_CONDUCTIVITY')
+           'WAXMAN_SMITS_CLAY_CONDUCTIVITY','FLUID_ELECTRICAL_CONDUCTIVITY')
       case default
         call PrintErrMsg(option,'Output variable "' // trim(word) // &
           '" not supported when not running a flow mode.')
@@ -815,7 +815,8 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
            'ELECTRICAL_JACOBIAN','ELECTRICAL_POTENTIAL_DIPOLE', &
            'ARCHIE_CEMENTATION_EXPONENT','ARCHIE_SATURATION_EXPONENT', &
            'ARCHIE_TORTUOSITY_CONSTANT','SURFACE_ELECTRICAL_CONDUCTIVITY', &
-           'WAXMAN_SMITS_CLAY_CONDUCTIVITY','MATERIAL_ELECTRICAL_CONDUCTIVITY')
+           'WAXMAN_SMITS_CLAY_CONDUCTIVITY','MATERIAL_ELECTRICAL_CONDUCTIVITY',&
+           'FLUID_ELECTRICAL_CONDUCTIVITY')
         call PrintErrMsg(option,'Output variable "' // trim(word) // &
           '" not supported when not running a geophysics mode.')
     end select
@@ -1251,7 +1252,8 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
          'ELECTRICAL_JACOBIAN','ELECTRICAL_POTENTIAL_DIPOLE', &
          'ARCHIE_CEMENTATION_EXPONENT','ARCHIE_SATURATION_EXPONENT', &
          'ARCHIE_TORTUOSITY_CONSTANT','MATERIAL_ELECTRICAL_CONDUCTIVITY', &
-         'SURFACE_ELECTRICAL_CONDUCTIVITY','WAXMAN_SMITS_CLAY_CONDUCTIVITY')
+         'SURFACE_ELECTRICAL_CONDUCTIVITY','WAXMAN_SMITS_CLAY_CONDUCTIVITY', &
+         'FLUID_ELECTRICAL_CONDUCTIVITY')
       if (option%ngeopdof <= 0) then
         call PrintErrMsg(option,trim(word)//' output only &
           &supported when the GEOPHYSICS process model is used.')
@@ -1262,6 +1264,11 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
           name = 'Electrical Conductivity'
           category = OUTPUT_GENERIC
           id = COMPUTED_ELECTRICAL_CONDUCTIVITY
+        case ('FLUID_ELECTRICAL_CONDUCTIVITY')
+          units = 'S/m'
+          name = 'Fluid Electrical Conductivity'
+          category = OUTPUT_GENERIC
+          id = FLUID_ELECTRICAL_CONDUCTIVITY
         case ('ELECTRICAL_POTENTIAL')
           units = 'V'
           name = 'Electrical Potential'

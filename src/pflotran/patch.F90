@@ -8233,6 +8233,11 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
         vec_ptr(local_id) = &
           patch%aux%ERT%auxvars(grid%nL2G(local_id))%bulk_conductivity
       enddo
+    case(FLUID_ELECTRICAL_CONDUCTIVITY)
+      do local_id=1,grid%nlmax
+        vec_ptr(local_id) = &
+          patch%aux%ERT%auxvars(grid%nL2G(local_id))%fluid_conductivity
+      enddo
     case(ELECTRICAL_POTENTIAL)
       call ERTAuxCheckElectrodeBounds(size(patch%aux%ERT%auxvars(1)% &
                                       potential),isubvar,isubvar2,option)
@@ -9625,6 +9630,8 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
       endif
     case(COMPUTED_ELECTRICAL_CONDUCTIVITY)
       value = patch%aux%ERT%auxvars(ghosted_id)%bulk_conductivity
+    case(FLUID_ELECTRICAL_CONDUCTIVITY)
+      value = patch%aux%ERT%auxvars(ghosted_id)%fluid_conductivity
     case(ELECTRICAL_POTENTIAL_DIPOLE)
       call ERTAuxCheckElectrodeBounds(size(patch%aux%ERT%auxvars(1)% &
                                       potential),isubvar,isubvar2,option)

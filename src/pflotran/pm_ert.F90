@@ -1046,6 +1046,7 @@ subroutine PMERTPreSolve(this)
                                          tracer_scale,dcond_dsat,dcond_dconc, &
                                          dcond_dpor, option)
     ert_auxvars(ghosted_id)%bulk_conductivity = cond
+    ert_auxvars(ghosted_id)%fluid_conductivity = cond_w
     if (this%coupled_ert_flow_jacobian) then
       if (local_id > 0) dcond_dsat_vec_ptr(local_id) = dcond_dsat
       if (associated(rt_auxvars) .or. associated(zflow_auxvars)) then
