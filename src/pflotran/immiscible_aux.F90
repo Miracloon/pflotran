@@ -349,17 +349,17 @@ subroutine ImmisciblePrintAuxVars(immis_auxvar,global_auxvar,material_auxvar, &
   print *, '      capillary pressure: ', immis_auxvar%pres(3)
   print *, '       liquid saturation: ', immis_auxvar%sat(1)
   print *, '          gas saturation: ', immis_auxvar%sat(2)
-  print *, '        liquid viscosity: ', immis_auxvar%kr(1)
-  print *, '           gas viscosity: ', immis_auxvar%kr(2)
+  print *, '        liquid viscosity: ', immis_auxvar%mu(1)
+  print *, '           gas viscosity: ', immis_auxvar%mu(2)
   print *, ' liquid rel permeability: ', immis_auxvar%kr(1)
-  print *, '    gas rel permeability: ', immis_auxvar%kr(1)
+  print *, '    gas rel permeability: ', immis_auxvar%kr(2)
   print *, '--------------------------------------------------------'
 
 end subroutine ImmisciblePrintAuxVars
 
 ! ************************************************************************** !
 
-subroutine ImmiscibleOutputAuxVars1(immis_auxvar,global_auxvar,material_auxvar, &
+subroutine ImmiscibleOutputAuxVars1(immis_auxvar,global_auxvar,material_auxvar,&
                                natural_id,string,append,option)
   !
   ! Prints out the contents of an auxvar to a file
@@ -400,10 +400,10 @@ subroutine ImmiscibleOutputAuxVars1(immis_auxvar,global_auxvar,material_auxvar, 
   write(IUNIT_TEMP,*) '      capillary pressure: ', immis_auxvar%pres(3)
   write(IUNIT_TEMP,*) '       liquid saturation: ', immis_auxvar%sat(1)
   write(IUNIT_TEMP,*) '          gas saturation: ', immis_auxvar%sat(2)
-  write(IUNIT_TEMP,*) '        liquid viscosity: ', immis_auxvar%kr(1)
-  write(IUNIT_TEMP,*) '           gas viscosity: ', immis_auxvar%kr(2)
+  write(IUNIT_TEMP,*) '        liquid viscosity: ', immis_auxvar%mu(1)
+  write(IUNIT_TEMP,*) '           gas viscosity: ', immis_auxvar%mu(2)
   write(IUNIT_TEMP,*) ' liquid rel permeability: ', immis_auxvar%kr(1)
-  write(IUNIT_TEMP,*) '    gas rel permeability: ', immis_auxvar%kr(1)
+  write(IUNIT_TEMP,*) '    gas rel permeability: ', immis_auxvar%kr(2)
   write(IUNIT_TEMP,*) '-------------------------------------------------------'
   close(IUNIT_TEMP)
 
