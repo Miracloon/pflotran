@@ -61,5 +61,12 @@ curl --request POST "$BITBUCKET_STATUS_API" \
     \"key\": \"$BITBUCKET_KEY\",
     \"name\": \"Go to GitLab\",
     \"description\": \"$BITBUCKET_DESCRIPTION\",
-    \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"
+    \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\",
+    \"refname\": \"$CI_COMMIT_REF_NAME\"
   }"
+
+echo "Pushing GitLab pipeline status to Bitbucket..."
+echo "Bitbucket API URL: $BITBUCKET_STATUS_API"
+echo "State: $BITBUCKET_STATE"
+echo "Branch: $CI_COMMIT_REF_NAME"
+echo "Commit: $CI_COMMIT_SHA"
