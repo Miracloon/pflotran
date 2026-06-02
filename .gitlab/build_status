@@ -25,7 +25,7 @@ fi
 BITBUCKET_API_ROOT="https://api.bitbucket.org/2.0"
 BITBUCKET_STATUS_API="$BITBUCKET_API_ROOT/repositories/$BITBUCKET_NAMESPACE/$BITBUCKET_REPOSITORY/commit/$CI_COMMIT_SHA/statuses/build"
 
-BITBUCKET_KEY="Go to GitLab"
+BITBUCKET_KEY="ci/gitlab-ci/${BUILD_KEY:-pipeline}"
 
 case "$BUILD_STATUS" in
   running)
@@ -59,6 +59,7 @@ curl --request POST "$BITBUCKET_STATUS_API" \
   --data "{
     \"state\": \"$BITBUCKET_STATE\",
     \"key\": \"$BITBUCKET_KEY\",
+    \"name\": \"Go to GitLab\",
     \"description\": \"$BITBUCKET_DESCRIPTION\",
     \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"
   }"
