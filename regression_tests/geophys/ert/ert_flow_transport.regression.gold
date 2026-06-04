@@ -14,6 +14,14 @@
         1:   2.7406316756960E-03
        41:   2.7406316756960E-03
        81:   2.5082458123028E-03
+-- GENERIC: Fluid Electrical Conductivity --
+      Max:   1.0880273480596E-02
+      Min:   1.0002718956767E-02
+     Mean:   1.0024929833806E-02
+       93:   1.0009529980188E-02
+        1:   1.0002718956767E-02
+       41:   1.0002718956767E-02
+       81:   1.0002718956767E-02
 -- GENERIC: Electrical Potential_2 --
       Max:   1.0538806809861E+02
       Min:   3.0271432541775E-02
@@ -55,7 +63,7 @@
        41:         1
        81:         1
 -- SOLUTION: Flow --
-   Time (seconds):   1.6758356000082E-02
+   Time (seconds):   1.7490505999831E-02
    Time Steps:            9
    Newton Iterations:           17
    Linear Solver Iterations:           57
@@ -63,7 +71,7 @@
    Solution 2-Norm:   1.1138064288819E+06
    Residual 2-Norm:   7.8962867749087E-16
 -- SOLUTION: Transport --
-   Time (seconds):   1.1850433999825E-02
+   Time (seconds):   1.2165403000040E-02
    Time Steps:            9
    Newton Iterations:            9
    Linear Solver Iterations:            9
