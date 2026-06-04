@@ -115,7 +115,7 @@ subroutine ImmiscibleSetup(realization)
   enddo
 
   error_found = error_found .or. (maxval(flag) > 0)
-  call MPI_Allreduce(MPI_IN_PLACE,error_found,ONE_INTEGER_MPI,MPI_LOGICAL, &
+  call MPI_Allreduce(MPI_IN_PLACE,error_found,ONE_INTEGER_MPI,MPI_C_BOOL, &
                      MPI_LOR,option%mycomm,ierr);CHKERRQ(ierr)
   if (error_found) then
     option%io_buffer = 'Material property errors found in ImmiscibleSetup.'
