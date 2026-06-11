@@ -156,9 +156,9 @@ subroutine GeomechDiscretizationCreateDM(geomech_discretization,dm_ptr, &
         'Geomechanics currently works only with unstructured grid.'
       call PrintErrMsg(option)
     case(UNSTRUCTURED_GRID)
-#if !defined(PETSC_HAVE_PARMETIS)
+#if !defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_METIS)
             option%io_buffer = &
-             'Must compile with Parmetis in order to use Geomechanics ' // &
+             'Must compile with Parmetis or Metis in order to use Geomechanics ' // &
              'unstructured grids.'
             call PrintErrMsg(option)
 #endif

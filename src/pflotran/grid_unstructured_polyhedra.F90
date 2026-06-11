@@ -735,7 +735,7 @@ subroutine UGridPolyhedraDecompose(ugrid, option)
   call PrintMsg(option,'Dual matrix')
 #endif
 
-#if defined(PETSC_HAVE_PARMETIS)
+#if defined(PETSC_HAVE_PARMETIS) || defined(PETSC_HAVE_METIS)
   call MatMeshToCellGraph(Adj_mat,num_common_vertices,Dual_mat, &
                           ierr);CHKERRQ(ierr)
 #endif

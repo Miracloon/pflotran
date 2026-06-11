@@ -636,32 +636,32 @@ subroutine DiscretizationDecomposeDomain(discretization,option)
 
       select case(discretization%grid%itype)
         case(IMPLICIT_UNSTRUCTURED_GRID)
-          ! petsc will call parmetis to calculate the graph/dual
-#if !defined(PETSC_HAVE_PARMETIS)
+          ! petsc will call parmetis/metis to calculate the graph/dual
+#if !defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_METIS)
             option%io_buffer = &
-             'Must compile with Parmetis in order to use implicit unstructured grids.'
+             'Must compile with Parmetis or Metis in order to use implicit unstructured grids.'
             call PrintErrMsg(option)
 #endif
           call UGridDecompose(discretization%grid%unstructured_grid, &
                               option)
         case(EXPLICIT_UNSTRUCTURED_GRID)
-#if !defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_PTSCOTCH)
+#if (!defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_METIS)) && !defined(PETSC_HAVE_PTSCOTCH)
             option%io_buffer = &
-             'Must compile with either Parmetis or PTSCOTCH in order to use explicit unstructured grids.'
+             'Must compile with either Parmetis/Metis or PTSCOTCH in order to use explicit unstructured grids.'
             call PrintErrMsg(option)
 #endif
           call UGridExplicitDecompose(discretization%grid%unstructured_grid,option)
         case(POLYHEDRA_UNSTRUCTURED_GRID)
-#if !defined(PETSC_HAVE_PARMETIS)
+#if !defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_METIS)
             option%io_buffer = &
-             'Must compile with Parmetis in order to use implicit unstructured grids.'
+             'Must compile with Parmetis or Metis in order to use implicit unstructured grids.'
             call PrintErrMsg(option)
 #endif
           call UGridPolyhedraDecompose(discretization%grid%unstructured_grid,option)
         case(ECLIPSE_UNSTRUCTURED_GRID)
-#if !defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_PTSCOTCH)
+#if (!defined(PETSC_HAVE_PARMETIS) && !defined(PETSC_HAVE_METIS)) && !defined(PETSC_HAVE_PTSCOTCH)
             option%io_buffer = &
-             'Must compile with either Parmetis or PTSCOTCH in order to use Eclipse grids.'
+             'Must compile with either Parmetis/Metis or PTSCOTCH in order to use Eclipse grids.'
             call PrintErrMsg(option)
 #endif
           call UGridExplicitDecompose(discretization%grid%unstructured_grid,option)
