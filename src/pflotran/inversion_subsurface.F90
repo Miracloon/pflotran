@@ -583,7 +583,7 @@ subroutine InvSubsurfSetupForwardRunLinkage(this)
   use PM_ERT_class
   use PM_Subsurface_Flow_class
   use String_module
-  use Variables_module, only : PERMEABILITY, POROSITY, &
+  use Variables_module, only : PERMEABILITY, BASE_POROSITY, &
                   ARCHIE_CEMENTATION_EXPONENT, ARCHIE_SATURATION_EXPONENT, &
                   ARCHIE_TORTUOSITY_CONSTANT
   use Waypoint_module
@@ -712,7 +712,7 @@ subroutine InvSubsurfSetupForwardRunLinkage(this)
                                                      parameter_name, &
                                                    this%driver)
         select case(param_id)
-          case(PERMEABILITY,POROSITY)
+          case(PERMEABILITY,BASE_POROSITY)
           case default
             string = 'COUPLED_ZFLOW_ERT does not currently support &
               &inversion for "' // &
@@ -1172,7 +1172,6 @@ subroutine InvSubsurfConnectToForwardRun(this)
   PetscReal, pointer :: vec_ptr(:)
   PetscMPIInt :: mpi_int
   PetscBool :: iflag
-  PetscInt :: iqoi(2)
   PetscErrorCode :: ierr
 
   perturbation => this%inversion_aux%perturbation
@@ -1248,12 +1247,10 @@ subroutine InvSubsurfConnectToForwardRun(this)
   if (associated(this%inversion_option%invcomm) .and. &
       this%inversion_aux%startup_phase) then
     if (this%inversion_aux%qoi_is_full_vector) then
-      iqoi = InversionParameterIntToQOIArray( &
-                                  this%inversion_aux%parameters(1))
       ! on first iteration of inversion, store the values
       call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                   this%realization%field%work_loc, &
-                                  iqoi(1),iqoi(2))
+                                  this%inversion_aux%parameters(1)%itype)
       call DiscretizationLocalToGlobal(this%realization%discretization, &
                                       this%realization%field%work_loc, &
                                       this%realization%field%work,ONEDOF)
@@ -1340,7 +1337,7 @@ subroutine InvSubsurfSetAdjointVariable(this,iparameter_type)
   ! Date: 03/30/22
 
   use String_module
-  use Variables_module, only : PERMEABILITY, POROSITY, VG_ALPHA, VG_M, &
+  use Variables_module, only : PERMEABILITY, BASE_POROSITY, VG_ALPHA, VG_M, &
                                VG_SR, ARCHIE_CEMENTATION_EXPONENT, &
                                ARCHIE_SATURATION_EXPONENT, &
                                ARCHIE_TORTUOSITY_CONSTANT, &
@@ -1365,7 +1362,7 @@ subroutine InvSubsurfSetAdjointVariable(this,iparameter_type)
   select case(iparameter_type)
     case(PERMEABILITY)
       zflow_adjoint_parameter = ZFLOW_ADJOINT_PERMEABILITY
-    case(POROSITY)
+    case(BASE_POROSITY)
       zflow_adjoint_parameter = ZFLOW_ADJOINT_POROSITY
     case(VG_ALPHA,VG_M,VG_SR,ARCHIE_CEMENTATION_EXPONENT, &
          ARCHIE_SATURATION_EXPONENT,ARCHIE_TORTUOSITY_CONSTANT, &
@@ -2068,7 +2065,6 @@ subroutine InvSubsurfPertCalcSensitivity(this)
 
   type(option_type), pointer :: option
   PetscInt :: idof_pert
-  PetscInt :: iqoi(2)
   PetscErrorCode :: ierr
 
   ! destroy non-perturbed forward run
@@ -2148,7 +2144,6 @@ subroutine InvSubsurfPertCalcSensitivity(this)
 
   ! reset parameters to base copy
   if (this%inversion_aux%qoi_is_full_vector) then
-    iqoi = InversionParameterIntToQOIArray(this%inversion_aux%parameters(1))
     call VecCopy(this%inversion_aux%perturbation%base_parameter_vec, &
                  this%inversion_aux%dist_parameter_vec, &
                  ierr);CHKERRQ(ierr)
@@ -2161,7 +2156,7 @@ subroutine InvSubsurfPertCalcSensitivity(this)
                                      this%realization%field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                  this%realization%field%work_loc, &
-                                 iqoi(1),iqoi(2))
+                                 this%inversion_aux%parameters(1)%itype)
   else
     call InvAuxParamVecToMaterial(this%inversion_aux)
   endif

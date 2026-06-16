@@ -2007,7 +2007,7 @@ end subroutine MaterialAssignPropertyToAux
 
 ! ************************************************************************** !
 
-subroutine MaterialSetAuxVarScalar(Material,value,ivar,isubvar)
+subroutine MaterialSetAuxVarScalar(Material,value,ivar)
   !
   ! Sets values of a material auxvar data using a scalar value.
   !
@@ -2022,7 +2022,6 @@ subroutine MaterialSetAuxVarScalar(Material,value,ivar,isubvar)
   type(material_type) :: Material ! from realization%patch%aux%Material
   PetscReal :: value
   PetscInt :: ivar
-  PetscInt :: isubvar
 
   PetscInt :: i
   PetscInt :: index_
@@ -2036,20 +2035,17 @@ subroutine MaterialSetAuxVarScalar(Material,value,ivar,isubvar)
         material_auxvars(i)%volume = value
       enddo
     case(POROSITY)
-      select case(isubvar)
-        case(POROSITY_CURRENT)
-          do i=1, Material%num_aux
-            material_auxvars(i)%porosity = value
-          enddo
-        case(POROSITY_BASE)
-          do i=1, Material%num_aux
-            material_auxvars(i)%porosity_base = value
-          enddo
-        case(POROSITY_INITIAL)
-          do i=1, Material%num_aux
-            material_auxvars(i)%porosity_0 = value
-          enddo
-      end select
+      do i=1, Material%num_aux
+        material_auxvars(i)%porosity = value
+      enddo
+    case(BASE_POROSITY)
+      do i=1, Material%num_aux
+        material_auxvars(i)%porosity_base = value
+      enddo
+    case(INITIAL_POROSITY)
+      do i=1, Material%num_aux
+        material_auxvars(i)%porosity_0 = value
+      enddo
     case(TORTUOSITY)
       do i=1, Material%num_aux
         material_auxvars(i)%tortuosity = value
@@ -2093,7 +2089,7 @@ end subroutine MaterialSetAuxVarScalar
 
 ! ************************************************************************** !
 
-subroutine MaterialSetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
+subroutine MaterialSetAuxVarVecLoc(Material,vec_loc,ivar)
   !
   ! Sets values of material auxvar data using a vector.
   !
@@ -2108,7 +2104,6 @@ subroutine MaterialSetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
   type(material_type) :: Material ! from realization%patch%aux%Material
   Vec :: vec_loc
   PetscInt :: ivar
-  PetscInt :: isubvar
 
   PetscInt :: ghosted_id
   PetscInt :: index_
@@ -2125,23 +2120,17 @@ subroutine MaterialSetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
         material_auxvars(ghosted_id)%volume = vec_loc_p(ghosted_id)
       enddo
     case(POROSITY)
-      select case(isubvar)
-        case(POROSITY_CURRENT)
-          do ghosted_id=1, Material%num_aux
-            material_auxvars(ghosted_id)%porosity = vec_loc_p(ghosted_id)
-          enddo
-        case(POROSITY_BASE)
-          do ghosted_id=1, Material%num_aux
-            material_auxvars(ghosted_id)%porosity_base = vec_loc_p(ghosted_id)
-          enddo
-        case(POROSITY_INITIAL)
-          do ghosted_id=1, Material%num_aux
-            material_auxvars(ghosted_id)%porosity_0 = vec_loc_p(ghosted_id)
-          enddo
-        case default
-          print *, 'Error indexing porosity in MaterialSetAuxVarVecLoc()'
-          stop
-      end select
+      do ghosted_id=1, Material%num_aux
+        material_auxvars(ghosted_id)%porosity = vec_loc_p(ghosted_id)
+      enddo
+    case(BASE_POROSITY)
+      do ghosted_id=1, Material%num_aux
+        material_auxvars(ghosted_id)%porosity_base = vec_loc_p(ghosted_id)
+      enddo
+    case(INITIAL_POROSITY)
+      do ghosted_id=1, Material%num_aux
+        material_auxvars(ghosted_id)%porosity_0 = vec_loc_p(ghosted_id)
+      enddo
     case(TORTUOSITY)
       do ghosted_id=1, Material%num_aux
         material_auxvars(ghosted_id)%tortuosity = vec_loc_p(ghosted_id)
@@ -2207,7 +2196,7 @@ end subroutine MaterialSetAuxVarVecLoc
 
 ! ************************************************************************** !
 
-subroutine MaterialGetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
+subroutine MaterialGetAuxVarVecLoc(Material,vec_loc,ivar)
   !
   ! Gets values of material auxvar data using a vector.
   !
@@ -2221,7 +2210,6 @@ subroutine MaterialGetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
   type(material_type) :: Material ! from realization%patch%aux%Material
   Vec :: vec_loc
   PetscInt :: ivar
-  PetscInt :: isubvar
 
   PetscInt :: ghosted_id
   PetscInt :: index_
@@ -2238,24 +2226,18 @@ subroutine MaterialGetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
         vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%volume
       enddo
     case(POROSITY)
-      select case(isubvar)
-        case(POROSITY_CURRENT)
-          do ghosted_id=1, Material%num_aux
-            vec_loc_p(ghosted_id) = &
-              material_auxvars(ghosted_id)%porosity
-          enddo
-        case(POROSITY_BASE)
-          do ghosted_id=1, Material%num_aux
-            vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%porosity_base
-          enddo
-        case(POROSITY_INITIAL)
-          do ghosted_id=1, Material%num_aux
-            vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%porosity_0
-          enddo
-        case default
-          print *, 'Error indexing porosity in MaterialGetAuxVarVecLoc()'
-          stop
-      end select
+      do ghosted_id=1, Material%num_aux
+        vec_loc_p(ghosted_id) = &
+          material_auxvars(ghosted_id)%porosity
+      enddo
+    case(BASE_POROSITY)
+      do ghosted_id=1, Material%num_aux
+        vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%porosity_base
+      enddo
+    case(INITIAL_POROSITY)
+      do ghosted_id=1, Material%num_aux
+        vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%porosity_0
+      enddo
     case(TORTUOSITY)
       do ghosted_id=1, Material%num_aux
         vec_loc_p(ghosted_id) = material_auxvars(ghosted_id)%tortuosity
@@ -2334,8 +2316,7 @@ subroutine MaterialWeightAuxVars(Material,weight,field,comm1)
   call VecAXPBY(field%work,weight,1.d0-weight,field%porosity_tpdt, &
                 ierr);CHKERRQ(ierr)
   call comm1%GlobalToLocal(field%work,field%work_loc)
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_CURRENT)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY)
 
 end subroutine MaterialWeightAuxVars
 
@@ -2408,7 +2389,7 @@ end subroutine MaterialUpdateAuxVars
 
 ! ************************************************************************** !
 
-subroutine MaterialAuxVarCommunicate(comm,Material,vec_loc,ivar,isubvar)
+subroutine MaterialAuxVarCommunicate(comm,Material,vec_loc,ivar)
   !
   ! Sets values of material auxvar data using a vector.
   !
@@ -2424,11 +2405,10 @@ subroutine MaterialAuxVarCommunicate(comm,Material,vec_loc,ivar,isubvar)
   type(material_type) :: Material ! from realization%patch%aux%Material
   Vec :: vec_loc
   PetscInt :: ivar
-  PetscInt :: isubvar
 
-  call MaterialGetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
+  call MaterialGetAuxVarVecLoc(Material,vec_loc,ivar)
   call comm%LocalToLocal(vec_loc,vec_loc)
-  call MaterialSetAuxVarVecLoc(Material,vec_loc,ivar,isubvar)
+  call MaterialSetAuxVarVecLoc(Material,vec_loc,ivar)
 
 end subroutine MaterialAuxVarCommunicate
 
@@ -2455,19 +2435,13 @@ subroutine MaterialCommunicatePerms(comm,Material,vec_loc,option)
   Vec :: vec_loc
   type(option_type) :: option
 
-  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
-  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
-  call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_X)
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_Y)
+  call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_Z)
   if (option%flow%full_perm_tensor) then
-    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                   PERMEABILITY_XY,ZERO_INTEGER)
-    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                   PERMEABILITY_XZ,ZERO_INTEGER)
-    call MaterialAuxVarCommunicate(comm,Material,vec_loc, &
-                                   PERMEABILITY_YZ,ZERO_INTEGER)
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_XY)
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_XZ)
+    call MaterialAuxVarCommunicate(comm,Material,vec_loc,PERMEABILITY_YZ)
   endif
 
 end subroutine MaterialCommunicatePerms

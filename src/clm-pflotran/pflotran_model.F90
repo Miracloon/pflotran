@@ -622,13 +622,13 @@ end subroutine pflotranModelSetICs
     call VecDuplicate(field%work_loc,perm_zz_loc,ierr);CHKERRQ(ierr)
 
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,porosity_loc, &
-                                 POROSITY,ZERO_INTEGER)
+                                 POROSITY)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_xx_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
+                                 PERMEABILITY_X)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_yy_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
+                                 PERMEABILITY_Y)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_zz_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
+                                 PERMEABILITY_Z)
 
     call VecGetArray(porosity_loc,porosity_loc_p,ierr);CHKERRQ(ierr)
     call VecGetArray(perm_xx_loc,perm_xx_loc_p,ierr);CHKERRQ(ierr)
@@ -684,13 +684,13 @@ end subroutine pflotranModelSetICs
     call VecRestoreArray(perm_zz_loc,perm_zz_loc_p,ierr);CHKERRQ(ierr)
 
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material,porosity_loc, &
-                                 POROSITY,ZERO_INTEGER)
+                                 POROSITY)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material,perm_xx_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
+                                 PERMEABILITY_X)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material,perm_yy_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
+                                 PERMEABILITY_Y)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material,perm_zz_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
+                                 PERMEABILITY_Z)
 
     call VecDestroy(porosity_loc,ierr);CHKERRQ(ierr)
     call VecDestroy(perm_xx_loc,ierr);CHKERRQ(ierr)
@@ -794,13 +794,13 @@ end subroutine pflotranModelSetICs
     call VecDuplicate(field%work_loc,perm_zz_loc,ierr);CHKERRQ(ierr)
 
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,porosity_loc, &
-                                 POROSITY,ZERO_INTEGER)
+                                 POROSITY)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_xx_loc, &
-                                 PERMEABILITY_X,ZERO_INTEGER)
+                                 PERMEABILITY_X)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_yy_loc, &
-                                 PERMEABILITY_Y,ZERO_INTEGER)
+                                 PERMEABILITY_Y)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material,perm_zz_loc, &
-                                 PERMEABILITY_Z,ZERO_INTEGER)
+                                 PERMEABILITY_Z)
 
     call VecGetArray(clm_pf_idata%hksat_x2_pf,hksat_x2_pf_loc, &
                      ierr);CHKERRQ(ierr)

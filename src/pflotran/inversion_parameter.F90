@@ -4,7 +4,7 @@ module Inversion_Parameter_module
   use petscsys
   use PFLOTRAN_Constants_module
   use Variables_module, only : MATERIAL_ELECTRICAL_CONDUCTIVITY, &
-                               PERMEABILITY, POROSITY, &
+                               PERMEABILITY, BASE_POROSITY, &
                                VG_SR, VG_ALPHA, VG_M, &
                                ARCHIE_CEMENTATION_EXPONENT, &
                                ARCHIE_SATURATION_EXPONENT, &
@@ -58,7 +58,6 @@ module Inversion_Parameter_module
             InversionParamSetGlobalBounds, &
             InversionParamGetGlobalBounds, &
             InversionParameterBoundParameter, &
-            InversionParameterIntToQOIArray, &
             InversionParameterPrint, &
             InversionParameterPrintUpdate, &
             InversionParameterStrip, &
@@ -342,8 +341,8 @@ function InversionParamGetItypeFromName(name_,driver)
       i = MATERIAL_ELECTRICAL_CONDUCTIVITY
     case('PERMEABILITY')
       i = PERMEABILITY
-    case('POROSITY')
-      i = POROSITY
+    case('POROSITY') ! this is really base porosity
+      i = BASE_POROSITY
     case('ALPHA')
       i = VG_ALPHA
     case('RESIDUAL_SATURATION')
@@ -396,7 +395,7 @@ function InversionParamGetNameFromItype(itype,driver)
       word = 'ELECTRICAL_CONDUCTIVITY'
     case(PERMEABILITY)
       word = 'PERMEABILITY'
-    case(POROSITY)
+    case(BASE_POROSITY)
       word = 'POROSITY'
     case(VG_ALPHA)
       word = 'ALPHA'
@@ -446,7 +445,7 @@ function InvParamItypeToItypeInternal(itype)
       i = MAP_ELEC_COND
     case(PERMEABILITY)
       i = MAP_PERM
-    case(POROSITY)
+    case(BASE_POROSITY)
       i = MAP_POR
     case(VG_ALPHA)
       i = MAP_VG_ALPHA
@@ -492,7 +491,7 @@ subroutine InversionParamInitBounds()
   call InversionParamSetGlobalBounds(MATERIAL_ELECTRICAL_CONDUCTIVITY, &
                                      default_lower_bound,default_upper_bound)
   call InversionParamSetGlobalBounds(PERMEABILITY,1.d-30,1.d-7)
-  call InversionParamSetGlobalBounds(POROSITY,0.d0,1.d0)
+  call InversionParamSetGlobalBounds(BASE_POROSITY,0.d0,1.d0)
   call InversionParamSetGlobalBounds(VG_ALPHA,1.d-6,1.d-3)
   call InversionParamSetGlobalBounds(VG_SR,0.d0,0.6d0) ! not based on data
   call InversionParamSetGlobalBounds(VG_M,0.2d0,0.9d0)
@@ -577,32 +576,6 @@ subroutine InversionParameterBoundParameter(inversion_parameter,value)
   value = max(min(value,upper_bound),lower_bound)
 
 end subroutine InversionParameterBoundParameter
-
-! ************************************************************************** !
-
-function InversionParameterIntToQOIArray(inversion_parameter)
-  !
-  ! Maps an inverion parameter to subsurface model parameter id
-  !
-  ! Author: Glenn Hammond
-  ! Date: 03/25/22
-  !
-  use String_module
-  use Material_Aux_module, only : POROSITY_BASE
-
-  type(inversion_parameter_type) :: inversion_parameter
-
-  PetscInt :: InversionParameterIntToQOIArray(2)
-
-  InversionParameterIntToQOIArray(1) = inversion_parameter%itype
-  select case(inversion_parameter%itype)
-    case(POROSITY)
-      InversionParameterIntToQOIArray(2) = POROSITY_BASE
-    case default
-      InversionParameterIntToQOIArray(2) = ZERO_INTEGER
-  end select
-
-end function InversionParameterIntToQOIArray
 
 ! ************************************************************************** !
 

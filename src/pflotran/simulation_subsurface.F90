@@ -594,7 +594,6 @@ subroutine SimSubsurfOverwriteInvParameters(this)
   class(realization_subsurface_type), pointer :: realization
   type(inversion_aux_type), pointer :: inversion_aux
   type(inversion_perturbation_type), pointer :: perturbation
-  PetscInt :: iqoi(2)
   PetscReal :: rmax, rmin
   PetscErrorCode :: ierr
 
@@ -603,7 +602,6 @@ subroutine SimSubsurfOverwriteInvParameters(this)
   perturbation => inversion_aux%perturbation
 
   if (inversion_aux%qoi_is_full_vector) then
-    iqoi = InversionParameterIntToQOIArray(inversion_aux%parameters(1))
     ! on subsequent iterations, overwrite what was read from input file
     ! with latest inverted values
     call InvAuxScatGlobalToDistParam(inversion_aux, &
@@ -614,8 +612,8 @@ subroutine SimSubsurfOverwriteInvParameters(this)
                                       realization%field%work, &
                                       realization%field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  realization%field%work_loc, &
-                                  iqoi(1),iqoi(2))
+                                 realization%field%work_loc, &
+                                 inversion_aux%parameters(1)%itype)
   else
 #if 1
     call InvAuxParamVecToMaterial(inversion_aux)
@@ -694,10 +692,9 @@ subroutine SimSubsurfOverwriteInvParameters(this)
         call DiscretizationGlobalToLocal(realization%discretization, &
                                          realization%field%work, &
                                          realization%field%work_loc,ONEDOF)
-        iqoi = InversionParameterIntToQOIArray(inversion_aux%parameters(1))
         call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
                                      realization%field%work_loc, &
-                                     iqoi(1),iqoi(2))
+                                     inversion_aux%parameters(1)%itype)
       else
         perturbation%base_value = &
           inversion_aux%parameters(perturbation%idof_pert)%value

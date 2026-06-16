@@ -16,12 +16,6 @@ module Material_Aux_module
   PetscInt, parameter, public :: perm_yz_index = 5
   PetscInt, parameter, public :: perm_xz_index = 6
 
-  ! do not use 0 as an index as there is a case statement in material.F90
-  ! designed to catch erroneous values outside [1,2].
-  PetscInt, parameter, public :: POROSITY_CURRENT = 1
-  PetscInt, parameter, public :: POROSITY_BASE = 2
-  PetscInt, parameter, public :: POROSITY_INITIAL = 3
-
   ! Tensor to scalar conversion models
   ! default for structured grids = TENSOR_TO_SCALAR_LINEAR
   ! default for unstructured grids = TENSOR_TO_SCALAR_POTENTIAL

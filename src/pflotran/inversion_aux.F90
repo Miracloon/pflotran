@@ -292,7 +292,8 @@ subroutine InvAuxGetSetParamValueByMat(aux,value,iparameter_type,imat,iflag)
 
   use String_module
   use Utility_module
-  use Variables_module, only : PERMEABILITY, POROSITY, VG_ALPHA, VG_SR, VG_M, &
+  use Variables_module, only : PERMEABILITY, BASE_POROSITY, &
+                               VG_ALPHA, VG_SR, VG_M, &
                                ARCHIE_CEMENTATION_EXPONENT, &
                                ARCHIE_SATURATION_EXPONENT, &
                                ARCHIE_TORTUOSITY_CONSTANT, &
@@ -351,7 +352,7 @@ subroutine InvAuxGetSetParamValueByMat(aux,value,iparameter_type,imat,iflag)
         value = value * material_property%permeability(1,1)
         material_property%permeability(3,3) = value
       endif
-    case(POROSITY)
+    case(BASE_POROSITY)
       if (iflag == INVAUX_GET_MATERIAL_VALUE) then
         value = material_property%porosity
       else
@@ -568,7 +569,7 @@ subroutine InvAuxGetParamValueByCell(aux,value,iparameter_type,imat, &
                                   MaterialAuxVarGetValue
   use String_module
   use Variables_module, only : PERMEABILITY, PERMEABILITY_X, &
-                               POROSITY, BASE_POROSITY, &
+                               BASE_POROSITY, &
                                VG_ALPHA, VG_SR, VG_M, &
                                ARCHIE_CEMENTATION_EXPONENT, &
                                ARCHIE_SATURATION_EXPONENT, &
@@ -590,12 +591,11 @@ subroutine InvAuxGetParamValueByCell(aux,value,iparameter_type,imat, &
   select case(iparameter_type)
     case(MATERIAL_ELECTRICAL_CONDUCTIVITY,ARCHIE_CEMENTATION_EXPONENT, &
          ARCHIE_SATURATION_EXPONENT,ARCHIE_TORTUOSITY_CONSTANT, &
-         SURFACE_ELECTRICAL_CONDUCTIVITY,WAXMAN_SMITS_CLAY_CONDUCTIVITY)
+         SURFACE_ELECTRICAL_CONDUCTIVITY,WAXMAN_SMITS_CLAY_CONDUCTIVITY, &
+         BASE_POROSITY)
       value = MaterialAuxVarGetValue(material_auxvar,iparameter_type)
     case(PERMEABILITY)
       value = MaterialAuxVarGetValue(material_auxvar,PERMEABILITY_X)
-    case(POROSITY)
-      value = MaterialAuxVarGetValue(material_auxvar,BASE_POROSITY)
     case(VG_ALPHA,VG_SR,VG_M)
       material_property => aux%material_property_array(imat)%ptr
       cc => aux%cc_array(material_property%saturation_function_id)%ptr

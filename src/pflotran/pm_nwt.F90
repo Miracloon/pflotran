@@ -985,9 +985,8 @@ subroutine PMNWTFinalizeTimestep(this)
   ! Date: 04/18/2019
   !
 
-  use Variables_module, only : POROSITY
+  use Variables_module, only : BASE_POROSITY
   use Material_module, only : MaterialGetAuxVarVecLoc
-  use Material_Aux_module, only : POROSITY_BASE
   use Global_module
   use Patch_module
   use Field_module
@@ -1014,7 +1013,7 @@ subroutine PMNWTFinalizeTimestep(this)
     call VecCopy(field%porosity_tpdt,field%porosity_t,ierr);CHKERRQ(ierr)
     call RealizationUpdatePropertiesTS(this%realization)
     call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 POROSITY,POROSITY_BASE)
+                                 BASE_POROSITY)
     call this%comm1%LocalToGlobal(field%work_loc,field%porosity_tpdt)
   endif
 

@@ -708,7 +708,6 @@ subroutine InvERTSetupForwardRunLinkage(this)
   character(len=MAXWORDLENGTH) :: word
   character(len=MAXSTRINGLENGTH) :: string
   class(dataset_base_type), pointer :: dataset
-  PetscInt :: iqoi(2)
   PetscErrorCode :: ierr
 
   if (PetscObjectIsNull(this%quantity_of_interest)) then
@@ -726,7 +725,6 @@ subroutine InvERTSetupForwardRunLinkage(this)
       call PrintErrMsg(this%realization%option)
     endif
 
-    iqoi = InversionParameterIntToQOIArray(this%inversion_aux%parameters(1))
     if (this%app_cond_start_model) then
       ! non-ghosted Vec
       call VecDuplicate(this%realization%field%work,this%quantity_of_interest, &
@@ -739,7 +737,7 @@ subroutine InvERTSetupForwardRunLinkage(this)
                                       this%realization%field%work_loc,ONEDOF)
       call MaterialSetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                   this%realization%field%work_loc, &
-                                  iqoi(1),iqoi(2))
+                                  this%inversion_aux%parameters(1)%itype)
     else
       ! non-ghosted Vec
       call VecDuplicate(this%realization%field%work,this%quantity_of_interest, &
@@ -747,7 +745,7 @@ subroutine InvERTSetupForwardRunLinkage(this)
       ! ghosted Vec
       call MaterialGetAuxVarVecLoc(this%realization%patch%aux%Material, &
                                   this%realization%field%work_loc, &
-                                  iqoi(1),iqoi(2))
+                                  this%inversion_aux%parameters(1)%itype)
       call DiscretizationLocalToGlobal(this%realization%discretization, &
                                       this%realization%field%work_loc, &
                                       this%quantity_of_interest,ONEDOF)
@@ -1047,18 +1045,16 @@ subroutine InversionERTUpdateParameters(this)
   type(field_type), pointer :: field
   type(discretization_type), pointer :: discretization
 
-  PetscInt :: iqoi(2)
-
   field => this%realization%field
   discretization => this%realization%discretization
 
   if (.not.PetscObjectIsNull(this%quantity_of_interest)) then
-    iqoi = InversionParameterIntToQOIArray(this%inversion_aux%parameters(1))
     call DiscretizationGlobalToLocal(discretization, &
                                      this%quantity_of_interest, &
                                      field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(this%realization%patch%aux%Material, &
-                                 field%work_loc,iqoi(1),iqoi(2))
+                                 field%work_loc, &
+                                 this%inversion_aux%parameters(1)%itype)
   endif
 
   ! Build Wm matrix

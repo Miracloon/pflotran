@@ -338,9 +338,8 @@ subroutine CheckpointFlowProcessModelBinary(viewer,realization)
   use Grid_module
   use Global_module
   use Material_module
-  use Material_Aux_module, only : POROSITY_BASE
   use Petsc_Utility_module
-  use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
+  use Variables_module, only : BASE_POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2GetSlminVecLoc
 
@@ -400,22 +399,22 @@ subroutine CheckpointFlowProcessModelBinary(viewer,realization)
     ! (We only write diagonal terms of the permeability tensor for now,
     ! since we have yet to add the full-tensor formulation.)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,POROSITY,POROSITY_BASE)
+                                  field%work_loc,BASE_POROSITY)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call VecView(global_vec,viewer,ierr);CHKERRQ(ierr)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_X,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_X)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call VecView(global_vec,viewer,ierr);CHKERRQ(ierr)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Y,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Y)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call VecView(global_vec,viewer,ierr);CHKERRQ(ierr)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Z,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Z)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call VecView(global_vec,viewer,ierr);CHKERRQ(ierr)
@@ -443,9 +442,8 @@ subroutine RestartFlowProcessModelBinary(viewer,realization)
   use Grid_module
   use Global_module
   use Material_module
-  use Material_Aux_module, only : POROSITY_BASE
   use Petsc_Utility_module
-  use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
+  use Variables_module, only : BASE_POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2SetSlminVecLoc
   implicit none
@@ -501,22 +499,22 @@ subroutine RestartFlowProcessModelBinary(viewer,realization)
     call DiscretizationGlobalToLocal(discretization,global_vec, &
                                       field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,POROSITY,POROSITY_BASE)
+                                  field%work_loc,BASE_POROSITY)
     call VecLoad(global_vec,viewer,ierr);CHKERRQ(ierr)
     call DiscretizationGlobalToLocal(discretization,global_vec, &
                                       field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_X,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_X)
     call VecLoad(global_vec,viewer,ierr);CHKERRQ(ierr)
     call DiscretizationGlobalToLocal(discretization,global_vec, &
                                       field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Y,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Y)
     call VecLoad(global_vec,viewer,ierr);CHKERRQ(ierr)
     call DiscretizationGlobalToLocal(discretization,global_vec, &
                                       field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Z,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Z)
   endif
 
   call PUVecDestroy(global_vec)
@@ -1039,8 +1037,7 @@ subroutine CheckpointFlowProcessModelHDF5(pm_grp_id, realization)
   use Grid_module
   use Global_module
   use Material_module
-  use Material_Aux_module, only : POROSITY_BASE
-  use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
+  use Variables_module, only : BASE_POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2GetSlminVecLoc
   use hdf5
@@ -1118,7 +1115,7 @@ subroutine CheckpointFlowProcessModelHDF5(pm_grp_id, realization)
     ! (We only write diagonal terms of the permeability tensor for now,
     ! since we have yet to add the full-tensor formulation.)
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                 field%work_loc,POROSITY,POROSITY_BASE)
+                                 field%work_loc,BASE_POROSITY)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                      global_vec,ONEDOF)
     call DiscretizationGlobalToNatural(discretization, global_vec, &
@@ -1128,7 +1125,7 @@ subroutine CheckpointFlowProcessModelHDF5(pm_grp_id, realization)
                                              pm_grp_id, H5T_NATIVE_DOUBLE)
 
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_X,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_X)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call DiscretizationGlobalToNatural(discretization, global_vec, &
@@ -1138,7 +1135,7 @@ subroutine CheckpointFlowProcessModelHDF5(pm_grp_id, realization)
                                              pm_grp_id, H5T_NATIVE_DOUBLE)
 
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Y,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Y)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call DiscretizationGlobalToNatural(discretization, global_vec, &
@@ -1148,7 +1145,7 @@ subroutine CheckpointFlowProcessModelHDF5(pm_grp_id, realization)
                                              pm_grp_id, H5T_NATIVE_DOUBLE)
 
     call MaterialGetAuxVarVecLoc(realization%patch%aux%Material, &
-                                  field%work_loc,PERMEABILITY_Z,ZERO_INTEGER)
+                                  field%work_loc,PERMEABILITY_Z)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                       global_vec,ONEDOF)
     call DiscretizationGlobalToNatural(discretization, global_vec, &
@@ -1182,8 +1179,7 @@ subroutine RestartFlowProcessModelHDF5(pm_grp_id, realization)
   use Grid_module
   use Global_module
   use Material_module
-  use Material_Aux_module, only : POROSITY_BASE
-  use Variables_module, only : POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
+  use Variables_module, only : BASE_POROSITY, PERMEABILITY_X, PERMEABILITY_Y, &
                                PERMEABILITY_Z, STATE
   use SCO2_module, only : SCO2SetSlminVecLoc
   use hdf5
@@ -1272,7 +1268,7 @@ subroutine RestartFlowProcessModelHDF5(pm_grp_id, realization)
     call DiscretizationGlobalToLocal(discretization, global_vec, field%work_loc, &
                                      ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                 field%work_loc,POROSITY,POROSITY_BASE)
+                                 field%work_loc,BASE_POROSITY)
 
     dataset_name = "Permeability_X" // CHAR(0)
     call HDF5ReadDataSetInVec(dataset_name, option, natural_vec, &
@@ -1282,7 +1278,7 @@ subroutine RestartFlowProcessModelHDF5(pm_grp_id, realization)
     call DiscretizationGlobalToLocal(discretization, global_vec, field%work_loc, &
                                      ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                 field%work_loc,PERMEABILITY_X,ZERO_INTEGER)
+                                 field%work_loc,PERMEABILITY_X)
 
     dataset_name = "Permeability_Y" // CHAR(0)
     call HDF5ReadDataSetInVec(dataset_name, option, natural_vec, &
@@ -1292,7 +1288,7 @@ subroutine RestartFlowProcessModelHDF5(pm_grp_id, realization)
     call DiscretizationGlobalToLocal(discretization, global_vec, field%work_loc, &
                                      ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                 field%work_loc,PERMEABILITY_Y,ZERO_INTEGER)
+                                 field%work_loc,PERMEABILITY_Y)
 
     dataset_name = "Permeability_Z" // CHAR(0)
     call HDF5ReadDataSetInVec(dataset_name, option, natural_vec, &
@@ -1302,7 +1298,7 @@ subroutine RestartFlowProcessModelHDF5(pm_grp_id, realization)
     call DiscretizationGlobalToLocal(discretization, global_vec, field%work_loc, &
                                      ONEDOF)
     call MaterialSetAuxVarVecLoc(realization%patch%aux%Material, &
-                                 field%work_loc,PERMEABILITY_Z,ZERO_INTEGER)
+                                 field%work_loc,PERMEABILITY_Z)
 
     !MAN: For SCO2 mode, we need to read in min liquid saturation for
     !     hysteresis.

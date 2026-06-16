@@ -1580,11 +1580,11 @@ subroutine RealizationRevertFlowParameters(realization)
   use Option_module
   use Field_module
   use Discretization_module
-  use Material_Aux_module, only : material_type, &
-                              POROSITY_CURRENT, POROSITY_BASE, POROSITY_INITIAL
-  use Variables_module, only : PERMEABILITY_X, PERMEABILITY_Y, PERMEABILITY_Z, &
-                               PERMEABILITY_XY, PERMEABILITY_XZ, &
-                               PERMEABILITY_YZ, POROSITY
+  use Material_Aux_module
+  use Variables_module, only : PERMEABILITY_X, PERMEABILITY_Y, &
+                               PERMEABILITY_Z, PERMEABILITY_XY, &
+                               PERMEABILITY_XZ, PERMEABILITY_YZ, &
+                               POROSITY, INITIAL_POROSITY, BASE_POROSITY
 
   implicit none
 
@@ -1603,39 +1603,30 @@ subroutine RealizationRevertFlowParameters(realization)
   if (option%nflowdof > 0) then
     call DiscretizationGlobalToLocal(discretization,field%perm0_xx, &
                                      field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_X, &
-                                 ZERO_INTEGER)
+    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_X)
     call DiscretizationGlobalToLocal(discretization,field%perm0_yy, &
                                      field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Y, &
-                                 ZERO_INTEGER)
+    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Y)
     call DiscretizationGlobalToLocal(discretization,field%perm0_zz, &
                                      field%work_loc,ONEDOF)
-    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Z, &
-                                 ZERO_INTEGER)
+    call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Z)
     if (option%flow%full_perm_tensor) then
       call DiscretizationGlobalToLocal(discretization,field%perm0_xy, &
                                        field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XY, &
-                                   ZERO_INTEGER)
+      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XY)
       call DiscretizationGlobalToLocal(discretization,field%perm0_xz, &
                                        field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XZ, &
-                                   ZERO_INTEGER)
+      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XZ)
       call DiscretizationGlobalToLocal(discretization,field%perm0_yz, &
                                        field%work_loc,ONEDOF)
-      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_YZ, &
-                                   ZERO_INTEGER)
+      call MaterialSetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_YZ)
      endif
   endif
   call DiscretizationGlobalToLocal(discretization,field%porosity0, &
                                    field%work_loc,ONEDOF)
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_INITIAL)
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_BASE)
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_CURRENT)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,INITIAL_POROSITY)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,BASE_POROSITY)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY)
   ! tortuosity is not currently checkpointed
 !  call DiscretizationGlobalToLocal(discretization,field%tortuosity0, &
 !                                   field%work_loc,ONEDOF)
@@ -1676,40 +1667,31 @@ subroutine RealizStoreRestartFlowParams(realization)
   Material => realization%patch%aux%Material
 
   if (option%nflowdof > 0) then
-    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_X, &
-                                 ZERO_INTEGER)
+    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_X)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                      field%perm0_xx,ONEDOF)
-    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Y, &
-                                 ZERO_INTEGER)
+    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Y)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                      field%perm0_yy,ONEDOF)
-    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Z, &
-                                 ZERO_INTEGER)
+    call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_Z)
     call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                      field%perm0_zz,ONEDOF)
     if (option%flow%full_perm_tensor) then
-      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XY, &
-                                   ZERO_INTEGER)
+      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XY)
       call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                        field%perm0_xy,ONEDOF)
-      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XZ, &
-                                   ZERO_INTEGER)
+      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_XZ)
       call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                        field%perm0_xz,ONEDOF)
-      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_YZ, &
-                                   ZERO_INTEGER)
+      call MaterialGetAuxVarVecLoc(Material,field%work_loc,PERMEABILITY_YZ)
       call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                        field%perm0_yz,ONEDOF)
     endif
   endif
-  call MaterialGetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_BASE)
+  call MaterialGetAuxVarVecLoc(Material,field%work_loc,BASE_POROSITY)
   ! might as well update initial and base at the same time
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_INITIAL)
-  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY, &
-                               POROSITY_CURRENT)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,INITIAL_POROSITY)
+  call MaterialSetAuxVarVecLoc(Material,field%work_loc,POROSITY)
   call DiscretizationLocalToGlobal(discretization,field%work_loc, &
                                    field%porosity0,ONEDOF)
   ! tortuosity is not currently checkpointed
@@ -1955,7 +1937,7 @@ subroutine RealizationUpdatePropertiesTS(realization)
   use Reaction_Aux_module
   use Reactive_Transport_Aux_module
   use Reaction_Mineral_module
-  use Variables_module, only : POROSITY, TORTUOSITY
+  use Variables_module, only : BASE_POROSITY, TORTUOSITY
 
   implicit none
 
@@ -2038,11 +2020,11 @@ subroutine RealizationUpdatePropertiesTS(realization)
     call VecRestoreArrayRead(field%porosity0,porosity0_p, &
                                 ierr);CHKERRQ(ierr)
     call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 TORTUOSITY,ZERO_INTEGER)
+                                 TORTUOSITY)
     call DiscretizationLocalToLocal(discretization,field%work_loc, &
                                     field%work_loc,ONEDOF)
     call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                                 TORTUOSITY,ZERO_INTEGER)
+                                 TORTUOSITY)
   endif
 
   if (reaction%update_permeability) then
@@ -2105,10 +2087,9 @@ subroutine RealizationUpdatePropertiesTS(realization)
 
   ! perform check to ensure that porosity is bounded between 0 and 1
   ! since it is calculated as 1.d-sum_volfrac, it cannot be > 1
-  call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               POROSITY,POROSITY_BASE)
+  call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc,BASE_POROSITY)
   call DiscretizationLocalToGlobal(discretization,field%work_loc, &
-                                  field%work,ONEDOF)
+                                   field%work,ONEDOF)
   call VecMin(field%work,ivalue,min_value,ierr);CHKERRQ(ierr)
   if (min_value < 0.d0) then
     write(option%io_buffer,*) 'Sum of mineral volume fractions has ' // &
@@ -2253,7 +2234,7 @@ subroutine RealizationUpdateMineralPorosity(realization)
   use Reaction_Mineral_module
   use Reactive_Transport_Aux_module
   use Material_Aux_module
-  use Variables_module, only : POROSITY
+  use Variables_module, only : POROSITY, BASE_POROSITY, INITIAL_POROSITY
 
   implicit none
 
@@ -2300,14 +2281,11 @@ subroutine RealizationUpdateMineralPorosity(realization)
   endif
 
   ! update ghosted porosities
-  call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               POROSITY,POROSITY_BASE)
+  call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc,BASE_POROSITY)
   call DiscretizationLocalToLocal(discretization,field%work_loc, &
                                   field%work_loc,ONEDOF)
-  call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               POROSITY,POROSITY_BASE)
-  call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               POROSITY,POROSITY_CURRENT)
+  call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc,BASE_POROSITY)
+  call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc,POROSITY)
 !  call MaterialSetAuxVarScalar(patch%aux%Material,UNINITIALIZED_DOUBLE, &
 !                               POROSITY,POROSITY_CURRENT)
 

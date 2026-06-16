@@ -749,7 +749,7 @@ subroutine InvZFlowSetupForwardRunLinkage(this)
   use Inversion_Measurement_Aux_module
   use Inversion_Parameter_module
   use Option_module
-  use Variables_module, only : PERMEABILITY,POROSITY, &
+  use Variables_module, only : PERMEABILITY,BASE_POROSITY, &
                                VG_ALPHA,VG_SR,VG_M, &
                                ARCHIE_CEMENTATION_EXPONENT, &
                                ARCHIE_SATURATION_EXPONENT, &
@@ -765,7 +765,7 @@ subroutine InvZFlowSetupForwardRunLinkage(this)
 
   PetscBool :: exists
   character(len=MAXWORDLENGTH) :: word
-  PetscInt :: iqoi(2)
+  PetscInt :: iqoi
   PetscInt :: i
   PetscErrorCode :: ierr
 
@@ -773,17 +773,17 @@ subroutine InvZFlowSetupForwardRunLinkage(this)
 
   ! check to ensure that quantity of interest exists
   exists = PETSC_FALSE
-  iqoi = InversionParameterIntToQOIArray(this%inversion_aux%parameters(1))
-  select case(iqoi(1))
-    case(PERMEABILITY,POROSITY,VG_ALPHA,VG_SR,VG_M, &
+  iqoi = this%inversion_aux%parameters(1)%itype
+  select case(iqoi)
+    case(PERMEABILITY,BASE_POROSITY,VG_ALPHA,VG_SR,VG_M, &
          VERTICAL_PERM_ANISOTROPY_RATIO)
       if (this%realization%option%iflowmode /= NULL_MODE) exists = PETSC_TRUE
-      word = InversionParamGetNameFromItype(iqoi(1),this%driver)
+      word = InversionParamGetNameFromItype(iqoi,this%driver)
     case(MATERIAL_ELECTRICAL_CONDUCTIVITY,ARCHIE_CEMENTATION_EXPONENT, &
          ARCHIE_SATURATION_EXPONENT,ARCHIE_TORTUOSITY_CONSTANT, &
          SURFACE_ELECTRICAL_CONDUCTIVITY,WAXMAN_SMITS_CLAY_CONDUCTIVITY)
       if (this%realization%option%igeopmode /= NULL_MODE) exists = PETSC_TRUE
-      word = InversionParamGetNameFromItype(iqoi(1),this%driver)
+      word = InversionParamGetNameFromItype(iqoi,this%driver)
     case default
       word = 'unknown_parameter'
   end select

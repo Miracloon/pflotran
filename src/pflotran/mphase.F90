@@ -1972,23 +1972,23 @@ subroutine MphaseResidual(snes,xx,r,realization,debug,ierr)
   call GlobalUpdateState(realization)
 
   call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_X,ZERO_INTEGER)
+                               PERMEABILITY_X)
   call DiscretizationLocalToLocal(discretization,field%work_loc, &
                                   field%work_loc,ONEDOF)
   call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_X,ZERO_INTEGER)
+                               PERMEABILITY_X)
   call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_Y,ZERO_INTEGER)
+                               PERMEABILITY_Y)
   call DiscretizationLocalToLocal(discretization,field%work_loc, &
                                   field%work_loc,ONEDOF)
   call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_Y,ZERO_INTEGER)
+                               PERMEABILITY_Y)
   call MaterialGetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_Z,ZERO_INTEGER)
+                               PERMEABILITY_Z)
   call DiscretizationLocalToLocal(discretization,field%work_loc, &
                                   field%work_loc,ONEDOF)
   call MaterialSetAuxVarVecLoc(patch%aux%Material,field%work_loc, &
-                               PERMEABILITY_Z,ZERO_INTEGER)
+                               PERMEABILITY_Z)
 
   call MphaseResidualPatch(snes,xx,r,realization,debug,ierr)
 

@@ -1024,8 +1024,7 @@ subroutine PMHydrateInitializeTimestep(this)
 !geh:remove   everywhere
   call MaterialAuxVarCommunicate(this%comm1, &
                                  this%realization%patch%aux%Material, &
-                                 this%realization%field%work_loc,TORTUOSITY, &
-                                 ZERO_INTEGER)
+                                 this%realization%field%work_loc,TORTUOSITY)
 
   call HydrateInitializeTimestep(this%realization)
   if (associated(this%pmwell_ptr)) then
