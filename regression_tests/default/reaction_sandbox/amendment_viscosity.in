@@ -1,0 +1,260 @@
+#Description: 2D flow and tranpsort with shear thinning amendment
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+    /
+    SUBSURFACE_TRANSPORT transport
+      MODE GIRT
+    /
+    PARAMETER viscosity
+      PARAMETER_NAME Viscosity
+      WHEN_TO_UPDATE AFTER_FLOW
+    / 
+  /
+END
+
+SUBSURFACE
+
+#=========================== parameters =======================================
+PARAMETER
+  NAME Viscosity
+  VARIABLE LIQUID_VISCOSITY
+#  SCALAR 1.d-3
+END
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+  TIMESTEPPER
+    CFL_GOVERNOR 1.d0
+  /
+  NEWTON_SOLVER
+    ITOL_UPDATE 1.d0
+  /
+  LINEAR_SOLVER
+    SOLVER DIRECT
+  /
+END
+
+NUMERICAL_METHODS TRANSPORT
+  TIMESTEPPER
+  /
+  NEWTON_SOLVER
+    NUMERICAL_JACOBIAN
+  /
+  LINEAR_SOLVER
+    SOLVER DIRECT
+  /
+END
+
+#=========================== regression =======================================
+REGRESSION
+  CELLS_PER_PROCESS 5
+  CELL_IDS
+    34
+  /
+END
+
+#=========================== discretization ===================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 10 1 10
+  BOUNDS
+    0.   0.  0.
+    10. 10. 10.
+  /
+END
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  PERMEABILITY
+    PERM_ISO 1.d-12
+  /
+  CHARACTERISTIC_CURVES cc1
+END
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES cc1
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    ALPHA  1.d-4
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== chemistry ========================================
+CHEMISTRY
+  PRIMARY_SPECIES
+    Vaq
+  /
+
+  IMMOBILE_SPECIES
+    Vim
+  /
+
+  REACTION_SANDBOX
+    AMENDMENT
+      PARTICLE_NAME_AQ Vaq
+      PARTICLE_NAME_IM Vim
+      RATE_ATTACHMENT FILTRATION_MODEL
+        DIAMETER_COLLECTOR 2.0E-3
+        DIAMETER_PARTICLE  1.0E-7
+        HAMAKER_CONSTANT   5.0E-21
+        DENSITY_PARTICLE   1050.0
+        ALPHA_EFFICIENCY   0.2
+      /
+      RATE_DETACHMENT CONSTANT
+        RATE   1.000E-04 1/h
+      /
+      DECAY_AQUEOUS TEMPERATURE_MODEL
+        TREF    4.0
+        ZT      29.1
+        N       2.0
+        LOGDREF 2.3
+      /
+      DECAY_ADSORBED TEMPERATURE_MODEL
+        TREF    4.0
+        ZT      29.1
+        N       2.0
+        LOGDREF 2.3
+      /
+    /
+  /
+
+  LOG_FORMULATION
+#  TRUNCATE_CONCENTRATION 1.0E-15
+  OUTPUT
+    TOTAL
+    ALL
+  /
+END
+
+#=========================== output options ===================================
+OUTPUT
+  SNAPSHOT_FILE
+    PERIODIC TIME 0.25 y
+    FORMAT HDF5
+    VARIABLES
+      LIQUID_VISCOSITY
+    /
+  /
+END
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 1.d0 y
+  INITIAL_TIMESTEP_SIZE 1.d0 h
+  MAXIMUM_TIMESTEP_SIZE 0.25 y
+END
+
+#=========================== regions ==========================================
+REGION all
+  INFINITE
+END
+
+REGION west
+  FACE WEST
+  COORDINATES
+    0.d0 -1.d20 -1.d20
+    0.d0  1.d20  1.d20
+  /
+END
+
+REGION east
+  FACE EAST
+  COORDINATES
+    10.d0 -1.d20 -1.d20
+    10.d0  1.d20  1.d20
+  /
+END
+
+REGION amendment
+  COORDINATES
+    3. -1.d20 3.
+    5.  1.d20 6.
+  /
+END
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial
+  TYPE
+    LIQUID_PRESSURE HYDROSTATIC
+  /
+  DATUM 0.d0 0.d0 20.d0
+  LIQUID_PRESSURE 101325.d0
+END
+
+FLOW_CONDITION inlet
+  TYPE
+    LIQUID_FLUX NEUMANN
+  /
+  LIQUID_FLUX 1.d0 m/y
+END
+
+#=========================== transport conditions =============================
+TRANSPORT_CONDITION initial
+  TYPE DIRICHLET_ZERO_GRADIENT
+  CONSTRAINT initial
+    CONCENTRATIONS
+      Vaq 1.d-10  T
+    /
+    IMMOBILE
+      Vim 1.d-10
+    /
+  /
+END
+
+TRANSPORT_CONDITION amendment
+  TYPE DIRICHLET_ZERO_GRADIENT
+  CONSTRAINT amendment
+    CONCENTRATIONS
+      Vaq 1.d-3  T
+    /
+    IMMOBILE
+      Vim 1.d-10
+    /
+  /
+END
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION all
+END
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION amendment
+  REGION amendment
+END
+
+BOUNDARY_CONDITION outlet
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION east
+END
+
+BOUNDARY_CONDITION inlet
+  FLOW_CONDITION inlet
+  TRANSPORT_CONDITION initial
+  REGION west
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+
+END_SUBSURFACE
