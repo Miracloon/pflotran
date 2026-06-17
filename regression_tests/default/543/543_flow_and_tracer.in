@@ -34,7 +34,7 @@ SUBSURFACE
 #=========================== parameters =======================================
 PARAMETER
   NAME test
-  VALUE 86.d0
+  SCALAR 86.d0
 END
 
 #=========================== numerical methods ================================

@@ -16,7 +16,8 @@ module Global_module
          GlobalGetAuxVarVecLoc, &
          GlobalWeightAuxVars, &
          GlobalUpdateState, &
-         GlobalSetAuxVarsAtTimeLevel
+         GlobalSetAuxVarsAtTimeLevel, &
+         GlobalUpdateParameter
 
 contains
 
@@ -36,7 +37,7 @@ subroutine GlobalSetup(realization)
 
   implicit none
 
-  class(realization_subsurface_type) :: realization
+  class(realization_subsurface_type), pointer :: realization
 
   type(option_type), pointer :: option
   type(patch_type),pointer :: patch
@@ -518,12 +519,12 @@ end subroutine GlobalGetAuxVarVecLoc
 
 ! ************************************************************************** !
 
-subroutine GlobalUpdateParameterArray(realization)
+subroutine GlobalUpdateParameter(realization,parameter)
   !
   ! Updates values in the parameter array
   !
   ! Author: Glenn Hammond
-  ! Date: 01/05/24
+  ! Date: 05/28/26
   !
   use Dataset_Base_class
   use Dataset_Common_HDF5_class
@@ -533,16 +534,17 @@ subroutine GlobalUpdateParameterArray(realization)
   use HDF5_module
   use Option_module
   use Parameter_module
+  use Realization_Base_class
   use Realization_Subsurface_class
 
   class(realization_subsurface_type) :: realization
+  type(parameter_type) :: parameter
 
   class(dataset_base_type), pointer :: dataset
-  type(parameter_type), pointer :: cur_parameter
   type(grid_type), pointer :: grid
   type(option_type), pointer :: option
   type(global_auxvar_type), pointer :: auxvars(:)
-  character(len=:), allocatable :: err_string
+  character(len=MAXSTRINGLENGTH) :: err_string
   character(len=MAXSTRINGLENGTH) :: string, string2
 
   PetscInt :: ghosted_id
@@ -553,26 +555,36 @@ subroutine GlobalUpdateParameterArray(realization)
 
   auxvars => realization%patch%aux%Global%auxvars
 
-  ! at this point, field%work and field%work_loc are available to perform
-  ! operations such as reading datasets
-  cur_parameter => realization%parameter_list
-  do
-    if (.not.associated(cur_parameter)) exit
-    if (len_trim(cur_parameter%dataset_name) > 0) then
-      err_string = 'PARAMETER "' // trim(cur_parameter%name) // '"'
+  select case(parameter%itype)
+    case(PARAMETER_SCALAR)
+      do ghosted_id = 1, grid%ngmax
+        auxvars(ghosted_id)%parameters(parameter%id) = &
+          parameter%value
+      enddo
+    case(PARAMETER_VARIABLE)
+      call RealizationGetVariable(realization, &
+                                  realization%field%work, &
+                                  parameter%ivar,parameter%isubvar)
+      call realization%comm1%GlobalToLocal(realization%field%work, &
+                                    realization%field%work_loc)
+      call GlobalSetParameterVecLoc(realization, &
+                                    realization%field%work_loc, &
+                                    parameter%id)
+    case(PARAMETER_DATASET)
+      err_string = 'PARAMETER "' // trim(parameter%name) // '"'
       dataset => &
         DatasetBaseGetPointer(realization%datasets, &
-                              cur_parameter%dataset_name,err_string,option)
+                              parameter%linkage_name,err_string,option)
       select type(dataset)
         class is(dataset_gridded_hdf5_type)
           call DatasetGriddedHDF5Load(dataset,option)
           do ghosted_id = 1, grid%ngmax
             call DatasetGriddedHDF5InterpolateReal(dataset, &
-                                                   grid%x(ghosted_id), &
-                                                   grid%y(ghosted_id), &
-                                                   grid%z(ghosted_id), &
-                                                   tempreal,option)
-            auxvars(ghosted_id)%parameters(cur_parameter%id) = tempreal
+                                                  grid%x(ghosted_id), &
+                                                  grid%y(ghosted_id), &
+                                                  grid%z(ghosted_id), &
+                                                  tempreal,option)
+            auxvars(ghosted_id)%parameters(parameter%id) = tempreal
           enddo
         class is(dataset_common_hdf5_type)
           string = ''
@@ -583,21 +595,40 @@ subroutine GlobalUpdateParameterArray(realization)
                                             string,string2, &
                                             dataset%realization_dependent)
           call DiscretizationGlobalToLocal(realization%discretization, &
-                                           realization%field%work, &
-                                           realization%field%work_loc,ONEDOF)
+                                          realization%field%work, &
+                                          realization%field%work_loc,ONEDOF)
           call GlobalSetParameterVecLoc(realization, &
                                         realization%field%work_loc, &
-                                        cur_parameter%id)
+                                        parameter%id)
         class default
           option%io_buffer = 'Unrecognized dataset type in &
             &GlobalSetup() for ' // trim(err_string)
           call PrintErrMsg(option)
       end select
-    else
-      do ghosted_id = 1, grid%ngmax
-        auxvars(ghosted_id)%parameters(cur_parameter%id) = cur_parameter%value
-      enddo
-    endif
+  end select
+
+end subroutine GlobalUpdateParameter
+
+! ************************************************************************** !
+
+subroutine GlobalUpdateParameterArray(realization)
+  !
+  ! Updates values in the parameter array
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/05/24
+  !
+  use Parameter_module
+  use Realization_Subsurface_class
+
+  class(realization_subsurface_type), pointer :: realization
+
+  type(parameter_type), pointer :: cur_parameter
+
+  cur_parameter => realization%parameter_list
+  do
+    if (.not.associated(cur_parameter)) exit
+    call GlobalUpdateParameter(realization,cur_parameter)
     cur_parameter => cur_parameter%next
   enddo
 

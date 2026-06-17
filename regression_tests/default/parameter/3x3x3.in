@@ -41,7 +41,7 @@ END
 #=========================== parameters =======================================
 PARAMETER
   NAME scalar
-  VALUE 86.
+  SCALAR 86.
 END
 
 PARAMETER

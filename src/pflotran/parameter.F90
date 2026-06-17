@@ -6,13 +6,21 @@ module Parameter_module
 
   implicit none
 
+  PetscInt, parameter, public :: PARAMETER_SCALAR = 1
+  PetscInt, parameter, public :: PARAMETER_VARIABLE = 2
+  PetscInt, parameter, public :: PARAMETER_DATASET = 3
+
   private
 
   type, public :: parameter_type
     character(len=MAXWORDLENGTH) :: name
     PetscInt :: id
     PetscReal :: value
-    character(len=MAXWORDLENGTH) :: dataset_name
+    PetscInt :: itype ! scalar, variable, or dataset
+    ! linkage to other entities (e.g., variables, datasets)
+    character(len=MAXWORDLENGTH) :: linkage_name
+    PetscInt :: ivar
+    PetscInt :: isubvar
     type(parameter_type), pointer :: next
   end type parameter_type
 
@@ -40,7 +48,10 @@ function ParameterCreate()
   parameter%name = ''
   parameter%id = UNINITIALIZED_INTEGER
   parameter%value = UNINITIALIZED_DOUBLE
-  parameter%dataset_name = ''
+  parameter%itype = UNINITIALIZED_INTEGER
+  parameter%ivar = UNINITIALIZED_INTEGER
+  parameter%isubvar = UNINITIALIZED_INTEGER
+  parameter%linkage_name = ''
   nullify(parameter%next)
   ParameterCreate => parameter
 
@@ -86,11 +97,17 @@ subroutine ParameterRead(parameter,input,option)
       case('NAME')
         call InputReadWord(input,option,parameter%name,PETSC_TRUE)
         call InputErrorMsg(input,option,keyword,error_str)
-      case('VALUE')
+      case('SCALAR')
+        parameter%itype = PARAMETER_SCALAR
         call InputReadDouble(input,option,parameter%value)
         call InputErrorMsg(input,option,keyword,error_str)
       case('DATASET')
-        call InputReadWord(input,option,parameter%dataset_name,PETSC_TRUE)
+        parameter%itype = PARAMETER_DATASET
+        call InputReadWord(input,option,parameter%linkage_name,PETSC_TRUE)
+        call InputErrorMsg(input,option,keyword,error_str)
+      case('VARIABLE')
+        parameter%itype = PARAMETER_VARIABLE
+        call InputReadWord(input,option,parameter%linkage_name,PETSC_TRUE)
         call InputErrorMsg(input,option,keyword,error_str)
       case default
         call InputKeywordUnrecognized(input,keyword,error_str,option)
@@ -105,8 +122,9 @@ subroutine ParameterRead(parameter,input,option)
   endif
 
   if (Uninitialized(parameter%value) .and. &
-     len_trim(parameter%dataset_name) == 0) then
-    option%io_buffer = 'No VALUE or DATASET specified for a PARAMETER "' // &
+     len_trim(parameter%linkage_name) == 0) then
+    option%io_buffer = 'No SCALAR or DATASET name or VARIABLE specified for &
+      &a PARAMETER "' // &
       trim(parameter%name) // '" in the input file.'
     call PrintErrMsg(option)
   endif

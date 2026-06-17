@@ -14,8 +14,9 @@ module PM_Parameter_class
 
   private
 
-  PetscInt, parameter, public :: UPDATE_AFTER_LAST_PM = 0
-  PetscInt, parameter, public :: UPDATE_AFTER_FLOW = 1
+  PetscInt, parameter, public :: UPDATE_NEVER = 0
+  PetscInt, parameter, public :: UPDATE_AFTER_LAST_PM = 1
+  PetscInt, parameter, public :: UPDATE_AFTER_FLOW = 2
 
   PetscInt, parameter :: PARAMETER_BY_CELL = 1
   PetscInt, parameter :: PARAMETER_BY_MATERIAL = 2
@@ -24,27 +25,18 @@ module PM_Parameter_class
     class(realization_subsurface_type), pointer :: realization
     class(communicator_type), pointer :: comm1
     type(parameter_type), pointer :: parameter
+    PetscInt :: itype ! scalar, variable, or dataset
     PetscInt :: when_to_update
-    procedure(PMParameterUpdate), pointer :: Update => null()
+    PetscInt :: ivar
+    PetscInt :: isubvar
   contains
     procedure, public :: Setup => PMParameterSetup
     procedure, public :: SetRealization => PMParameterSetRealization
     procedure, public :: InitializeRun => PMParameterInitializeRun
+    procedure, public :: Update => PMParameterUpdate
     procedure, public :: FinalizeRun => PMParameterFinalizeRun
     procedure, public :: Destroy => PMParameterDestroy
   end type pm_parameter_type
-
-  ! interface blocks
-  interface
-    subroutine PMParameterUpdate(this,time,ierr)
-      use petscsys
-      import :: pm_parameter_type
-      implicit none
-      class(pm_parameter_type) :: this
-      PetscReal :: time
-      PetscErrorCode :: ierr
-    end subroutine PMParameterUpdate
-  end interface
 
   public :: PMParameterCreate, &
             PMParameterInit, &
@@ -87,11 +79,13 @@ subroutine PMParameterInit(this)
   class(pm_parameter_type) :: this
 
   call PMBaseInit(this)
-  this%when_to_update = UNINITIALIZED_INTEGER
+  this%when_to_update = UPDATE_NEVER
+  this%itype = UNINITIALIZED_INTEGER
+  this%ivar = UNINITIALIZED_INTEGER
+  this%isubvar = UNINITIALIZED_INTEGER
   nullify(this%parameter)
   nullify(this%realization)
   nullify(this%comm1)
-  this%Update => PMParameterUpdateDoNothing
 
 end subroutine PMParameterInit
 
@@ -105,12 +99,17 @@ subroutine PMParameterSetup(this)
   ! Date: 12/22/23
 
   use Option_module
+  use Output_Aux_module
   use String_module
 
   class(pm_parameter_type) :: this
 
   type(parameter_type), pointer :: cur_parameter
   character(len=MAXWORDLENGTH) :: parameter_name
+  ! for linking to realization variables
+  character(len=MAXWORDLENGTH) :: units
+  character(len=MAXWORDLENGTH) :: output_name
+  PetscInt :: category, ivar, isubvar
 
   call this%SetRealization()
   parameter_name = this%parameter%name
@@ -137,6 +136,26 @@ subroutine PMParameterSetup(this)
       '" not found among available parameters.'
     call PrintErrMsg(this%option)
   endif
+
+  cur_parameter => this%parameter
+  select case(cur_parameter%itype)
+    case(PARAMETER_SCALAR)
+    case(PARAMETER_DATASET)
+      this%option%io_buffer = 'PMParameterSetup needs to be updated for &
+        &PARAMETER_DATASET.'
+      call PrintErrMsg(this%option)
+    case(PARAMETER_VARIABLE)
+      call OutputVariableToID(cur_parameter%linkage_name, &
+                              output_name,units,category, &
+                              ivar,isubvar,ZERO_INTEGER,this%option)
+      cur_parameter%ivar = ivar
+      cur_parameter%isubvar = isubvar
+    case default
+      this%option%io_buffer = &
+        'Unrecognized parameter type for parameter "' // &
+        trim(parameter_name) // '".'
+      call PrintErrMsg(this%option)
+  end select
 
   this%header = 'PARAMETER (' // trim(this%name) // '->' // &
                 trim(parameter_name) // ')'
@@ -215,6 +234,8 @@ subroutine PMParameterRead(input,option,this)
         call InputErrorMsg(input,option,keyword,error_str)
         call StringToUpper(word)
         select case(trim(word))
+          case('INITIAL')
+            this%when_to_update = UPDATE_NEVER
           case('AFTER_LAST_PM')
             this%when_to_update = UPDATE_AFTER_LAST_PM
           case('AFTER_FLOW')
@@ -342,42 +363,23 @@ end subroutine PMParameterSwapPM
 
 ! ************************************************************************** !
 
-subroutine PMParameterUpdateDoNothing(this,time,ierr)
+subroutine PMParameterUpdate(this,time,ierr)
   !
   ! Updates the parameter
   !
   ! Author: Glenn Hammond
   ! Date: 01/18/24
 
-  use Option_module
-
-  class(pm_parameter_type) :: this
-  PetscReal :: time
-  PetscErrorCode :: ierr
-
-  this%option%io_buffer = 'Doing nothing for PARAMETER "' // &
-    trim(this%name) // '".'
-  call PrintMsg(this%option)
-  ierr = 0
-
-end subroutine PMParameterUpdateDoNothing
-
-! ************************************************************************** !
-
-subroutine PMParameterUpdateReadDataset(this,time,ierr)
-  !
-  ! Updates the parameter
-  !
-  ! Author: Glenn Hammond
-  ! Date: 01/18/24
+  use Global_module
 
   class(pm_parameter_type) :: this
   PetscReal :: time
   PetscErrorCode :: ierr
 
   ierr = 0
+  call GlobalUpdateParameter(this%realization,this%parameter)
 
-end subroutine PMParameterUpdateReadDataset
+end subroutine PMParameterUpdate
 
 ! ************************************************************************** !
 
