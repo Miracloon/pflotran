@@ -177,13 +177,14 @@ subroutine SimSubsurfInitializeRun(this)
   ! Author: Glenn Hammond
   ! Date: 02/15/21
   !
+  use hdf5
   use Init_Subsurface_module
   use Logging_module
   use Option_module
   use Option_Checkpoint_module
   use Output_module
   use Parameter_module
-  use hdf5
+  use Global_module
 
   implicit none
 
@@ -260,6 +261,7 @@ subroutine SimSubsurfInitializeRun(this)
   ! initialize performs overwrite of restart, if applicable
   call this%process_model_coupler_list%InitializeRun()
   call this%JumpStart()
+  call GlobalParameterQualityCheck(this%realization)
 
   call SimulationBaseInputRecordPrint(this,this%option)
   call PrintMsg(this%option,'')

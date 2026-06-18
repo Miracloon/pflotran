@@ -1061,6 +1061,8 @@ global.o : \
   realization_base.o \
   realization_subsurface.o \
   richards_aux.o \
+  string.o \
+  utility.o \
   variables.o \
   zflow_aux.o
 global_aux.o : \
@@ -2405,6 +2407,7 @@ pm_parameter.o : \
   global.o \
   input_aux.o \
   option.o \
+  output_aux.o \
   parameter.o \
   pflotran_constants.o \
   pm_base.o \
@@ -3875,6 +3878,7 @@ simulation_subsurface.o : \
   geomechanics_attributes.o \
   geomechanics_realization.o \
   geomechanics_regression.o \
+  global.o \
   init_subsurface.o \
   input_aux.o \
   inversion_aux.o \

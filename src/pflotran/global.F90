@@ -17,6 +17,7 @@ module Global_module
          GlobalWeightAuxVars, &
          GlobalUpdateState, &
          GlobalSetAuxVarsAtTimeLevel, &
+         GlobalParameterQualityCheck, &
          GlobalUpdateParameter
 
 contains
@@ -562,14 +563,20 @@ subroutine GlobalUpdateParameter(realization,parameter)
           parameter%value
       enddo
     case(PARAMETER_VARIABLE)
-      call RealizationGetVariable(realization, &
-                                  realization%field%work, &
-                                  parameter%ivar,parameter%isubvar)
-      call realization%comm1%GlobalToLocal(realization%field%work, &
-                                    realization%field%work_loc)
-      call GlobalSetParameterVecLoc(realization, &
-                                    realization%field%work_loc, &
-                                    parameter%id)
+      if (Uninitialized(parameter%ivar)) then
+        do ghosted_id = 1, grid%ngmax
+          auxvars(ghosted_id)%parameters(parameter%id) = UNINITIALIZED_DOUBLE
+        enddo
+      else
+        call RealizationGetVariable(realization, &
+                                    realization%field%work, &
+                                    parameter%ivar,parameter%isubvar)
+        call realization%comm1%GlobalToLocal(realization%field%work, &
+                                      realization%field%work_loc)
+        call GlobalSetParameterVecLoc(realization, &
+                                      realization%field%work_loc, &
+                                      parameter%id)
+      endif
     case(PARAMETER_DATASET)
       err_string = 'PARAMETER "' // trim(parameter%name) // '"'
       dataset => &
@@ -666,6 +673,64 @@ subroutine GlobalSetParameterVecLoc(realization,vec_loc,iparameter)
   call VecRestoreArrayRead(vec_loc,vec_loc_p,ierr);CHKERRQ(ierr)
 
 end subroutine GlobalSetParameterVecLoc
+
+! ************************************************************************** !
+
+subroutine GlobalParameterQualityCheck(realization)
+  !
+  ! Updates values in the parameter array
+  !
+  ! Author: Glenn Hammond
+  ! Date: 01/05/24
+  !
+  use Grid_module
+  use Option_module
+  use Parameter_module
+  use Realization_Subsurface_class
+  use String_module
+  use Utility_module
+
+  class(realization_subsurface_type), pointer :: realization
+
+  type(parameter_type), pointer :: cur_parameter
+  type(grid_type), pointer :: grid
+  type(option_type), pointer :: option
+  type(global_auxvar_type), pointer :: auxvars(:)
+  PetscBool :: error_found
+  PetscInt :: ghosted_id
+  PetscInt:: iparameter
+  PetscErrorCode :: ierr
+
+  option => realization%option
+  grid => realization%patch%grid
+  auxvars => realization%patch%aux%Global%auxvars
+
+  cur_parameter => realization%parameter_list
+  error_found = PETSC_FALSE
+  do
+    if (.not.associated(cur_parameter)) exit
+    iparameter = cur_parameter%id
+    do ghosted_id = 1, grid%ngmax
+      if (Uninitialized(auxvars(ghosted_id)%parameters(iparameter))) then
+        option%io_buffer = 'Uninitialized PARAMETER "' // &
+          trim(cur_parameter%name) // '" at cell ' // &
+          StringWrite(grid%nG2A(ghosted_id)) // '.'
+        call PrintErrMsgByRank(option)
+        error_found = PETSC_TRUE
+        exit
+      endif
+    enddo
+    cur_parameter => cur_parameter%next
+  enddo
+
+  call MPI_Allreduce(MPI_IN_PLACE,error_found,ONE_INTEGER_MPI,MPI_C_BOOL, &
+                     MPI_LOR,option%mycomm,ierr);CHKERRQ(ierr)
+  if (error_found) then
+    option%io_buffer = 'Errors found in PARAMETERs. See messages above.'
+    call PrintErrMsg(option)
+  endif
+
+end subroutine GlobalParameterQualityCheck
 
 ! ************************************************************************** !
 

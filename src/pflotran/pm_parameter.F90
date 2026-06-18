@@ -109,7 +109,7 @@ subroutine PMParameterSetup(this)
   ! for linking to realization variables
   character(len=MAXWORDLENGTH) :: units
   character(len=MAXWORDLENGTH) :: output_name
-  PetscInt :: category, ivar, isubvar
+  PetscInt :: category, ivar, isubvar, isubsubvar
 
   call this%SetRealization()
   parameter_name = this%parameter%name
@@ -147,7 +147,7 @@ subroutine PMParameterSetup(this)
     case(PARAMETER_VARIABLE)
       call OutputVariableToID(cur_parameter%linkage_name, &
                               output_name,units,category, &
-                              ivar,isubvar,ZERO_INTEGER,this%option)
+                              ivar,isubvar,isubsubvar,this%option)
       cur_parameter%ivar = ivar
       cur_parameter%isubvar = isubvar
     case default
