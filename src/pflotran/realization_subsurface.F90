@@ -98,7 +98,8 @@ module Realization_Subsurface_class
             RealizationCheckConsistency, &
             RealizationPrintStateAtCells, &
             RealizationProcessOutputVarList, &
-            RealizSetupPrescribedConservation
+            RealizSetupPrescribedConservation, &
+            RealLinkMatPropsToDatasets
 
 contains
 
@@ -651,14 +652,10 @@ subroutine RealProcessMatPropAndSatFunc(realization)
   ! Author: Glenn Hammond
   ! Date: 01/21/09, 01/12/11
   !
-
-  use String_module
-  use Dataset_Common_HDF5_class
-  use Dataset_module
   use Characteristic_Curves_module
   use Characteristic_Curves_Thermal_module
+  use Material_module, only : MaterialInitAuxIndices
   use TH_Aux_module, only : th_ice_model
-
 
   implicit none
 
@@ -682,6 +679,8 @@ subroutine RealProcessMatPropAndSatFunc(realization)
   call MaterialPropConvertListToArray(patch%material_properties, &
                                       patch%material_property_array, &
                                       option)
+  call MaterialInitAuxIndices(patch%material_property_array,option)
+
   if (associated(realization%saturation_functions)) then
     patch%saturation_functions => realization%saturation_functions
     call SaturatFuncConvertListToArray(patch%saturation_functions, &
@@ -885,6 +884,30 @@ subroutine RealProcessMatPropAndSatFunc(realization)
         call PrintErrMsg(option)
     endif
 
+    cur_material_property => cur_material_property%next
+  enddo
+
+end subroutine RealProcessMatPropAndSatFunc
+
+! ************************************************************************** !
+
+subroutine RealLinkMatPropsToDatasets(realization)
+  !
+  ! Setup linkeage between material properites and datasets, if they exist
+  !
+  ! Author: Glenn Hammond
+  ! Date: 06/19/26
+  !
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+
+  type(material_property_type), pointer :: cur_material_property
+
+  cur_material_property => realization%material_properties
+  do
+    if (.not.associated(cur_material_property)) exit
+
     ! if named, link dataset to property
     call RealLinkMatPropToDataset(realization,cur_material_property, &
                                   cur_material_property%porosity_dataset, &
@@ -952,8 +975,7 @@ subroutine RealProcessMatPropAndSatFunc(realization)
     cur_material_property => cur_material_property%next
   enddo
 
-
-end subroutine RealProcessMatPropAndSatFunc
+end subroutine RealLinkMatPropsToDatasets
 
 ! ************************************************************************** !
 

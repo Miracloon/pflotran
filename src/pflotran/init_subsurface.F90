@@ -52,7 +52,6 @@ subroutine SubsurfAllocMatPropDataStructs(realization)
   ! Date: 10/07/14
   !
   use Realization_Subsurface_class
-  use Material_module
   use Option_module
   use Discretization_module
   use Grid_module
@@ -74,10 +73,6 @@ subroutine SubsurfAllocMatPropDataStructs(realization)
   option => realization%option
   patch => realization%patch
   grid => patch%grid
-
-  ! initialize material auxiliary indices.  this does not have to be done
-  ! for each patch, just once.
-  call MaterialInitAuxIndices(realization%patch%material_property_array,option)
 
   ! create mappinging
   if (.not.associated(patch%imat)) then

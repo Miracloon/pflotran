@@ -512,6 +512,8 @@ subroutine FactorySubsurfSetupRealization(simulation)
   call EOSReferenceDensity(option)
 
   call ParameterSetup(realization%parameter_list,option)
+  call RealProcessMatPropAndSatFunc(realization)
+
   select case(option%itranmode)
     case(RT_MODE)
       select type(pm=>simulation%tran_process_model_coupler%pm_list)
@@ -606,8 +608,7 @@ subroutine FactorySubsurfSetupRealization(simulation)
     call PatchGetCompMassInRegionAssign(realization%patch%region_list, &
          realization%output_option%mass_balance_region_list,option)
   endif
-  ! link conditions with regions through couplers and generate connectivity
-  call RealProcessMatPropAndSatFunc(realization)
+  call RealLinkMatPropsToDatasets(realization)
   ! must process conditions before couplers in order to determine dataset types
   call RealizationProcessConditions(realization)
   call RealizationProcessCouplers(realization)
