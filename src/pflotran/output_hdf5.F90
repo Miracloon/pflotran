@@ -3829,6 +3829,13 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   option => realization_base%option
   output_option => realization_base%output_option
 
+  nullify(flowrates)
+  nullify(darcy)
+  nullify(nat_ids_up)
+  nullify(nat_ids_dn)
+  nullify(density_kg)
+  nullify(area)
+
   write_cells_and_area = PETSC_FALSE
   if (output_option%plot_number == 0) then
     write_cells_and_area = PETSC_TRUE
@@ -3897,6 +3904,7 @@ subroutine OutputHDF5WriteExplicitFlowrates(realization_base)
   call DeallocateArray(nat_ids_dn)
   call DeallocateArray(density_kg)
   call DeallocateArray(area)
+
 
 end subroutine OutputHDF5WriteExplicitFlowrates
 
