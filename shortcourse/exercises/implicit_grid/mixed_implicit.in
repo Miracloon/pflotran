@@ -34,6 +34,7 @@ CHEMISTRY
     Tracer3
   /
   OUTPUT
+    ALL
     TOTAL
   /
 END
@@ -170,7 +171,7 @@ FLOW_CONDITION well
   TYPE
     RATE volumetric_rate
   /
-  RATE 0.1 l/min
+  RATE 1.6666667d-6 m^3/sec  #0.1 l/min
 END
 
 #=========================== transport conditions =============================
@@ -233,14 +234,14 @@ BOUNDARY_CONDITION west
   REGION west
 END
 
-BOUNDARY_CONDITION
+BOUNDARY_CONDITION top
   FLOW_CONDITION recharge
   TRANSPORT_CONDITION tracer2
   REGION top
 END
 
 # source/sink
-SOURCE_SINK
+SOURCE_SINK well
   FLOW_CONDITION well
   TRANSPORT_CONDITION tracer3
   REGION well

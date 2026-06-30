@@ -1047,7 +1047,6 @@ CHEMISTRY
     ISOTHERM_REACTIONS
       Tracer3
         DISTRIBUTION_COEFFICIENT 4000.d0
-        KD_MINERAL_NAME Rock(s)
       /
     /
   /
@@ -1163,9 +1162,6 @@ CONSTRAINT initial
     Tracer2 1.d-20 T
     Tracer3 1.d-20 T
   /
-  MINERALS
-    Rock(s) DATASET vol_frac 1.d0
-  /
 END
 
 CONSTRAINT tracer
@@ -1173,9 +1169,6 @@ CONSTRAINT tracer
     Tracer1 1.d0 T
     Tracer2 1.d0 T
     Tracer3 1.d0 T
-  /
-  MINERALS
-    Rock(s) DATASET vol_frac 1.d0
   /
 END
 	\end{semiverbatim}

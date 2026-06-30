@@ -67,54 +67,58 @@ END
 # == chemistry ================================================================
 CHEMISTRY
 
-!OPERATOR_SPLIT
-!GLOBAL_IMPLICIT
+  PRIMARY_SPECIES
+    H+
+    Cu++
+    SiO2(aq)
+    SO4--
+    Tracer
+  /
 
-PRIMARY_SPECIES
-H+
-Cu++
-SiO2(aq)
-SO4--
-Tracer
-/
-SECONDARY_SPECIES
-OH-
-CuOH+
-CuSO4(aq)
-HSO4-
-H2SO4(aq)
-/
-MINERALS
-Quartz
-Chalcedony
-SiO2(am)
-Chrysocolla
-Chrysocolla1
-Chrysocolla2
-/
-#
-MINERAL_KINETICS
-Chrysocolla2
-RATE_CONSTANT 5.e-12 mol/cm^2-sec
-SURFACE_AREA_VOL_FRAC_POWER 0.666667d0
-/
-SiO2(am) 
-RATE_CONSTANT 1.e-10 mol/cm^2-sec
-/
-Quartz 
-RATE_CONSTANT 1.e-18 mol/cm^2-sec
-/
-/
-#
-DATABASE ../../../database/hanford.dat
-LOG_FORMULATION
-ACTIVITY_COEFFICIENTS ! NEWTON_ITERATION
-MOLAL
-OUTPUT
-All
-TOTAL
-/
-UPDATE_MINERAL_SURFACE_AREA
+  SECONDARY_SPECIES
+    OH-
+    CuOH+
+    CuSO4(aq)
+    HSO4-
+    H2SO4(aq)
+  /
+
+  MINERALS
+    Quartz
+    Chalcedony
+    SiO2(am)
+    Chrysocolla
+    Chrysocolla1
+    Chrysocolla2
+  /
+
+  MINERAL_KINETICS
+    Chrysocolla2
+      RATE_CONSTANT 5.e-12 mol/cm^2-sec
+      SURFACE_AREA_VOL_FRAC_POWER 0.666667d0
+      SURFACE_AREA_FUNCTION VOLUME_FRACTION_RATIO
+    /
+    SiO2(am)
+      RATE_CONSTANT 1.e-10 mol/cm^2-sec
+      SURFACE_AREA_FUNCTION CONSTANT
+    /
+    Quartz
+      RATE_CONSTANT 1.e-18 mol/cm^2-sec
+      SURFACE_AREA_VOL_FRAC_POWER 0.666667d0
+      SURFACE_AREA_FUNCTION VOLUME_FRACTION_RATIO
+    /
+  /
+
+  DATABASE ../../../database/hanford.dat
+  LOG_FORMULATION
+  ACTIVITY_COEFFICIENTS
+  MOLAL
+
+  OUTPUT
+    ALL
+    TOTAL
+  /
+
 /
 
 # == reference variables ======================================================
@@ -256,13 +260,13 @@ TRANSPORT_CONDITION Initial
 REGION all
 /
 
-SOURCE_SINK
+SOURCE_SINK injection
 FLOW_CONDITION injection
 TRANSPORT_CONDITION injection
 REGION injection
 END
 
-SOURCE_SINK
+SOURCE_SINK extraction
 FLOW_CONDITION extraction
 TRANSPORT_CONDITION withdrawal
 REGION extraction

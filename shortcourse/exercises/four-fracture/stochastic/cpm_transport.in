@@ -65,25 +65,12 @@ DATASET Porosity
   HDF5_DATASET_NAME Porosity
 END
 
-DATASET vol_frac
-  FILENAME ./output/dfnGen_output/cpm/porosity.h5
-  HDF5_DATASET_NAME Porosity
-END
-
 #=========================== chemistry ========================================
 CHEMISTRY
   PRIMARY_SPECIES
     Tracer1
     Tracer2
     Tracer3
-  /
-  MINERALS
-    Rock(s)
-  /
-  MINERAL_KINETICS
-    Rock(s)
-      RATE_CONSTANT 0.d0
-    /
   /
   RADIOACTIVE_DECAY_REACTION
     REACTION Tracer2 <->
@@ -93,7 +80,6 @@ CHEMISTRY
     ISOTHERM_REACTIONS
       Tracer3
         DISTRIBUTION_COEFFICIENT 4000.d0
-	KD_MINERAL_NAME Rock(s)
       /
     /
   /
@@ -241,9 +227,6 @@ CONSTRAINT initial
     Tracer2 1.d-20 T
     Tracer3 1.d-20 T
   /
-  MINERALS
-    Rock(s) DATASET vol_frac 1.d0
-  /
 END
 
 CONSTRAINT tracer
@@ -251,9 +234,6 @@ CONSTRAINT tracer
     Tracer1 1.d0 T
     Tracer2 1.d0 T
     Tracer3 1.d0 T
-  /
-  MINERALS
-    Rock(s) DATASET vol_frac 1.d0
   /
 END
 #=========================== condition couplers ===============================
