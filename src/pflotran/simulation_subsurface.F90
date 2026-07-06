@@ -495,7 +495,7 @@ subroutine SimSubsurfJumpStart(this)
   endif
 
   ! print initial condition output if not a restarted sim
-  call OutputInit(option,master_timestepper%steps)
+  call OutputInit(option,output_option,master_timestepper%steps)
   if (output_option%plot_number == 0 .and. &
       master_timestepper%max_time_step >= 0) then
     snapshot_plot_flag = output_option%print_initial_snap

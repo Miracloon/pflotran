@@ -262,21 +262,20 @@ subroutine OutputConservation(realization_base)
 
   endif
 
-100 format(100es16.8)
-110 format(100es16.8)
-
   ! write time
   if (OptionIsIORank(option)) then
-    write(fid,100,advance="no") option%time/output_option%tconv
+    call WriteRealFixedNoAdv(fid,option%time/output_option%tconv)
   endif
 
   if (option%nflowdof > 0) then
-    if (OptionIsIORank(option)) &
-      write(fid,100,advance="no") option%flow_dt/output_option%tconv
+    if (OptionIsIORank(option)) then
+      call WriteRealFixedNoAdv(fid,option%flow_dt/output_option%tconv)
+    endif
   endif
   if (option%ntrandof > 0) then
-    if (OptionIsIORank(option)) &
-      write(fid,100,advance="no") option%tran_dt/output_option%tconv
+    if (OptionIsIORank(option)) then
+      call WriteRealFixedNoAdv(fid,option%tran_dt/output_option%tconv)
+    endif
   endif
 
 ! print out global mass and energy balance
@@ -321,9 +320,9 @@ subroutine OutputConservation(realization_base)
     if (OptionIsIORank(option)) then
       select case(option%iflowmode)
         case(RICHARDS_MODE,RICHARDS_TS_MODE)
-          write(fid,110,advance="no") sum_eq_global(1:option%nflowdof)
+          call WriteRealNoAdv(fid,sum_eq_global(1:option%nflowdof))
         case(TH_MODE,TH_TS_MODE)
-          write(fid,110,advance="no") sum_eq_global(1:option%nflowdof)
+          call WriteRealNoAdv(fid,sum_eq_global(1:option%nflowdof))
         case default
           option%io_buffer = 'Select case statement in OutputConservation &
             &needs to be extended for current flow mode: ' // &
@@ -369,21 +368,19 @@ subroutine OutputConservation(realization_base)
           ! total across all phases
           do icomp = 1, reaction%naqcomp
             if (reaction%primary_species_print(icomp)) then
-              write(fid,110,advance="no") array_global(icomp,1)
+              call WriteRealNoAdv(fid,array_global(icomp,1))
             endif
           enddo
           ! immobile species
           do i = 1, reaction%immobile%nimmobile
             if (reaction%immobile%print_me(i)) then
-              write(fid,110,advance="no") &
-                array_global(i,7)
+              call WriteRealNoAdv(fid,array_global(i,7))
             endif
           enddo
           ! gas species
           do i = 1, reaction%gas%nactive_gas
             if (reaction%gas%active_print_me(i)) then
-              write(fid,110,advance="no") &
-                array_global(i,8)
+              call WriteRealNoAdv(fid,array_global(i,8))
             endif
           enddo
         endif
@@ -392,7 +389,7 @@ subroutine OutputConservation(realization_base)
           if (OptionIsIORank(option)) then
             do i = 1, reaction%mineral%nkinmnrl
               if (reaction%mineral%kinmnrl_print(i)) then
-                write(fid,110,advance="no") array_global(i,6)
+                call WriteRealNoAdv(fid,array_global(i,6))
               endif
             enddo
           endif
@@ -401,9 +398,6 @@ subroutine OutputConservation(realization_base)
       case(NWT_MODE)
     end select
   endif
-
-
-120 format(100es17.8e3)
 
   allocate(array(option%nflowdof + option%ntrandof,2))
   allocate(array_global(option%nflowdof + option%ntrandof,2))
@@ -453,11 +447,7 @@ subroutine OutputConservation(realization_base)
         do i = 1, option%nflowdof
           do j = 1, 2  ! 1 = integral, 2 = instantaneous
             tempreal = array_global(i,j)*flow_dof_scale(i)
-            if (dabs(tempreal) > 0.d0 .and. dabs(tempreal) < 1.d-99) then
-              write(fid,120,advance="no") tempreal
-            else
-              write(fid,110,advance="no") tempreal
-            endif
+            call WriteRealNoAdv(fid,tempreal)
           enddo
         enddo
       endif
@@ -469,11 +459,7 @@ subroutine OutputConservation(realization_base)
               do j = 1, 2  ! 1 = integral, 2 = instantaneous
                 if (reaction%primary_species_print(i)) then
                   tempreal = array_global(istart+i,j)
-                  if (dabs(tempreal) > 0.d0 .and. dabs(tempreal) < 1.d-99) then
-                    write(fid,120,advance="no") tempreal
-                  else
-                    write(fid,110,advance="no") tempreal
-                  endif
+                  call WriteRealNoAdv(fid,tempreal)
                 endif
               enddo
             enddo
@@ -482,11 +468,7 @@ subroutine OutputConservation(realization_base)
               do j = 1, 2  ! 1 = integral, 2 = instantaneous
                 if (reaction_nw%species_print(i)) then
                   tempreal = array_global(istart+i,j)
-                  if (dabs(tempreal) > 0.d0 .and. dabs(tempreal) < 1.d-99) then
-                    write(fid,120,advance="no") tempreal
-                  else
-                    write(fid,110,advance="no") tempreal
-                  endif
+                  call WriteRealNoAdv(fid,tempreal)
                 endif
               enddo
             enddo

@@ -90,6 +90,7 @@ END
 
 #=========================== output options ===================================
 OUTPUT
+  ASCII_DIGITS_OF_PRECISION 9
   CONSERVATION_FILE
     PERIODIC TIMESTEP 10
   /

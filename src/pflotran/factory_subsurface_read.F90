@@ -2178,6 +2178,29 @@ subroutine FactorySubsurfReadInput(simulation,input)
               output_option%extend_hdf5_time_format = PETSC_TRUE
             case ('ACKNOWLEDGE_VTK_FLAW')
               output_option%vtk_acknowledgment = PETSC_TRUE
+            case('ASCII_DIGITS_OF_PRECISION')
+              call InputReadInt(input,option,temp_int)
+              call InputErrorMsg(input,option,word,'OUTPUT')
+              if (temp_int < 1 .or. temp_int > 16) then
+                option%io_buffer = 'OUTPUT,ASCII_DIGITS_OF_PRECISION must be an &
+                                  &integer between 1 and 16.'
+                call PrintErrMsg(option)
+              endif
+              output_option%digits_of_precision = temp_int
+              call InputReadInt(input,option,temp_int)
+              if (.not.InputError(input%ierr)) then
+                if (temp_int == 3) then
+                  output_option%digits_of_precision = &
+                      output_option%digits_of_precision + 1000
+                else
+                  if (temp_int /= 2) then
+                    option%io_buffer = 'OUTPUT,ASCII_DIGITS_OF_PRECISION: &
+                      &2 or 3 is the only supported option for the &
+                      &number of digits in the ASCII exponent.'
+                    call PrintErrMsg(option)
+                  endif
+                endif
+              endif
             case default
               call InputKeywordUnrecognized(input,word,'OUTPUT',option)
           end select

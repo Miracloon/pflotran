@@ -15,6 +15,7 @@ OUTPUT
       bottom
       middle
     /
+    ASCII_DIGITS_OF_PRECISION 9 3
   /
 END
 

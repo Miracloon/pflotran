@@ -94,6 +94,7 @@ module Output_Aux_module
     character(len=MAXWORDLENGTH) :: plot_name
 
     PetscBool :: print_hydrograph
+    PetscInt :: digits_of_precision
 
   end type output_option_type
 
@@ -158,6 +159,40 @@ module Output_Aux_module
   PetscInt, parameter, public :: OUTPUT_STRESS = 8
   PetscInt, parameter, public :: OUTPUT_STRAIN = 9
 
+  ! interface blocks
+  interface
+    subroutine WriteRealDummy(fid,value)
+      use petscsys
+      PetscInt :: fid
+      PetscReal :: value
+    end subroutine WriteRealDummy
+    subroutine WriteRealArrayDummy(fid,values)
+      use petscsys
+      PetscInt :: fid
+      PetscReal :: values(:)
+    end subroutine WriteRealArrayDummy
+  end interface
+
+  procedure(WriteRealDummy), pointer :: WriteRealNoAdvPtr => &
+    OutputWriteReal7
+  procedure(WriteRealArrayDummy), pointer :: WriteRealArrayNoAdvPtr => &
+    OutputWriteRealArray7
+
+  procedure(WriteRealDummy), pointer :: WriteRealFixedNoAdvPtr => &
+    OutputWriteReal7
+  procedure(WriteRealArrayDummy), pointer :: WriteRealArrayFixedNoAdvPtr => &
+    OutputWriteRealArray7
+
+  interface WriteRealNoAdv
+    module procedure OutputWriteRealScalar
+    module procedure OutputWriteRealArray
+  end interface
+
+  interface WriteRealFixedNoAdv
+    module procedure OutputWriteRealScalarFixed
+    module procedure OutputWriteRealArrayFixed
+  end interface
+
   public :: OutputOptionCreate, &
             OutputOptionDuplicate, &
             OutputVariableCreate, &
@@ -177,6 +212,10 @@ module Output_Aux_module
             OutputVariableGetName, &
             OutputVariableListDestroy, &
             OutputH5Create, &
+            OutputSetASCIIPrecision, &
+            WriteRealNoAdv, &
+            WriteRealFixedNoAdv, &
+            WriteNewLine, &
             OutputH5Destroy
 
 contains
@@ -278,10 +317,128 @@ function OutputOptionCreate()
   output_option%plot_name = ""
 
   output_option%print_hydrograph = PETSC_FALSE
+  output_option%digits_of_precision = 7
 
   OutputOptionCreate => output_option
 
 end function OutputOptionCreate
+
+! ************************************************************************** !
+
+subroutine OutputSetASCIIPrecision(output_option)
+  !
+  ! sets the precision for ascii output
+  !
+  ! Author: Glenn Hammond
+  ! Date: 07/06/26
+  !
+  implicit none
+
+  type(output_option_type) :: output_option
+
+  select case(output_option%digits_of_precision)
+    case(1)
+      WriteRealNoAdvPtr => OutputWriteReal1
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray1
+    case(2)
+      WriteRealNoAdvPtr => OutputWriteReal2
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray2
+    case(3)
+      WriteRealNoAdvPtr => OutputWriteReal3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray3
+    case(4)
+      WriteRealNoAdvPtr => OutputWriteReal4
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray4
+    case(5)
+      WriteRealNoAdvPtr => OutputWriteReal5
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray5
+    case(6)
+      WriteRealNoAdvPtr => OutputWriteReal6
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray6
+    case(7)
+      WriteRealNoAdvPtr => OutputWriteReal7
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray7
+    case(8)
+      WriteRealNoAdvPtr => OutputWriteReal8
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray8
+    case(9)
+      WriteRealNoAdvPtr => OutputWriteReal9
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray9
+    case(10)
+      WriteRealNoAdvPtr => OutputWriteReal10
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray10
+    case(11)
+      WriteRealNoAdvPtr => OutputWriteReal11
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray11
+    case(12)
+      WriteRealNoAdvPtr => OutputWriteReal12
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray12
+    case(13)
+      WriteRealNoAdvPtr => OutputWriteReal13
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray13
+    case(14)
+      WriteRealNoAdvPtr => OutputWriteReal14
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray14
+    case(15)
+      WriteRealNoAdvPtr => OutputWriteReal15
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray15
+    case(16)
+      WriteRealNoAdvPtr => OutputWriteReal16
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray16
+    case(1001)
+      WriteRealNoAdvPtr => OutputWriteReal1_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray1_3
+    case(1002)
+      WriteRealNoAdvPtr => OutputWriteReal2_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray2_3
+    case(1003)
+      WriteRealNoAdvPtr => OutputWriteReal3_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray3_3
+    case(1004)
+      WriteRealNoAdvPtr => OutputWriteReal4_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray4_3
+    case(1005)
+      WriteRealNoAdvPtr => OutputWriteReal5_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray5_3
+    case(1006)
+      WriteRealNoAdvPtr => OutputWriteReal6_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray6_3
+    case(1007)
+      WriteRealNoAdvPtr => OutputWriteReal7_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray7_3
+    case(1008)
+      WriteRealNoAdvPtr => OutputWriteReal8_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray8_3
+    case(1009)
+      WriteRealNoAdvPtr => OutputWriteReal9_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray9_3
+    case(1010)
+      WriteRealNoAdvPtr => OutputWriteReal10_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray10_3
+    case(1011)
+      WriteRealNoAdvPtr => OutputWriteReal11_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray11_3
+    case(1012)
+      WriteRealNoAdvPtr => OutputWriteReal12_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray12_3
+    case(1013)
+      WriteRealNoAdvPtr => OutputWriteReal13_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray13_3
+    case(1014)
+      WriteRealNoAdvPtr => OutputWriteReal14_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray14_3
+    case(1015)
+      WriteRealNoAdvPtr => OutputWriteReal15_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray15_3
+    case(1016)
+      WriteRealNoAdvPtr => OutputWriteReal16_3
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray16_3
+    case default
+      WriteRealNoAdvPtr => OutputWriteReal7
+      WriteRealArrayNoAdvPtr => OutputWriteRealArray7
+  end select
+
+end subroutine OutputSetASCIIPrecision
 
 ! ************************************************************************** !
 
@@ -429,6 +586,7 @@ function OutputOptionDuplicate(output_option)
   output_option2%plot_name = output_option%plot_name
 
   output_option2%print_hydrograph = output_option%print_hydrograph
+  output_option2%digits_of_precision = output_option%digits_of_precision
 
   OutputOptionDuplicate => output_option2
 
@@ -1598,6 +1756,421 @@ function OutputVariableGetName(output_variable)
                                output_variable%subname)
 
 end function OutputVariableGetName
+
+! ************************************************************************** !
+
+subroutine WriteNewLine(fid)
+  PetscInt :: fid
+  write(fid,*)
+end subroutine WriteNewLine
+
+subroutine OutputWriteRealScalar(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  call WriteRealNoAdvPtr(fid,value)
+end subroutine OutputWriteRealScalar
+
+subroutine OutputWriteRealArray(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  call WriteRealArrayNoAdvPtr(fid,values)
+end subroutine OutputWriteRealArray
+
+subroutine OutputWriteRealScalarFixed(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  call WriteRealFixedNoAdvPtr(fid,value)
+end subroutine OutputWriteRealScalarFixed
+
+subroutine OutputWriteRealArrayFixed(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  call WriteRealArrayFixedNoAdvPtr(fid,values)
+end subroutine OutputWriteRealArrayFixed
+
+subroutine OutputWriteReal1(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es8.0)',advance='no') value
+end subroutine OutputWriteReal1
+
+subroutine OutputWriteReal2(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es9.1)',advance='no') value
+end subroutine OutputWriteReal2
+
+subroutine OutputWriteReal3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es10.2)',advance='no') value
+end subroutine OutputWriteReal3
+
+subroutine OutputWriteReal4(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es11.3)',advance='no') value
+end subroutine OutputWriteReal4
+
+subroutine OutputWriteReal5(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es12.4)',advance='no') value
+end subroutine OutputWriteReal5
+
+subroutine OutputWriteReal6(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es13.5)',advance='no') value
+end subroutine OutputWriteReal6
+
+subroutine OutputWriteReal7(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es14.6)',advance='no') value
+end subroutine OutputWriteReal7
+
+subroutine OutputWriteReal8(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es15.7)',advance='no') value
+end subroutine OutputWriteReal8
+
+subroutine OutputWriteReal9(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es16.8)',advance='no') value
+end subroutine OutputWriteReal9
+
+subroutine OutputWriteReal10(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es17.9)',advance='no') value
+end subroutine OutputWriteReal10
+
+subroutine OutputWriteReal11(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es18.10)',advance='no') value
+end subroutine OutputWriteReal11
+
+subroutine OutputWriteReal12(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es19.11)',advance='no') value
+end subroutine OutputWriteReal12
+
+subroutine OutputWriteReal13(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es20.12)',advance='no') value
+end subroutine OutputWriteReal13
+
+subroutine OutputWriteReal14(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es21.13)',advance='no') value
+end subroutine OutputWriteReal14
+
+subroutine OutputWriteReal15(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es22.14)',advance='no') value
+end subroutine OutputWriteReal15
+
+subroutine OutputWriteReal16(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es23.15)',advance='no') value
+end subroutine OutputWriteReal16
+
+subroutine OutputWriteReal1_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es9.0e3)',advance='no') value
+end subroutine OutputWriteReal1_3
+
+subroutine OutputWriteReal2_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es10.1e3)',advance='no') value
+end subroutine OutputWriteReal2_3
+
+subroutine OutputWriteReal3_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es11.2e3)',advance='no') value
+end subroutine OutputWriteReal3_3
+
+subroutine OutputWriteReal4_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es12.3e3)',advance='no') value
+end subroutine OutputWriteReal4_3
+
+subroutine OutputWriteReal5_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es13.4e3)',advance='no') value
+end subroutine OutputWriteReal5_3
+
+subroutine OutputWriteReal6_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es14.5e3)',advance='no') value
+end subroutine OutputWriteReal6_3
+
+subroutine OutputWriteReal7_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es15.6e3)',advance='no') value
+end subroutine OutputWriteReal7_3
+
+subroutine OutputWriteReal8_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es16.7e3)',advance='no') value
+end subroutine OutputWriteReal8_3
+
+subroutine OutputWriteReal9_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es17.8e3)',advance='no') value
+end subroutine OutputWriteReal9_3
+
+subroutine OutputWriteReal10_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es18.9e3)',advance='no') value
+end subroutine OutputWriteReal10_3
+
+subroutine OutputWriteReal11_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es19.10e3)',advance='no') value
+end subroutine OutputWriteReal11_3
+
+subroutine OutputWriteReal12_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es20.11e3)',advance='no') value
+end subroutine OutputWriteReal12_3
+
+subroutine OutputWriteReal13_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es21.12e3)',advance='no') value
+end subroutine OutputWriteReal13_3
+
+subroutine OutputWriteReal14_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es22.13e3)',advance='no') value
+end subroutine OutputWriteReal14_3
+
+subroutine OutputWriteReal15_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es23.14e3)',advance='no') value
+end subroutine OutputWriteReal15_3
+
+subroutine OutputWriteReal16_3(fid,value)
+  PetscInt :: fid
+  PetscReal :: value
+  write(fid,'(es24.15e3)',advance='no') value
+end subroutine OutputWriteReal16_3
+
+subroutine OutputWriteRealArray1(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es8.0))',advance='no') values
+end subroutine OutputWriteRealArray1
+
+subroutine OutputWriteRealArray2(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es9.1))',advance='no') values
+end subroutine OutputWriteRealArray2
+
+subroutine OutputWriteRealArray3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es10.2))',advance='no') values
+end subroutine OutputWriteRealArray3
+
+subroutine OutputWriteRealArray4(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es11.3))',advance='no') values
+end subroutine OutputWriteRealArray4
+
+subroutine OutputWriteRealArray5(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es12.4))',advance='no') values
+end subroutine OutputWriteRealArray5
+
+subroutine OutputWriteRealArray6(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es13.5))',advance='no') values
+end subroutine OutputWriteRealArray6
+
+subroutine OutputWriteRealArray7(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es14.6))',advance='no') values
+end subroutine OutputWriteRealArray7
+
+subroutine OutputWriteRealArray8(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es15.7))',advance='no') values
+end subroutine OutputWriteRealArray8
+
+subroutine OutputWriteRealArray9(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es16.8))',advance='no') values
+end subroutine OutputWriteRealArray9
+
+subroutine OutputWriteRealArray10(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es17.9))',advance='no') values
+end subroutine OutputWriteRealArray10
+
+subroutine OutputWriteRealArray11(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es18.10))',advance='no') values
+end subroutine OutputWriteRealArray11
+
+subroutine OutputWriteRealArray12(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es19.11))',advance='no') values
+end subroutine OutputWriteRealArray12
+
+subroutine OutputWriteRealArray13(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es20.12))',advance='no') values
+end subroutine OutputWriteRealArray13
+
+subroutine OutputWriteRealArray14(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es21.13))',advance='no') values
+end subroutine OutputWriteRealArray14
+
+subroutine OutputWriteRealArray15(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es22.14))',advance='no') values
+end subroutine OutputWriteRealArray15
+
+subroutine OutputWriteRealArray16(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es23.15))',advance='no') values
+end subroutine OutputWriteRealArray16
+
+subroutine OutputWriteRealArray1_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es9.0e3))',advance='no') values
+end subroutine OutputWriteRealArray1_3
+
+subroutine OutputWriteRealArray2_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es10.1e3))',advance='no') values
+end subroutine OutputWriteRealArray2_3
+
+subroutine OutputWriteRealArray3_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es11.2e3))',advance='no') values
+end subroutine OutputWriteRealArray3_3
+
+subroutine OutputWriteRealArray4_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es12.3e3))',advance='no') values
+end subroutine OutputWriteRealArray4_3
+
+subroutine OutputWriteRealArray5_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es13.4e3))',advance='no') values
+end subroutine OutputWriteRealArray5_3
+
+subroutine OutputWriteRealArray6_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es14.5e3))',advance='no') values
+end subroutine OutputWriteRealArray6_3
+
+subroutine OutputWriteRealArray7_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es15.6e3))',advance='no') values
+end subroutine OutputWriteRealArray7_3
+
+subroutine OutputWriteRealArray8_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es16.7e3))',advance='no') values
+end subroutine OutputWriteRealArray8_3
+
+subroutine OutputWriteRealArray9_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es17.8e3))',advance='no') values
+end subroutine OutputWriteRealArray9_3
+
+subroutine OutputWriteRealArray10_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es18.9e3))',advance='no') values
+end subroutine OutputWriteRealArray10_3
+
+subroutine OutputWriteRealArray11_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es19.10e3))',advance='no') values
+end subroutine OutputWriteRealArray11_3
+
+subroutine OutputWriteRealArray12_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es20.11e3))',advance='no') values
+end subroutine OutputWriteRealArray12_3
+
+subroutine OutputWriteRealArray13_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es21.12e3))',advance='no') values
+end subroutine OutputWriteRealArray13_3
+
+subroutine OutputWriteRealArray14_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es22.13e3))',advance='no') values
+end subroutine OutputWriteRealArray14_3
+
+subroutine OutputWriteRealArray15_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es23.14e3))',advance='no') values
+end subroutine OutputWriteRealArray15_3
+
+subroutine OutputWriteRealArray16_3(fid,values)
+  PetscInt :: fid
+  PetscReal :: values(:)
+  write(fid,'(*(es24.15e3))',advance='no') values
+end subroutine OutputWriteRealArray16_3
 
 ! ************************************************************************** !
 

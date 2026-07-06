@@ -8,6 +8,7 @@ SUBSURFACE
 
 #=========================== output options ===================================
 OUTPUT
+  ASCII_DIGITS_OF_PRECISION 6
   FORMAT TECPLOT POINT
   VARIABLES
     LIQUID_PRESSURE

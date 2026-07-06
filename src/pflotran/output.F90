@@ -41,7 +41,7 @@ contains
 
 ! ************************************************************************** !
 
-subroutine OutputInit(option,num_steps)
+subroutine OutputInit(option,output_option,num_steps)
   !
   ! Initializes variables
   !
@@ -49,12 +49,14 @@ subroutine OutputInit(option,num_steps)
   ! Date: 01/22/09
   !
   use Option_module
+  use Output_Aux_module
   use Output_Common_module
   use Output_EKG_module
 
   implicit none
 
   type(option_type) :: option
+  type(output_option_type) :: output_option
   PetscInt :: num_steps
 
   call OutputCommonInit()
@@ -62,6 +64,8 @@ subroutine OutputInit(option,num_steps)
   call OutputConservationInit(num_steps)
   call OutputHDF5Init(num_steps)
   call OutputEKGInit(option,num_steps)
+  call OutputSetASCIIPrecision(output_option)
+
 
 end subroutine OutputInit
 
@@ -112,6 +116,7 @@ subroutine OutputFileRead(input,realization,output_option, &
   PetscReal :: units_conversion
   PetscReal :: time_increment
   PetscInt :: k
+  PetscInt :: temp_int
   PetscBool :: added
   PetscBool :: vel_cent, vel_face
   PetscBool :: fluxes
@@ -578,7 +583,29 @@ subroutine OutputFileRead(input,realization,output_option, &
         aveg_mass_flowrate = PETSC_TRUE
       case('AVERAGE_ENERGY_FLOWRATE')
         aveg_energy_flowrate = PETSC_TRUE
-
+      case('ASCII_DIGITS_OF_PRECISION')
+        call InputReadInt(input,option,temp_int)
+        call InputErrorMsg(input,option,word,'OUTPUT')
+        if (temp_int < 1 .or. temp_int > 16) then
+          option%io_buffer = 'OUTPUT,ASCII_DIGITS_OF_PRECISION must be an &
+                             &integer between 1 and 16.'
+          call PrintErrMsg(option)
+        endif
+        output_option%digits_of_precision = temp_int
+        call InputReadInt(input,option,temp_int)
+        if (.not.InputError(input%ierr)) then
+          if (temp_int == 3) then
+            output_option%digits_of_precision = &
+                 output_option%digits_of_precision + 1000
+          else
+            if (temp_int /= 2) then
+              option%io_buffer = 'OUTPUT,ASCII_DIGITS_OF_PRECISION: &
+                &2 or 3 is the only supported option for the &
+                &number of digits in the ASCII exponent.'
+              call PrintErrMsg(option)
+            endif
+          endif
+        endif
 !.................
       case default
         string = 'OUTPUT,' // trim(block_name)

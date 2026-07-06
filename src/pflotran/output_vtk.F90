@@ -314,7 +314,6 @@ subroutine WriteVTKGrid(fid,realization_base)
   PetscInt :: vertex_id
   PetscErrorCode :: ierr
 
-1000 format(es13.6,1x,es13.6,1x,es13.6)
 1001 format(i1,8(1x,i8))
 
   call PetscLogEventBegin(logging%event_output_grid_vtk,ierr);CHKERRQ(ierr)
@@ -352,10 +351,16 @@ subroutine WriteVTKGrid(fid,realization_base)
             y = discretization%origin_global(Y_DIRECTION)
           endif
           x = discretization%origin_global(X_DIRECTION)
-          write(fid,1000) x,y,z
+          call WriteRealFixedNoAdv(fid,x)
+          call WriteRealFixedNoAdv(fid,y)
+          call WriteRealFixedNoAdv(fid,z)
+          call WriteNewLine(fid)
           do i=1,nx
             x = x + grid%structured_grid%dx_global(i)
-            write(fid,1000) x,y,z
+            call WriteRealFixedNoAdv(fid,x)
+            call WriteRealFixedNoAdv(fid,y)
+            call WriteRealFixedNoAdv(fid,z)
+            call WriteNewLine(fid)
           enddo
         enddo
       enddo
@@ -376,7 +381,7 @@ subroutine WriteVTKGrid(fid,realization_base)
         enddo
       enddo
 
-      write(fid,'(a)') ""
+      call WriteNewLine(fid)
 
 1030 format('CELL_TYPES',1x,i12)
       write(fid,1030) grid%nmax
@@ -384,7 +389,7 @@ subroutine WriteVTKGrid(fid,realization_base)
         write(fid,'(i2)') 12
       enddo
 
-      write(fid,'(a)') ""
+      call WriteNewLine(fid)
 
     endif
   else
@@ -469,7 +474,6 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
   PetscReal, allocatable :: real_data(:), real_data_recv(:)
   PetscErrorCode :: ierr
 
-1001 format(10(es13.6,1x))
 1002 format(i3)
 
   patch => realization_base%patch
@@ -549,7 +553,8 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
         istart = iend+1
         if (iend+10 > local_size_mpi) exit
         iend = istart+9
-        write(fid,1001) real_data(istart:iend)
+        call WriteRealNoAdv(fid,real_data(istart:iend))
+        call WriteNewLine(fid)
       enddo
       ! shift remaining data to front of array
       real_data(1:local_size_mpi-iend) = real_data(iend+1:local_size_mpi)
@@ -602,7 +607,8 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
           istart = iend+1
           if (iend+10 > num_in_array) exit
           iend = istart+9
-          write(fid,1001) real_data(istart:iend)
+          call WriteRealNoAdv(fid,real_data(istart:iend))
+          call WriteNewLine(fid)
         enddo
         if (iend > 0) then
           real_data(1:num_in_array-iend) = real_data(iend+1:num_in_array)
@@ -622,10 +628,12 @@ subroutine WriteVTKDataSet(fid,realization_base,dataset_name,array,datatype, &
       if (num_in_array > 0) &
         write(fid,1002) integer_data(1:num_in_array)
     else
-      if (num_in_array > 0) &
-        write(fid,1001) real_data(1:num_in_array)
+      if (num_in_array > 0) then
+        call WriteRealNoAdv(fid,real_data(1:num_in_array))
+        call WriteNewLine(fid)
+      endif
     endif
-    write(fid,'(/)')
+    call WriteNewLine(fid)
   else
 #ifdef HANDSHAKE
     if (option%io_handshake_buffer_size > 0) then

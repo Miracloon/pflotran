@@ -110,6 +110,7 @@ MATERIAL_PROPERTY soil1
 
 #========================= output options =========================
 OUTPUT
+  ASCII_DIGITS_OF_PRECISION 7
   TIMES s 2.6042e4 3.9063e4 5.2083e4
   PERIODIC_OBSERVATION TIMESTEP 1
   PRINT_COLUMN_IDS

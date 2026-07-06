@@ -82,7 +82,7 @@ subroutine OutputTecplotHeader(fid,realization_base,icolumn)
                                       output_option%output_snap_variable_list, &
                                        '',icolumn,PETSC_TRUE,variable_count)
   ! need to terminate line
-  write(fid,'(a)') ''
+  call WriteNewLine(fid)
   ! add x, y, z variables to count
   variable_count = variable_count + 3
 
@@ -850,8 +850,8 @@ subroutine OutputTecplotWriteFluxVelBlock(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
-                           adjusted_size)
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array, &
+                                   TECPLOT_REAL,adjusted_size,PETSC_TRUE)
   ! since the array has potentially been resized, must reallocate
   deallocate(array)
   nullify(array)
@@ -876,8 +876,8 @@ subroutine OutputTecplotWriteFluxVelBlock(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
-                           adjusted_size)
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array, &
+                                   TECPLOT_REAL,adjusted_size,PETSC_TRUE)
   deallocate(array)
   nullify(array)
 
@@ -901,8 +901,8 @@ subroutine OutputTecplotWriteFluxVelBlock(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
-                           adjusted_size)
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array, &
+                                   TECPLOT_REAL,adjusted_size,PETSC_TRUE)
   deallocate(array)
   nullify(array)
 
@@ -918,8 +918,8 @@ subroutine OutputTecplotWriteFluxVelBlock(realization_base,iphase, &
   adjusted_size = local_size
   call OutputConvertArrayToNatural(indices,array,adjusted_size, &
                                    global_size,option)
-  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array,TECPLOT_REAL, &
-                           adjusted_size)
+  call OutputTecplotWriteDataset(OUTPUT_UNIT,realization_base,array, &
+                                 TECPLOT_REAL,adjusted_size,PETSC_FALSE)
   deallocate(array)
   deallocate(indices)
 
@@ -991,15 +991,13 @@ subroutine OutputTecplotPoint(realization_base)
     call OutputTecplotHeader(OUTPUT_UNIT,realization_base,icolumn)
   endif
 
-1000 format(es13.6,1x)
 1001 format(i4,1x)
-1009 format('')
 
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
-    write(OUTPUT_UNIT,1000,advance='no') grid%x(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') grid%y(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') grid%z(ghosted_id)
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%x(ghosted_id))
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%y(ghosted_id))
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%z(ghosted_id))
 
     ! loop over snapshot variables and write to file
     cur_variable => output_option%output_snap_variable_list%first
@@ -1010,14 +1008,14 @@ subroutine OutputTecplotPoint(realization_base)
                                            cur_variable%isubvar, &
                                            cur_variable%isubsubvar)
       if (cur_variable%iformat == 0) then
-        write(OUTPUT_UNIT,1000,advance='no') value
+        call WriteRealNoAdv(OUTPUT_UNIT,value)
       else
         write(OUTPUT_UNIT,1001,advance='no') int(value)
       endif
       cur_variable => cur_variable%next
     enddo
 
-    write(OUTPUT_UNIT,1009)
+    call WriteNewLine(OUTPUT_UNIT)
 
   enddo
 
@@ -1146,9 +1144,7 @@ subroutine OutputTecplotVelocitiesPoint(realization_base)
   call VecGetArray(global_vec_vlz,vec_ptr_vlz,ierr);CHKERRQ(ierr)
 
   ! write points
-1000 format(es13.6,1x)
 1001 format(i4,1x)
-1009 format('')
 
   if (option%nphase > 1 .or. option%transport%nphase > 1) then
     call DiscretizationCreateVector(discretization,ONEDOF,global_vec_vgx, &
@@ -1170,18 +1166,18 @@ subroutine OutputTecplotVelocitiesPoint(realization_base)
   do local_id = 1, grid%nlmax
     ghosted_id = grid%nL2G(local_id)
     ! local and ghosted are same for non-parallel
-    write(OUTPUT_UNIT,1000,advance='no') grid%x(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') grid%y(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') grid%z(ghosted_id)
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%x(ghosted_id))
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%y(ghosted_id))
+    call WriteRealFixedNoAdv(OUTPUT_UNIT,grid%z(ghosted_id))
 
-    write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vlx(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vly(ghosted_id)
-    write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vlz(ghosted_id)
+    call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vlx(ghosted_id))
+    call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vly(ghosted_id))
+    call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vlz(ghosted_id))
 
     if (option%nphase > 1 .or. option%transport%nphase > 1) then
-      write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vgx(ghosted_id)
-      write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vgy(ghosted_id)
-      write(OUTPUT_UNIT,1000,advance='no') vec_ptr_vgz(ghosted_id)
+      call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vgx(ghosted_id))
+      call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vgy(ghosted_id))
+      call WriteRealNoAdv(OUTPUT_UNIT,vec_ptr_vgz(ghosted_id))
     endif
 
     ! material id
@@ -1189,7 +1185,7 @@ subroutine OutputTecplotVelocitiesPoint(realization_base)
                                          MATERIAL_ID,ZERO_INTEGER)
     write(OUTPUT_UNIT,1001,advance='no') int(value)
 
-    write(OUTPUT_UNIT,1009)
+    call WriteNewLine(OUTPUT_UNIT)
   enddo
 
   call VecRestoreArray(global_vec_vlx,vec_ptr_vlx,ierr);CHKERRQ(ierr)
@@ -1349,8 +1345,6 @@ subroutine OutputTecplotWriteStructuredGrid(fid,realization_base)
   PetscReal :: temp_real
   PetscErrorCode :: ierr
 
-1000 format(es13.6,1x)
-
   call PetscLogEventBegin(logging%event_output_str_grid_tecplot, &
                           ierr);CHKERRQ(ierr)
 
@@ -1368,57 +1362,57 @@ subroutine OutputTecplotWriteStructuredGrid(fid,realization_base)
     do k=1,nz+1
       do j=1,ny+1
         temp_real = realization_base%discretization%origin_global(X_DIRECTION)
-        write(fid,1000,advance='no') temp_real
+        call WriteRealFixedNoAdv(fid,temp_real)
         count = count + 1
         if (mod(count,10) == 0) then
-          write(fid,'(a)') ""
+          call WriteNewLine(fid)
           count = 0
         endif
         do i=1,nx
           temp_real = temp_real + grid%structured_grid%dx_global(i)
-          write(fid,1000,advance='no') temp_real
+          call WriteRealFixedNoAdv(fid,temp_real)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
       enddo
     enddo
-    if (count /= 0) write(fid,'(a)') ""
+    if (count /= 0) call WriteNewLine(fid)
     ! y-dir
     count = 0
     do k=1,nz+1
       temp_real = realization_base%discretization%origin_global(Y_DIRECTION)
       do i=1,nx+1
-        write(fid,1000,advance='no') temp_real
+        call WriteRealFixedNoAdv(fid,temp_real)
         count = count + 1
         if (mod(count,10) == 0) then
-          write(fid,'(a)') ""
+          call WriteNewLine(fid)
           count = 0
         endif
       enddo
       do j=1,ny
         temp_real = temp_real + grid%structured_grid%dy_global(j)
         do i=1,nx+1
-          write(fid,1000,advance='no') temp_real
+          call WriteRealFixedNoAdv(fid,temp_real)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
       enddo
     enddo
-    if (count /= 0) write(fid,'(a)') ""
+    if (count /= 0) call WriteNewLine(fid)
     ! z-dir
     count = 0
     temp_real = realization_base%discretization%origin_global(Z_DIRECTION)
     do i=1,(nx+1)*(ny+1)
-      write(fid,1000,advance='no') temp_real
+      call WriteRealFixedNoAdv(fid,temp_real)
       count = count + 1
       if (mod(count,10) == 0) then
-        write(fid,'(a)') ""
+        call WriteNewLine(fid)
         count = 0
       endif
     enddo
@@ -1426,16 +1420,16 @@ subroutine OutputTecplotWriteStructuredGrid(fid,realization_base)
       temp_real = temp_real + grid%structured_grid%dz_global(k)
       do j=1,ny+1
         do i=1,nx+1
-          write(fid,1000,advance='no') temp_real
+          call WriteRealFixedNoAdv(fid,temp_real)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
       enddo
     enddo
-    if (count /= 0) write(fid,'(a)') ""
+    if (count /= 0) call WriteNewLine(fid)
 
   endif
 
@@ -1482,8 +1476,6 @@ subroutine OutputTecplotWriteUGridVertices(fid,realization_base)
   option => realization_base%option
   output_option => realization_base%output_option
 
-1000 format(es13.6,1x)
-
   select case (grid%itype)
     case (IMPLICIT_UNSTRUCTURED_GRID, POLYHEDRA_UNSTRUCTURED_GRID)
       call VecCreateMPI(option%mycomm,PETSC_DECIDE, &
@@ -1494,24 +1486,24 @@ subroutine OutputTecplotWriteUGridVertices(fid,realization_base)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex x-coordinate'
-      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
-      local_size)
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr, &
+                                     TECPLOT_REAL,local_size,PETSC_TRUE)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
       call OutputGetVertexCoordinates(grid,global_vertex_vec,Y_COORDINATE,option)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex y-coordinate'
-      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
-      local_size)
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr, &
+                                     TECPLOT_REAL,local_size,PETSC_TRUE)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
       call OutputGetVertexCoordinates(grid,global_vertex_vec, Z_COORDINATE,option)
       call VecGetArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
       if (OptionIsIORank(option)) &
         write(fid,'(a)') '# vertex z-coordinate'
-      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,TECPLOT_REAL, &
-      local_size)
+      call OutputTecplotWriteDataset(fid,realization_base,vec_ptr, &
+                                     TECPLOT_REAL,local_size,PETSC_TRUE)
       call VecRestoreArray(global_vertex_vec,vec_ptr,ierr);CHKERRQ(ierr)
 
       call VecDestroy(global_vertex_vec,ierr);CHKERRQ(ierr)
@@ -1521,37 +1513,37 @@ subroutine OutputTecplotWriteUGridVertices(fid,realization_base)
         num_verts = grid%unstructured_grid%explicit_grid%num_vertices
         count = 0
         do ivert = 1, num_verts
-          write(fid,1000,advance='no') grid%unstructured_grid%explicit_grid% &
-                                       vertex_coordinates(ivert)%x
+          call WriteRealFixedNoAdv(fid,grid%unstructured_grid%explicit_grid% &
+                                       vertex_coordinates(ivert)%x)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
-        if (count /= 0) write(fid,'(a)') ""
+        if (count /= 0) call WriteNewLine(fid)
         count = 0
         do ivert = 1, num_verts
-          write(fid,1000,advance='no') grid%unstructured_grid%explicit_grid% &
-                                       vertex_coordinates(ivert)%y
+          call WriteRealFixedNoAdv(fid,grid%unstructured_grid%explicit_grid% &
+                                       vertex_coordinates(ivert)%y)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
-        if (count /= 0) write(fid,'(a)') ""
+        if (count /= 0) call WriteNewLine(fid)
         count = 0
         do ivert = 1, num_verts
-          write(fid,1000,advance='no') grid%unstructured_grid%explicit_grid% &
-                                       vertex_coordinates(ivert)%z
+          call WriteRealFixedNoAdv(fid,grid%unstructured_grid%explicit_grid% &
+                                       vertex_coordinates(ivert)%z)
           count = count + 1
           if (mod(count,10) == 0) then
-            write(fid,'(a)') ""
+            call WriteNewLine(fid)
             count = 0
           endif
         enddo
-        if (count /= 0) write(fid,'(a)') ""
+        if (count /= 0) call WriteNewLine(fid)
         elseif (output_option%print_explicit_dual_grid) then
           write(fid,'(">",/,"Add explicit mesh vertex information here",/,">")')
         else
@@ -1718,9 +1710,9 @@ subroutine OutputTecplotWriteUGridElements(fid,realization_base)
                      INSERT_VALUES,SCATTER_FORWARD,ierr);CHKERRQ(ierr)
   call VecGetArray(natural_vec,vec_ptr,ierr);CHKERRQ(ierr)
   call OutputTecplotWriteDsetNumPerLine(fid,realization_base,vec_ptr, &
-                                     TECPLOT_INTEGER, &
-                                     grid%unstructured_grid%nlmax*8, &
-                                     EIGHT_INTEGER)
+                                        TECPLOT_INTEGER, &
+                                        grid%unstructured_grid%nlmax*8, &
+                                        EIGHT_INTEGER,PETSC_FALSE)
   call VecRestoreArray(natural_vec,vec_ptr,ierr);CHKERRQ(ierr)
   call VecDestroy(global_vec,ierr);CHKERRQ(ierr)
   call VecDestroy(natural_vec,ierr);CHKERRQ(ierr)
@@ -1862,26 +1854,24 @@ subroutine OutputTecplotWriteDatasetFromVec(fid,realization_base,vec,datatype)
   PetscReal, pointer :: vec_ptr(:)
 
   call VecGetArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
-  call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,datatype,ZERO_INTEGER)
+  call OutputTecplotWriteDataset(fid,realization_base,vec_ptr,datatype, &
+                                 ZERO_INTEGER,PETSC_FALSE)
   call VecRestoreArray(vec,vec_ptr,ierr);CHKERRQ(ierr)
 
 end subroutine OutputTecplotWriteDatasetFromVec
 
 ! ************************************************************************** !
 
-subroutine OutputTecplotWriteDataset(fid,realization_base,array,datatype,size_flag)
+subroutine OutputTecplotWriteDataset(fid,realization_base,array,datatype, &
+                                     size_flag,write_fixed)
   !
-  ! Writes data from an array within a block
-  ! of a Tecplot file
+  ! Writes data from an array within a block of a Tecplot file.
   !
   ! Author: Glenn Hammond
   ! Date: 10/25/07
   !
 
   use Realization_Base_class, only : realization_base_type
-  use Grid_module
-  use Option_module
-  use Patch_module
 
   implicit none
 
@@ -1889,23 +1879,23 @@ subroutine OutputTecplotWriteDataset(fid,realization_base,array,datatype,size_fl
   class(realization_base_type) :: realization_base
   PetscReal :: array(:)
   PetscInt :: datatype
-  PetscInt :: size_flag ! if size_flag /= 0, use size_flag as the local size
+  PetscInt :: size_flag
+  PetscBool :: write_fixed
 
   PetscInt, parameter :: num_per_line = 10
 
   call OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype, &
-                                     size_flag,num_per_line)
+                                        size_flag,num_per_line,write_fixed)
 
 end subroutine OutputTecplotWriteDataset
 
 ! ************************************************************************** !
 
 subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype, &
-                                         size_flag,num_per_line)
+                                            size_flag,num_per_line,write_fixed)
   !
-  ! Writes data from an array within a block
-  ! of a Tecplot file with a specified number
-  ! of values per line
+  ! Writes data from an array within a block of a Tecplot file with a
+  ! specified number of values per line.
   !
   ! Author: Glenn Hammond
   ! Date: 10/25/07, 12/02/11
@@ -1924,6 +1914,7 @@ subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype,
   PetscInt :: datatype
   PetscInt :: size_flag ! if size_flag /= 0, use size_flag as the local size
   PetscInt :: num_per_line
+  PetscBool :: write_fixed
 
   type(grid_type), pointer :: grid
   type(option_type), pointer :: option
@@ -1944,7 +1935,6 @@ subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype,
 1002 format(100(i6,1x))
 1003 format(100(i8,1x))
 1004 format(100(i10,1x))
-1010 format(100(es13.6,1x))
 
   patch => realization_base%patch
   grid => patch%grid
@@ -2032,8 +2022,13 @@ subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype,
         istart = iend+1
         if (iend+num_per_line > local_size_mpi) exit
         iend = istart+(num_per_line-1)
-        ! if num_per_line exceeds 100, need to change the format statement below
-        write(fid,1010) real_data(istart:iend)
+        ! if num_per_line exceeds 100, need to change format statement below
+        if (write_fixed) then
+          call WriteRealFixedNoAdv(fid,real_data(istart:iend))
+        else
+          call WriteRealNoAdv(fid,real_data(istart:iend))
+        endif
+        call WriteNewLine(fid)
       enddo
       ! shift remaining data to front of array
       real_data(1:local_size_mpi-iend) = real_data(iend+1:local_size_mpi)
@@ -2097,8 +2092,13 @@ subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype,
           istart = iend+1
           if (iend+num_per_line > num_in_array) exit
           iend = istart+(num_per_line-1)
-          ! if num_per_line exceeds 100, need to change the format statement below
-          write(fid,1010) real_data(istart:iend)
+          ! if num_per_line exceeds 100, need to change format statement below
+          if (write_fixed) then
+            call WriteRealFixedNoAdv(fid,real_data(istart:iend))
+          else
+            call WriteRealNoAdv(fid,real_data(istart:iend))
+          endif
+          call WriteNewLine(fid)
         enddo
         if (iend > 0) then
           real_data(1:num_in_array-iend) = real_data(iend+1:num_in_array)
@@ -2130,8 +2130,14 @@ subroutine OutputTecplotWriteDsetNumPerLine(fid,realization_base,array,datatype,
         endif
       endif
     else
-      if (num_in_array > 0) &
-        write(fid,1010) real_data(1:num_in_array)
+      if (num_in_array > 0) then
+        if (write_fixed) then
+          call WriteRealFixedNoAdv(fid,real_data(1:num_in_array))
+        else
+          call WriteRealNoAdv(fid,real_data(1:num_in_array))
+        endif
+        call WriteNewLine(fid)
+      endif
     endif
   else
 #ifdef HANDSHAKE
@@ -2243,8 +2249,6 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
     call PrintMsg(option)
   endif
 
-
-1000 format(es13.6,1x)
 1001 format(i10,1x)
 
  ! Order of printing for the 1st file
@@ -2256,10 +2260,10 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
   do i = 1, count
     write(OUTPUT_UNIT,1001,advance='no') nat_ids_up(i)
     write(OUTPUT_UNIT,1001,advance='no') nat_ids_dn(i)
-    write(OUTPUT_UNIT,1000,advance='no') darcy(i)
-    write(OUTPUT_UNIT,1000,advance='no') density_kg(i)
-    write(OUTPUT_UNIT,1000,advance='no') area(i)
-    write(OUTPUT_UNIT,'(a)')
+    call WriteRealNoAdv(OUTPUT_UNIT,darcy(i))
+    call WriteRealNoAdv(OUTPUT_UNIT,density_kg(i))
+    call WriteRealNoAdv(OUTPUT_UNIT,area(i))
+    call WriteNewLine(OUTPUT_UNIT)
   enddo
   close(OUTPUT_UNIT)
 
@@ -2281,11 +2285,11 @@ subroutine OutputTecplotWriteExplFlowrates(realization_base)
   open(unit=OUTPUT_UNIT,file=trim(string),action="write")
   do icell = 1, num_cells
     write(OUTPUT_UNIT,1001,advance='no') ids(icell)
-    write(OUTPUT_UNIT,1000,advance='no') sat(icell)
-    write(OUTPUT_UNIT,1000,advance='no') por(icell)
-    write(OUTPUT_UNIT,1000,advance='no') density_kg(icell)
-    write(OUTPUT_UNIT,1000,advance='no') pressure(icell)
-    write(OUTPUT_UNIT,'(a)')
+    call WriteRealNoAdv(OUTPUT_UNIT,sat(icell))
+    call WriteRealNoAdv(OUTPUT_UNIT,por(icell))
+    call WriteRealNoAdv(OUTPUT_UNIT,density_kg(icell))
+    call WriteRealNoAdv(OUTPUT_UNIT,pressure(icell))
+    call WriteNewLine(OUTPUT_UNIT)
   enddo
   close(OUTPUT_UNIT)
 
@@ -2345,6 +2349,7 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
   PetscInt :: local_id
   PetscInt :: naqcomp, nkinmnrl
   PetscReal, pointer :: dist(:)
+  PetscReal :: tempreal
 
   patch => realization_base%patch
   option => realization_base%option
@@ -2368,9 +2373,6 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
   endif
 
   ! write points
-1000 format(es13.6,1x)
-1009 format('')
-
   count = 0
   observation => patch%observation_list%first
   do
@@ -2445,8 +2447,7 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
                   option%nsec_cells
     string = trim(string) // ',J=1, K=1, DATAPACKING=POINT'
     write(OUTPUT_UNIT,'(a)',advance='no') trim(string)
-    write(OUTPUT_UNIT,1009)
-
+    call WriteNewLine(OUTPUT_UNIT)
 
     do sec_id = 1,option%nsec_cells
       do icell = 1,observation%region%num_cells
@@ -2459,32 +2460,31 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
         endif
 
         if (size(dist) < sec_id) then
-          write(OUTPUT_UNIT,1000,advance='no') &
-              -999.d0
+          call WriteRealNoAdv(OUTPUT_UNIT,-999.d0)
         else
-          write(OUTPUT_UNIT,1000,advance='no') dist(sec_id)
+          call WriteRealNoAdv(OUTPUT_UNIT,dist(sec_id))
         endif
 
         if (observation%print_secondary_data(1)) then
-          write(OUTPUT_UNIT,1000,advance='no') &
-          RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+          tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
                                        SECONDARY_TEMPERATURE,sec_id)
+          call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
         endif
         if (observation%print_secondary_data(2)) then
           if (associated(reaction)) then
             if (reaction%naqcomp > 0) then
               do naqcomp = 1, reaction%naqcomp
-                write(OUTPUT_UNIT,1000,advance='no') &
-                RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+                tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
                                              SECONDARY_CONCENTRATION,sec_id, &
                                              naqcomp)
+                call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
               enddo
             endif
             do i=1,reaction%gas%nactive_gas
               if (reaction%gas%active_print_me(i)) then
-                write(OUTPUT_UNIT,1000,advance='no') &
-                RealizGetVariableValueAtCell(realization_base,ghosted_id, &
-                                               SECONDARY_CONCENTRATION_GAS,sec_id,i)
+                tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+                                             SECONDARY_CONCENTRATION_GAS,sec_id,i)
+                call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
               endif
             enddo
           endif
@@ -2494,9 +2494,9 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
             if (associated(reaction%mineral)) then
               if (reaction%mineral%nkinmnrl > 0) then
                 do nkinmnrl = 1, reaction%mineral%nkinmnrl
-                  write(OUTPUT_UNIT,1000,advance='no') &
-                  RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+                  tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
                                                SEC_MIN_VOLFRAC,sec_id,nkinmnrl)
+                  call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
                 enddo
               endif
             endif
@@ -2507,9 +2507,9 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
             if (associated(reaction%mineral)) then
               if (reaction%mineral%nkinmnrl > 0) then
                 do nkinmnrl = 1, reaction%mineral%nkinmnrl
-                  write(OUTPUT_UNIT,1000,advance='no') &
-                  RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+                  tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
                                                SEC_MIN_RATE,sec_id,nkinmnrl)
+                  call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
                 enddo
               endif
             endif
@@ -2520,16 +2520,16 @@ subroutine OutputTecplotSecondaryContinuum(realization_base)
             if (associated(reaction%mineral)) then
               if (reaction%mineral%nkinmnrl > 0) then
                 do nkinmnrl = 1, reaction%mineral%nkinmnrl
-                  write(OUTPUT_UNIT,1000,advance='no') &
-                  RealizGetVariableValueAtCell(realization_base,ghosted_id, &
+                  tempreal = RealizGetVariableValueAtCell(realization_base,ghosted_id, &
                                                SEC_MIN_SI,sec_id,nkinmnrl)
+                  call WriteRealNoAdv(OUTPUT_UNIT,tempreal)
                 enddo
               endif
             endif
           endif
         endif
       enddo
-      write(OUTPUT_UNIT,1009)
+      call WriteNewLine(OUTPUT_UNIT)
     enddo
 
     close(OUTPUT_UNIT)
@@ -2765,28 +2765,28 @@ subroutine OutputTecplotWritePolyUGridElem(fid,realization_base)
                       grid%unstructured_grid%polyhedra_grid%uface_nverts*1.d0, &
                       TECPLOT_INTEGER, &
                       grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
-                      TEN_INTEGER)
+                      TEN_INTEGER,PETSC_FALSE)
 
   write(fid,'(a)') '# id of vertices/nodes forming a face'
   call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
                   grid%unstructured_grid%polyhedra_grid%uface_natvertids*1.d0, &
                   TECPLOT_INTEGER, &
                   grid%unstructured_grid%polyhedra_grid%num_verts_of_ufaces_local, &
-                  FOUR_INTEGER)
+                  FOUR_INTEGER,PETSC_FALSE)
 
   write(fid,'(a)') '# id of control-volume/element left of a face'
   call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
              grid%unstructured_grid%polyhedra_grid%uface_left_natcellids*1.d0, &
              TECPLOT_INTEGER, &
              grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
-             TEN_INTEGER)
+             TEN_INTEGER,PETSC_FALSE)
 
   write(fid,'(a)') '# id of control-volume/element right of a face'
   call OutputTecplotWriteDsetNumPerLine(fid, realization_base, &
             grid%unstructured_grid%polyhedra_grid%uface_right_natcellids*1.d0, &
             TECPLOT_INTEGER, &
             grid%unstructured_grid%polyhedra_grid%num_ufaces_local, &
-            TEN_INTEGER)
+            TEN_INTEGER,PETSC_FALSE)
 
 end subroutine OutputTecplotWritePolyUGridElem
 

@@ -35,6 +35,7 @@ OUTPUT
   MASS_BALANCE_FILE
     PERIODIC TIMESTEP 1
   /
+  ASCII_DIGITS_OF_PRECISION 9
 END
 
 #=========================== times ============================================
