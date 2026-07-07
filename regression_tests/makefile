@@ -61,6 +61,7 @@ STANDARD_CFG = \
 	co2/sco2.cfg \
 	default/543/543.cfg \
 	default/anisothermal/anisothermal.cfg \
+	default/anisotropic_perm/aniso_perm1.cfg \
 	default/batch/batch.cfg \
 	default/batch/nucleation/nucleation.cfg \
 	default/capillarity/capillarity.cfg \
@@ -198,6 +199,7 @@ GEOMECHANICS_CFG = \
 
 FLOW_CFG = \
 	default/543/543.cfg \
+	default/anisotropic_perm/aniso_perm1.cfg \
 	default/condition/condition.cfg \
 	default/eos/eos.cfg \
 	default/infiltration1d/infiltration1d.cfg \

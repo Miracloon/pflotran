@@ -1,0 +1,22 @@
+# Flow with anisotropic permeabilty field
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+      OPTIONS
+        STEADY_STATE
+      END
+    END
+  END
+END
+
+SUBSURFACE
+
+## Set non-physical density to obtain easier numbers for debugging
+EOS WATER
+  DENSITY CONSTANT 1000
+END
+
+

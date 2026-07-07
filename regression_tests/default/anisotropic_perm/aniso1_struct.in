@@ -1,0 +1,32 @@
+EXTERNAL_FILE aniso1_common_head.in
+
+#=========================== discretization ===================================
+GRID
+  TYPE structured
+  NXYZ 4 1 4
+  BOUNDS
+    0.d0 0.d0  0.0d0
+    1.d0 1.d-1 1.d0
+  END
+  # BOX stencil type is needed for anisotropic permeability Jacobian terms
+  STENCIL_TYPE BOX
+END
+
+EXTERNAL_FILE aniso1_common_body.in
+
+#=========================== regression tests ============================
+
+REGRESSION
+  CELL_IDS
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+  /
+END
+
+END_SUBSURFACE

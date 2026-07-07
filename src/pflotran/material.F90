@@ -563,6 +563,15 @@ subroutine MaterialPropertyRead(material_property,input,option)
             case('FULL_TENSOR')
               material_property%full_permeability_tensor = PETSC_TRUE
               option%flow%full_perm_tensor = PETSC_TRUE
+            case('INCLUDE_OFF_DIAGONAL')
+              ! Include off-diagonal terms in flux calculations (i.e. not just
+              ! tensor to scalar operations)
+              ! Note. Presence of this keyword in a single permeability block
+              ! will enable off-diagonal terms on all connections, not just
+              ! connections in/adjacent to the relevant material.
+              option%connections_with_aniso_data = PETSC_TRUE
+              material_property%full_permeability_tensor = PETSC_TRUE
+              option%flow%full_perm_tensor = PETSC_TRUE
             case('VERTICAL_ANISOTROPY_RATIO')
               material_property%isotropic_permeability = PETSC_FALSE
               call InputReadDouble(input,option, &

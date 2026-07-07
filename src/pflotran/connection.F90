@@ -3,6 +3,7 @@ module Connection_module
 #include "petsc/finclude/petscsys.h"
   use petscsys
   use PFLOTRAN_Constants_module
+  use Anisotropy_Geom_Data_module
 
   implicit none
 
@@ -33,6 +34,8 @@ module Connection_module
     PetscReal, pointer :: cntr(:,:)    ! coordinates (1:3, num_connections) of the mass center of the face
     PetscInt, pointer :: face_id(:)    ! list of ids of faces (in local order)
     type(connection_set_type), pointer :: next
+
+    type(aniso_geom_data_type), pointer :: aniso_geom(:)           ! anisotropy data, one set per connection (if needed)
   end type connection_set_type
 
 
@@ -88,6 +91,7 @@ function ConnectionCreate(num_connections,connection_itype,grid_itype)
   nullify(connection%id_dn)
   nullify(connection%id_up2)
   nullify(connection%id_dn2)
+  nullify(connection%aniso_geom)
   nullify(connection%face_id)
   nullify(connection%dist)
   nullify(connection%intercp)
@@ -287,6 +291,7 @@ subroutine ConnectionDestroy(connection)
   implicit none
 
   type(connection_set_type), pointer :: connection
+  PetscInt :: nconn, iconn
 
   if (.not.associated(connection)) return
 
@@ -302,6 +307,15 @@ subroutine ConnectionDestroy(connection)
   call DeallocateArray(connection%cntr)
 
   nullify(connection%next)
+
+  if( associated(connection%aniso_geom) ) then
+    nconn = size(connection%aniso_geom)
+    do iconn = 1, nconn
+      call connection%aniso_geom(iconn)%DestroyMembers()
+    enddo
+    deallocate(connection%aniso_geom)
+    nullify(connection%aniso_geom)
+  endif
 
   deallocate(connection)
   nullify(connection)

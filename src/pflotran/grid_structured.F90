@@ -7,6 +7,8 @@ module Grid_Structured_module
   use PFLOTRAN_Constants_module
   use Utility_module, only : Equal
 
+  use Anisotropy_Geom_Data_module
+
   implicit none
 
   private
@@ -832,6 +834,8 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
 
   use Connection_module
   use Option_module
+  use Utility_module, only : DotProduct
+  use Geometry_module
 
   implicit none
 
@@ -842,7 +846,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
 
   PetscReal, parameter :: Pi=3.141592653590d0
 
-  PetscInt :: i, j, k, iconn, id_up, id_dn, id_up2, id_dn2
+  PetscInt :: i, j, k, iconn, id_up, id_dn, id_up2, id_dn2, iupdn
   PetscInt :: nconn
   PetscInt :: lenx, leny, lenz
   PetscInt :: tvd_ghost_offset, ghost_count
@@ -851,6 +855,15 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
   type(connection_set_type), pointer :: connections
 
   PetscReal, pointer :: radius(:)
+
+  ! these used in aniso calcs
+  type(aniso_geom_data_type), pointer :: aniso_geom_data
+  type(aniso_cell_data_type), pointer :: aniso_updn
+  PetscReal :: distvec(1:3)
+  PetscInt :: id, iadj
+
+  nullify(aniso_geom_data)
+  nullify(aniso_updn)
 
   radius => xc
 
@@ -877,6 +890,10 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
     allocate(connections%id_dn2(size(connections%id_dn)))
     connections%id_up2 = 0
     connections%id_dn2 = 0
+  endif
+
+  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+    allocate(connections%aniso_geom(nconn))
   endif
 
   iconn = 0
@@ -923,6 +940,105 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               connections%dist(1,iconn) = 1.d0  ! x component of unit vector
               connections%area(iconn) = struct_grid%dy(id_up)* &
                                         struct_grid%dz(id_up)
+
+              if (associated(connections%aniso_geom)) then
+                ! Set up prperties for anisotropy calculations
+                aniso_geom_data => connections%aniso_geom(iconn)
+                if (.not. aniso_geom_data%is_initialised) then
+                  ! there are up to 4 cells adjacent to up/dn cells
+                  call aniso_geom_data%InitialiseMembers(4)
+                endif
+
+                ! connections%face_id is not set for structured grid?  Set to iconn
+                aniso_geom_data%conn_face_id = iconn
+
+                ! (u,v,w) coords on x-dir interface
+                aniso_geom_data%uvec = [ 1,0,0 ]
+                aniso_geom_data%vvec = [ 0,1,0 ]
+                aniso_geom_data%wvec = [ 0,0,1 ]
+
+                ! up/dn cell data
+                aniso_geom_data%up%cell_id = id_up
+                aniso_geom_data%up%cell_pos = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%up%cell_pos)
+
+                aniso_geom_data%dn%cell_id = id_dn
+                aniso_geom_data%dn%cell_pos = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%dn%cell_pos)
+
+                ! up/dn adjacent cell data
+                if (j==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + (j-1) * struct_grid%ngx + k * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + (j-1) * struct_grid%ngx + k * struct_grid%ngxy + 1
+                endif
+                if (j==struct_grid%ngy-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + (j+1) * struct_grid%ngx + k * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + (j+1) * struct_grid%ngx + k * struct_grid%ngxy + 1
+                endif
+                if (k==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + j * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + j * struct_grid%ngx + (k-1) * struct_grid%ngxy + 1
+                endif
+                if (k==struct_grid%ngz-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + j * struct_grid%ngx + (k+1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + j * struct_grid%ngx + (k+1) * struct_grid%ngxy + 1
+                endif
+
+                ! Gravity terms
+                distvec = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,distvec)
+                distvec = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,distvec)
+
+                do iadj = 1, aniso_geom_data%up%num_adj
+                  id = aniso_geom_data%up%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%up%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                do iadj = 1, aniso_geom_data%dn%num_adj
+                  id = aniso_geom_data%dn%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%dn%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                call aniso_geom_data%MakeInterpolationParams(xc,yc,zc)
+
+              endif
             enddo
           enddo
         enddo
@@ -1015,6 +1131,104 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               connections%dist(2,iconn) = 1.d0  ! y component of unit vector
               connections%area(iconn) = struct_grid%dx(id_up)* &
                                     struct_grid%dz(id_up)
+
+              if (associated(connections%aniso_geom)) then
+                ! Set up prperties for anisotropy calculations
+                aniso_geom_data => connections%aniso_geom(iconn)
+                if (.not. aniso_geom_data%is_initialised) then
+                  ! there are up to 4 cells adjacent to up/dn cells
+                  call aniso_geom_data%InitialiseMembers(4)
+                endif
+
+                ! connections%face_id is not set for structured grid?  Set to iconn
+                aniso_geom_data%conn_face_id = iconn
+
+                ! (u,v,w) coords on y-dir interface
+                aniso_geom_data%uvec = [ 0,1,0 ]
+                aniso_geom_data%vvec = [ 0,0,1 ]
+                aniso_geom_data%wvec = [ 1,0,0 ]
+
+                ! up/dn cell data
+                aniso_geom_data%up%cell_id = id_up
+                aniso_geom_data%up%cell_pos = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%up%cell_pos)
+
+                aniso_geom_data%dn%cell_id = id_dn
+                aniso_geom_data%dn%cell_pos = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%dn%cell_pos)
+
+                if (i==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      (i-1) + 1 + (j-1) * struct_grid%ngx + k * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      (i-1) + 1 + (j-1) * struct_grid%ngx + k * struct_grid%ngxy + struct_grid%ngx
+                endif
+                if (i==struct_grid%ngx-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      (i+1) + 1 + (j-1) * struct_grid%ngx + k * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      (i+1) + 1 + (j-1) * struct_grid%ngx + k * struct_grid%ngxy + struct_grid%ngx
+                endif
+                if (k==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k-1) * struct_grid%ngxy + struct_grid%ngx
+                endif
+                if (k==struct_grid%ngz-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k+1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k+1) * struct_grid%ngxy + struct_grid%ngx
+                endif
+
+                ! Gravity terms
+                distvec = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,distvec)
+                distvec = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,distvec)
+
+                do iadj = 1, aniso_geom_data%up%num_adj
+                  id = aniso_geom_data%up%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%up%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                do iadj = 1, aniso_geom_data%dn%num_adj
+                  id = aniso_geom_data%dn%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%dn%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                call aniso_geom_data%MakeInterpolationParams(xc,yc,zc)
+
+              endif
             enddo
           enddo
         enddo
@@ -1073,6 +1287,104 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               connections%dist(3,iconn) = 1.d0  ! z component of unit vector
               connections%area(iconn) = struct_grid%dx(id_up) * &
                                         struct_grid%dy(id_up)
+
+              if (associated(connections%aniso_geom)) then
+                ! Set up prperties for anisotropy calculations
+                aniso_geom_data => connections%aniso_geom(iconn)
+                if (.not. aniso_geom_data%is_initialised) then
+                  ! there are up to 4 cells adjacent to up/dn cells
+                  call aniso_geom_data%InitialiseMembers(4)
+                endif
+
+                ! connections%face_id is not set for structured grid?  Set to iconn
+                aniso_geom_data%conn_face_id = iconn
+
+                ! (u,v,w) coords on x-dir interface
+                aniso_geom_data%uvec = [ 0,0,1 ]
+                aniso_geom_data%vvec = [ 1,0,0 ]
+                aniso_geom_data%wvec = [ 0,1,0 ]
+
+                ! up/dn cell data
+                aniso_geom_data%up%cell_id = id_up
+                aniso_geom_data%up%cell_pos = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%up%cell_pos)
+
+                aniso_geom_data%dn%cell_id = id_dn
+                aniso_geom_data%dn%cell_pos = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,&
+                                                    aniso_geom_data%dn%cell_pos)
+
+                if (i==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      (i-1) + 1 + j * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      (i-1) + 1 + j * struct_grid%ngx + (k-1) * struct_grid%ngxy + struct_grid%ngxy
+                endif
+                if (i==struct_grid%ngx-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      (i+1) + 1 + j * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      (i+1) + 1 + j * struct_grid%ngx + (k-1) * struct_grid%ngxy + struct_grid%ngxy
+                endif
+                if (j==0) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + 1 + (j-1) * struct_grid%ngx + (k-1) * struct_grid%ngxy + struct_grid%ngxy
+                endif
+                if (j==struct_grid%ngy-1) then
+                else
+                  aniso_geom_data%up%num_adj = aniso_geom_data%up%num_adj + 1
+                  aniso_geom_data%dn%num_adj = aniso_geom_data%dn%num_adj + 1
+
+                  id = aniso_geom_data%up%num_adj ! same as dn%num_adj
+
+                  aniso_geom_data%up%cell_id_adj(id) = &
+                      i + 1 + (j+1) * struct_grid%ngx + (k-1) * struct_grid%ngxy
+                  aniso_geom_data%dn%cell_id_adj(id) = &
+                      i + 1 + (j+1) * struct_grid%ngx + (k-1) * struct_grid%ngxy + struct_grid%ngxy
+                endif
+
+                ! Gravity terms
+                distvec = (/ xc(id_up),yc(id_up),zc(id_up) /)
+                aniso_geom_data%up%loc_gravity = DotProduct(option%gravity,distvec)
+                distvec = (/ xc(id_dn),yc(id_dn),zc(id_dn) /)
+                aniso_geom_data%dn%loc_gravity = DotProduct(option%gravity,distvec)
+
+                do iadj = 1, aniso_geom_data%up%num_adj
+                  id = aniso_geom_data%up%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%up%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                do iadj = 1, aniso_geom_data%dn%num_adj
+                  id = aniso_geom_data%dn%cell_id_adj(iadj)
+                  distvec = (/ xc(id),yc(id),zc(id) /)
+                  aniso_geom_data%dn%loc_gravity_adj(iadj) = DotProduct(option%gravity,distvec)
+                enddo
+
+                call aniso_geom_data%MakeInterpolationParams(xc,yc,zc)
+
+              endif
             enddo
           enddo
         enddo

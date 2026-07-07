@@ -9,6 +9,7 @@ module Richards_Aux_module
 
   use PFLOTRAN_Constants_module
   use Matrix_Zeroing_module
+  use Anisotropy_Richards_Data_module
   use Geomechanics_Linear_Aux_module
 
   implicit none
@@ -81,6 +82,7 @@ module Richards_Aux_module
     type(richards_auxvar_type), pointer :: auxvars(:)
     type(richards_auxvar_type), pointer :: auxvars_bc(:)
     type(richards_auxvar_type), pointer :: auxvars_ss(:)
+    type(aniso_richards_data_type), pointer :: aniso_richards_data(:) ! per connection, when needed
 #ifdef BUFFER_MATRIX
     type(matrix_buffer_type), pointer :: matrix_buffer
 #endif
@@ -124,6 +126,7 @@ function RichardsAuxCreate()
   nullify(aux%auxvars)
   nullify(aux%auxvars_bc)
   nullify(aux%auxvars_ss)
+  nullify(aux%aniso_richards_data)
 #ifdef BUFFER_MATRIX
   nullify(aux%matrix_buffer)
 #endif

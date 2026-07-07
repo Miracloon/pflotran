@@ -66,6 +66,7 @@ module Grid_Unstructured_Aux_module
                             ! (0,local_id) = number of neighbors for local_id
                             ! (iface=1:N,local_id) = ghosted_ids of neighbors
                             ! ghosted neighbors have negative ghost_ids
+    PetscBool, pointer :: cell_neighbors_local_aniso(:,:) ! flag anisotropy neighbors
     type(point3d_type), pointer :: vertices(:)
     type(point3d_type), pointer :: face_centroid(:)
     PetscReal, pointer :: face_area(:)
@@ -275,6 +276,7 @@ function UGridCreate()
   nullify(unstructured_grid%vertex_ids_natural)
   nullify(unstructured_grid%vertices)
   nullify(unstructured_grid%cell_neighbors_local_ghosted)
+  nullify(unstructured_grid%cell_neighbors_local_aniso)
   nullify(unstructured_grid%connection_to_face)
   nullify(unstructured_grid%face_centroid)
   nullify(unstructured_grid%face_area)
@@ -2047,6 +2049,8 @@ subroutine UGridDestroy(unstructured_grid)
   call DeallocateArray(unstructured_grid%cell_to_face_ghosted)
   call DeallocateArray(unstructured_grid%vertex_ids_natural)
   call DeallocateArray(unstructured_grid%cell_neighbors_local_ghosted)
+  if (associated(unstructured_grid%cell_neighbors_local_aniso)) &
+    deallocate(unstructured_grid%cell_neighbors_local_aniso)
   if (associated(unstructured_grid%vertices)) &
     deallocate(unstructured_grid%vertices)
   nullify(unstructured_grid%vertices)

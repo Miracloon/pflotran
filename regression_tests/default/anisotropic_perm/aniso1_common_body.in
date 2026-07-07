@@ -1,0 +1,204 @@
+#=========================== material properties ==============================
+MATERIAL_PROPERTY isoMaterial
+  ID 1
+  POROSITY   0.25d0
+  TORTUOSITY 0.5d0
+  SATURATION_FUNCTION sf1
+  PERMEABILITY
+    PERM_X 1.d-10
+    PERM_Y 1.d-10
+    PERM_Z 1.d-10
+  END
+END
+
+MATERIAL_PROPERTY anisoMaterial
+  ID 2
+  POROSITY   0.25d0
+  TORTUOSITY 0.5d0
+  SATURATION_FUNCTION sf1
+  PERMEABILITY
+    # treat as fully anisotropic (with off-diagonal)
+    INCLUDE_OFF_DIAGONAL
+    ANISOTROPIC
+    PERM_X   0.2d-9
+    PERM_Y   1.0d-9
+    PERM_Z   0.8d-9
+    PERM_XY  0.0d0
+    PERM_YZ  0.0d0
+#    PERM_XZ  0.4d-9
+    PERM_XZ  0.38d-9
+  END
+END
+
+#=========================== saturation functions =============================
+CHARACTERISTIC_CURVES sf1
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+    M 0.5d0
+    ALPHA 1.d-4
+    MAX_CAPILLARY_PRESSURE 1.d8
+  END
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  END
+END
+
+#=========================== output options ===================================
+OUTPUT
+TIME_UNITS s
+SNAPSHOT_FILE
+	FORMAT HDF5 SINGLE_FILE
+END
+  VELOCITY_AT_CENTER
+  VARIABLES
+	LIQUID_HEAD
+    PERMEABILITY_X
+    PERMEABILITY_Y
+    PERMEABILITY_Z
+    PERMEABILITY_XY
+    PERMEABILITY_YZ
+    PERMEABILITY_XZ
+  END
+END
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 10000.d0 y
+  # INITIAL_TIMESTEP_SIZE 1.d-2 y
+  MAXIMUM_TIMESTEP_SIZE 100 y        ! produces CFL ~<= 1.
+  MINIMUM_TIMESTEP_SIZE 1.d-2 y
+END
+
+#=========================== regions ==========================================
+REGION isoL
+  COORDINATES
+    0.d0  0.d0  0.d0
+    0.25d0 1.d-1 1.d0
+  END
+END
+
+REGION isoR
+  COORDINATES
+    0.75d0 0.d0  0.d0
+    1.d0  1.d-1 1.d0
+  END
+END
+
+REGION anisoL
+  COORDINATES
+    0.25d0 0.d0  0.d0
+    0.5d0 1.d-1 1.d0
+  END
+END
+REGION anisoR
+  COORDINATES
+    0.5d0 0.d0  0.d0
+    0.75d0 1.d-1 1.d0
+  END
+END
+
+REGION left
+  COORDINATES
+    0.d0 0.d0 0.d0
+    0.d0 1.d-1 1.d0
+  END
+  FACE WEST
+END
+
+REGION right
+  COORDINATES
+    1.d0 0.d0  0.d0
+    1.d0 1.d-1 1.d0
+  END
+  FACE EAST
+END
+
+REGION top
+  COORDINATES
+    0.d0 0.d0  1.d0
+    1.d0 1.d-1 1.d0
+  END
+  FACE TOP
+END
+
+REGION bottom
+  COORDINATES
+    0.d0 0.d0  0.d0
+    1.d0 1.d-1 0.d0
+  END
+  FACE BOTTOM
+END
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial
+  TYPE
+    LIQUID_PRESSURE hydrostatic
+  END
+  INTERPOLATION linear
+  DATUM 0.d0 0.d0 1.d0
+  LIQUID_PRESSURE 1982000.d0
+  GRADIENT
+    LIQUID_PRESSURE -10 0. 0.
+  END
+END
+
+#=========================== condition couplers ===============================
+
+# initial conditions
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION isoL
+END
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION isoR
+END
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION anisoL
+END
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION anisoR
+END
+
+# boundary conditions
+
+BOUNDARY_CONDITION left
+  FLOW_CONDITION initial
+  REGION left
+END
+
+BOUNDARY_CONDITION right
+  FLOW_CONDITION initial
+  REGION right
+END
+
+#=========================== stratigraphy couplers ============================
+
+STRATA
+  REGION isoL
+  MATERIAL isoMaterial
+END
+
+STRATA
+  REGION isoR
+  MATERIAL isoMaterial
+END
+
+STRATA
+  REGION   anisoL
+  MATERIAL anisoMaterial
+END
+
+STRATA
+  REGION   anisoR
+  MATERIAL anisoMaterial
+END
+
+#=========================== regression tests ============================

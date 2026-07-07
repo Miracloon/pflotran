@@ -190,6 +190,8 @@ chem_obj = \
 	${common_src}transport_constraint_nwt.o
 
 grid_obj = \
+	${common_src}anisodata.o \
+	${common_src}anisodata_richards.o \
 	${common_src}connection.o \
 	${common_src}communicator_base.o \
 	${common_src}communicator_structured.o \

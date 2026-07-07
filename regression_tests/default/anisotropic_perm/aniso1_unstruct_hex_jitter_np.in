@@ -1,0 +1,25 @@
+EXTERNAL_FILE aniso1_common_head.in
+
+#=========================== discretization ===================================
+GRID
+ TYPE UNSTRUCTURED unstr_hex_4x4_jitter.ugi
+END
+
+EXTERNAL_FILE aniso1_common_body.in
+
+#=========================== regression tests ============================
+
+REGRESSION
+  CELL_IDS
+    2
+    6
+    10
+    14
+    3
+    7
+    11
+    15
+  END
+END
+
+END_SUBSURFACE

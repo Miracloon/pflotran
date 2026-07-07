@@ -158,6 +158,7 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
                                   material_auxvar_dn, &
                                   richards_parameter, &
                                   area, dist, &
+                                  aniso_rich, &
                                   option, &
                                   characteristic_curves_up, &
                                   characteristic_curves_dn, &
@@ -173,6 +174,7 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
   use Characteristic_Curves_module
   use Material_Aux_module
   use Connection_module
+  use Anisotropy_Richards_Data_module
 
   implicit none
 
@@ -204,6 +206,16 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
   PetscReal :: dq_dp_up, dq_dp_dn
 
   PetscInt :: ideriv
+
+  type(aniso_richards_data_type), pointer :: aniso_rich
+  PetscReal :: v_darcy_aniso
+  PetscReal :: dv_darcy_dp_up, dv_darcy_dp_dn
+  PetscReal :: q_aniso
+  PetscReal :: dq_aniso_dp_up, dq_aniso_dp_dn
+  PetscReal, pointer :: dq_aniso_dp_up_adj(:)
+  PetscReal, pointer :: dq_aniso_dp_dn_adj(:)
+  PetscInt :: iadj
+
   type(richards_auxvar_type) :: rich_auxvar_pert_up, rich_auxvar_pert_dn
   type(global_auxvar_type) :: global_auxvar_pert_up, global_auxvar_pert_dn
   ! leave as type
@@ -211,7 +223,8 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
   PetscReal :: x_up(1), x_dn(1), x_pert_up(1), x_pert_dn(1), pert_up, pert_dn, &
             res(1), res_pert_up(1), res_pert_dn(1), J_pert_up(1,1), J_pert_dn(1,1)
 
-  v_darcy = 0.D0
+  v_darcy = 0.d0
+  v_darcy_aniso = 0.d0
   ukvr = 0.d0
 
   Jup = 0.d0
@@ -230,8 +243,21 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
 
   call ConnectionCalculateDistances(dist,option%gravity,dd_up,dd_dn, &
                                     dist_gravity,upweight)
-  call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
-  call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
+
+  if(.not. associated(aniso_rich)) then
+    call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
+    call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
+  else
+    ! Flux component due head gradients directly across the interface can be
+    ! calculated using the isotropic approach provided that permeabilty is set
+    ! consistent with anisotropic calculation (avoid collapsing to scalar).
+    ! Additional anisotropic terms due to tangential head gradients are added
+    ! by later call to RichardsFluxAniso()
+
+    ! u-direction is chosen to be normal to the interface, so
+    perm_up = aniso_rich%up%perm_uu
+    perm_dn = aniso_rich%dn%perm_uu
+  endif
 
   Dq = (perm_up * perm_dn)/(dd_up*perm_dn + dd_dn*perm_up)
 
@@ -270,12 +296,63 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
     if (ukvr>floweps) then
       v_darcy= Dq * ukvr * dphi
 
+      dv_darcy_dp_up = Dq*(dukvr_dp_up*dphi+ukvr*dphi_dp_up)
+      dv_darcy_dp_dn = Dq*(dukvr_dp_dn*dphi+ukvr*dphi_dp_dn)
+
       q = v_darcy * area
-      dq_dp_up = Dq*(dukvr_dp_up*dphi+ukvr*dphi_dp_up)*area
-      dq_dp_dn = Dq*(dukvr_dp_dn*dphi+ukvr*dphi_dp_dn)*area
+
+      dq_dp_up = dv_darcy_dp_up*area
+      dq_dp_dn = dv_darcy_dp_dn*area
 
       Jup(1,1) = (dq_dp_up*density_ave+q*dden_ave_dp_up)
       Jdn(1,1) = (dq_dp_dn*density_ave+q*dden_ave_dp_dn)
+
+      if(associated(aniso_rich)) then
+        ! Calculate anisotropic contributions with RichardsFluxAniso with calc_derivs=PETSC_TRUE
+        Call RichardsFluxAniso( aniso_rich, &
+                                material_auxvar_up,material_auxvar_dn,&
+                                global_auxvar_up,global_auxvar_dn,&
+                                option,dist,&
+                                ukvr,dukvr_dp_up,dukvr_dp_dn,&
+                                v_darcy, dv_darcy_dp_up, dv_darcy_dp_dn,&
+                                PETSC_TRUE,v_darcy_aniso)
+
+        ! aniso contributions for q and dq_dp_up/dn
+
+        q_aniso = v_darcy_aniso * area
+
+        dq_aniso_dp_up = aniso_rich%dv_darcy_aniso_dp_up * area
+        dq_aniso_dp_dn = aniso_rich%dv_darcy_aniso_dp_dn * area
+
+        ! additional aniso terms for dv_darcy_aniso_dp_up/dn_adj
+
+        allocate(dq_aniso_dp_up_adj(aniso_rich%aniso_geom%up%num_adj))
+        allocate(dq_aniso_dp_dn_adj(aniso_rich%aniso_geom%dn%num_adj))
+
+        do iadj=1,aniso_rich%aniso_geom%up%num_adj
+          dq_aniso_dp_up_adj(iadj) = aniso_rich%dv_darcy_aniso_dp_up_adj(iadj) * area
+        enddo
+        do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+          dq_aniso_dp_dn_adj(iadj) = aniso_rich%dv_darcy_aniso_dp_dn_adj(iadj) * area
+        enddo
+
+        ! Update Jup/dn for aniso contribution
+        Jup(1,1) = Jup(1,1) + (dq_aniso_dp_up*density_ave+q_aniso*dden_ave_dp_up)
+        Jdn(1,1) = Jdn(1,1) + (dq_aniso_dp_dn*density_ave+q_aniso*dden_ave_dp_dn)
+
+        ! Calculate J terms for derivatives w.r.t. cells adj to up/dn
+        ! Note dden_ave_dp_up_adj etc. assumed = 0 so no dden_... terms below
+        ! (The quantities below are used in RichardsJacobianInternalConn when constructing J)
+        do iadj=1,aniso_rich%aniso_geom%up%num_adj
+          aniso_rich%Jup_adj(iadj) = dq_aniso_dp_up_adj(iadj) * density_ave
+        enddo
+        do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+          aniso_rich%Jdn_adj(iadj) = dq_aniso_dp_dn_adj(iadj) * density_ave
+        enddo
+
+        deallocate(dq_aniso_dp_up_adj)
+        deallocate(dq_aniso_dp_dn_adj)
+      endif
     endif
   endif
 
@@ -298,6 +375,7 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
     call RichardsFlux(rich_auxvar_up,global_auxvar_up,material_auxvar_up, &
                       rich_auxvar_dn,global_auxvar_dn,material_auxvar_dn, &
                       area, dist, &
+                      aniso_rich, &
                       option,v_darcy,res)
     ideriv = 1
 !    pert_up = x_up(ideriv)*perturbation_tolerance
@@ -329,12 +407,14 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
                       rich_auxvar_dn,global_auxvar_dn, &
                       material_auxvar_dn, &
                       area, dist, &
+                      aniso_rich, &
                       option,v_darcy,res_pert_up)
     call RichardsFlux(rich_auxvar_up,global_auxvar_up, &
                       material_auxvar_up, &
                       rich_auxvar_pert_dn,global_auxvar_pert_dn, &
                       material_auxvar_pert_dn, &
                       area, dist, &
+                      aniso_rich, &
                       option,v_darcy,res_pert_dn)
     J_pert_up(1,ideriv) = (res_pert_up(1)-res(1))/pert_up
     J_pert_dn(1,ideriv) = (res_pert_dn(1)-res(1))/pert_dn
@@ -355,6 +435,7 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
                         rich_auxvar_dn,global_auxvar_dn, &
                         material_auxvar_dn, &
                         area, dist, &
+                        aniso_rich, &
                         option,v_darcy,Res)
   !
   ! Computes the internal flux terms for the residual
@@ -365,6 +446,7 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
   use Option_module
   use Material_Aux_module
   use Connection_module
+  use Anisotropy_Richards_Data_module
 
   implicit none
 
@@ -381,14 +463,30 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
   PetscReal :: ukvr,Dq
   PetscReal :: upweight, density_ave, gravity, dphi
 
+  type(aniso_richards_data_type), pointer :: aniso_rich
+  PetscReal :: v_darcy_aniso
+
   fluxm = 0.d0
   v_darcy = 0.D0
   ukvr = 0.d0
 
   call ConnectionCalculateDistances(dist,option%gravity,dd_up,dd_dn, &
                                     dist_gravity,upweight)
-  call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
-  call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
+
+  if(.not. associated(aniso_rich)) then
+    call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
+    call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
+  else
+    ! Flux component due head gradients directly across the interface can be
+    ! calculated using the isotropic approach provided that permeabilty is set
+    ! consistent with anisotropic calculation (avoid collapsing to scalar).
+    ! Additional anisotropic terms due to tangential head gradients are added
+    ! by later call to RichardsFluxAniso()
+
+    ! u-direction is chosen to be parallel to centre->centre direction, so
+    perm_up = aniso_rich%up%perm_uu
+    perm_dn = aniso_rich%dn%perm_uu
+  endif
 
   Dq = (perm_up * perm_dn)/(dd_up*perm_dn + dd_dn*perm_up)
 
@@ -418,6 +516,19 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
 
     if (ukvr>floweps) then
       v_darcy= Dq * ukvr * dphi
+
+      ! add anisotropic contributions
+      if(associated(aniso_rich)) then
+        ! Calculate anisotropic contributions with RichardsFluxAniso with calc_derivs=PETSC_FALSE
+        Call RichardsFluxAniso(   aniso_rich,material_auxvar_up,material_auxvar_dn,&
+                                  global_auxvar_up,global_auxvar_dn,&
+                                  option,dist,&
+                                  ukvr,0.d0,0.d0,&
+                                  v_darcy,0.d0,0.d0,&
+                                  PETSC_FALSE,v_darcy_aniso)
+        ! Add aniso contribution to v_darcy
+        v_darcy = v_darcy + v_darcy_aniso
+      endif
 
       q = v_darcy * area
 

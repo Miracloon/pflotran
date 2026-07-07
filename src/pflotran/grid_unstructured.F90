@@ -8,6 +8,8 @@ module Grid_Unstructured_module
 
   use PFLOTRAN_Constants_module
 
+  use Anisotropy_Geom_Data_module
+
   implicit none
 
   private
@@ -36,6 +38,8 @@ module Grid_Unstructured_module
             UGridMapSideSet2, &
             UGridMapBoundFacesInPolVol, &
             UGridImplicitExpandGhostCells
+
+  private :: UGridComputeGeomData
 
 contains
 
@@ -752,8 +756,16 @@ subroutine UGridDecompose(unstructured_grid,option)
 #endif
 
 #if defined(PETSC_HAVE_PARMETIS) || defined(PETSC_HAVE_METIS)
-  call MatMeshToCellGraph(Adj_mat,num_common_vertices,Dual_mat, &
-                          ierr);CHKERRQ(ierr)
+  if(option%connections_with_aniso_data .eqv. PETSC_FALSE) then
+    call MatMeshToCellGraph(Adj_mat,num_common_vertices,Dual_mat, &
+                            ierr);CHKERRQ(ierr)
+  else
+    ! One fewer common vertex is needed to define an 'off-diagonal'
+    ! anisotropic connection.  These must be included in the graph
+    ! when handling anisotropy.
+    call MatMeshToCellGraph(Adj_mat,num_common_vertices-1,Dual_mat, &
+                            ierr);CHKERRQ(ierr)
+  endif
 #endif
   call MatDestroy(Adj_mat,ierr);CHKERRQ(ierr)
 
@@ -1239,6 +1251,7 @@ function UGridComputeInternConnect(unstructured_grid, &
   PetscInt, allocatable :: vertex_to_cell(:,:)
   PetscInt, allocatable :: temp_int(:)
   PetscInt, allocatable :: temp_int_2d(:,:)
+  PetscInt, allocatable :: face_to_connection(:)
   PetscInt :: num_match
   PetscBool :: found
   PetscInt :: face_count
@@ -1254,13 +1267,14 @@ function UGridComputeInternConnect(unstructured_grid, &
   PetscInt :: vertex_ids4(4)
   PetscInt :: nfaces, nfaces2, nvertices, nvertices2, cell_type, cell_type2
   PetscInt :: face_type, face_type2
-  PetscBool :: face_found, vertex_found
+  PetscBool :: face_found, vertex_found, is_aniso_neighbour
 
   PetscReal :: v1(3), v2(3), v3(3), n1(3), n2(3), n_up_dn(3)
   PetscReal :: vcross(3), magnitude
   PetscReal :: area1, area2
   PetscReal :: dist_up, dist_dn
   PetscInt :: ivert
+  PetscInt :: num_common_vertices, num_common_vertices_max, num_common_vertices_reqd
 
   type(plane_type) :: plane1, plane2
   type(point3d_type) :: point1, point2, point3, point4
@@ -1314,7 +1328,7 @@ function UGridComputeInternConnect(unstructured_grid, &
   ! Remove duplicate faces:
   !
   ! A cell (cell_id) and Neighboring-Cell (cell_id2) will only share ONE face.
-  ! Find the face that cell_id ane cell_id2 share and remove it.
+  ! Find the face that cell_id and cell_id2 share and remove it.
   !
   ! Method:
   !        - Pick i-th face (iface) of cell_id and check if ALL the vertices of
@@ -1330,8 +1344,21 @@ function UGridComputeInternConnect(unstructured_grid, &
   ! NOTE: For a cell_type = WEDGE_TYPE, faces 1-3 have 4 vertices; while
   !       faces 4-5 have 3 vertices
   !
+
+  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+    ! Neighbours by virtue of anisotropy must be marked.
+    ! Uses the same indexing as %cell_neighbors_local_ghosted
+    allocate(unstructured_grid%cell_neighbors_local_aniso( &
+             0:unstructured_grid%max_ndual_per_cell,unstructured_grid%nlmax))
+    unstructured_grid%cell_neighbors_local_aniso = PETSC_FALSE
+  endif
+
+  ! When anisotropy is being handled, the result of UGridDecompose
+  ! will include additional off-diagonal connections (not just
+  ! full-face connections), so these must be handled when seeking
+  ! the full-face connections below.
   do local_id = 1, unstructured_grid%nlmax
-    ! Selet a cell and find number of vertices
+    ! Select a cell and find number of vertices
     cell_id = local_id
     ! cell_type is ghosted, but local cells are in the first nlmax entries
     cell_type = unstructured_grid%cell_type(local_id)
@@ -1348,10 +1375,18 @@ function UGridComputeInternConnect(unstructured_grid, &
       nfaces2 = UCellGetNFaces(cell_type2,option)
       ! Initialize
       face_found = PETSC_FALSE
+      ! Count the max number of common vertices between the current face
+      ! and the faces of the neighbouring cell (not all vertices will be shared
+      ! if this is an anisotropic neighbour)
+      num_common_vertices_max = 0
       do iface = 1, nfaces
         ! Select a face and find number of vertices forming the face
         face_id = cell_to_face(iface,cell_id)
         nvertices = UCellGetNFaceVertices(cell_type,iface,option)
+        ! Count the number of common vertices between the current face
+        ! and the neighbour face (not all vertices will be shared
+        ! if this is an anisotropic neighbour)
+        num_common_vertices = 0
         do ivertex = 1, nvertices
           ! Select a vertex and initialize vertex_found
           vertex_id = face_to_vertex(ivertex,face_id) ! face_to_vertex is 1-based indexing
@@ -1360,19 +1395,24 @@ function UGridComputeInternConnect(unstructured_grid, &
             vertex_id2 = unstructured_grid%cell_vertices(ivertex2,cell_id2)
             if (vertex_id == vertex_id2) then
               vertex_found = PETSC_TRUE
+              num_common_vertices = num_common_vertices + 1
               exit
             endif
           enddo
+          num_common_vertices_max = max(num_common_vertices_max,num_common_vertices)
           !
           ! If ivertex of iface of the Cell is not present as vertices of the
-          ! Neighboring-Cell, then iface is not the shared face. Skip iterating
-          ! over the remaing vertices of iface
-          if (.not.vertex_found) exit
+          ! Neighboring-Cell, then iface is not the shared face.
+          ! If not considering anisotropy, can skip iterating over the remaing vertices of iface.
+          ! But when anisotropy is considerd, only a common edge (3D) or vertex (2D) will be
+          ! shared between cells for off-diagonal connections.  In this case we cannot skip yet.
+          if (.not.vertex_found .and. .not. (option%connections_with_aniso_data  .eqv. PETSC_TRUE)) exit
         enddo
 
-        if (vertex_found) then
-          ! All the vertices of iface are present in the Neighboring cells.
-          ! Thus, iface is the shared face.
+        ! If all vertices are found on both faces then iface is the shared face.
+        ! If num_common_vertices<nvertices then this is an anisotropy connection
+        ! with only a common edge (3D) or vertex (2D).
+        if (num_common_vertices .eq. nvertices) then ! shared face
           face_found = PETSC_TRUE
 
           ! Now, we have to find iface2 that corresponds to iface
@@ -1440,12 +1480,34 @@ function UGridComputeInternConnect(unstructured_grid, &
       enddo ! iface-loop
 
       ! Check that one shared face was found between the Cell and Neighboring-Cell
-      if (.not.face_found) then
-        ! cell_id is both local and ghosted as they are same for unstructured
-        call UCellPrintCellInfo(unstructured_grid,cell_id,nG2A(cell_id),option)
-        call UCellPrintCellInfo(unstructured_grid,cell_id2,nG2A(cell_id2),option)
-        option%io_buffer='No shared face found.'
-        call PrintErrMsgByRank(option)
+      ! ..unless anisotropy is considered, in which case only a shared vertex (2D)
+      ! ..or edge (3D) is required.
+      ! This should always be the case, but check num_common_vertices_max against
+      ! number of vertices req'd to be an aniso neighbour to be sure.
+      if (.not. face_found) then
+        is_aniso_neighbour = PETSC_FALSE
+        if(option%connections_with_aniso_data  .eqv. PETSC_TRUE) then
+          if (nvertices .eq. 2) then ! 2D case - need only a shared vertex
+            num_common_vertices_reqd = 1
+          else  ! 3D case - need only a shared edge
+            num_common_vertices_reqd = 2
+          endif
+          if(num_common_vertices_max .eq. num_common_vertices_reqd) then
+            ! Found an anisotropic neighbour
+            ! NOTE, this is only populated for cases when the cell_id_dual>local_id
+            ! (where cell_id_dual is the cell_id corresponding to idual)
+            unstructured_grid%cell_neighbors_local_aniso(idual,local_id) = PETSC_TRUE
+            is_aniso_neighbour = PETSC_TRUE
+          endif
+        endif
+        if(is_aniso_neighbour .eqv. PETSC_FALSE) then
+          ! Common face wasn't found and isn't an aniso neighbour - error
+          ! cell_id is both local and ghosted as they are same for unstructured
+          call UCellPrintCellInfo(unstructured_grid,cell_id,nG2A(cell_id),option)
+          call UCellPrintCellInfo(unstructured_grid,cell_id2,nG2A(cell_id2),option)
+          option%io_buffer='No shared face found.'
+          call PrintErrMsgByRank(option)
+        endif
       endif
     enddo ! idual-loop
   enddo  ! local_id-loop
@@ -1531,6 +1593,12 @@ function UGridComputeInternConnect(unstructured_grid, &
   do local_id = 1, unstructured_grid%nlmax
     do idual = 1, unstructured_grid%cell_neighbors_local_ghosted(0,local_id)
       dual_id = unstructured_grid%cell_neighbors_local_ghosted(idual,local_id)
+      ! Connection should only counted for direct full-face neighbours, not anisotropic neighbours.
+      ! So if local_id, idual are related by anisotropy (i.e. do not share a common face)  then skip.
+      ! (Anisotropy info. is eventually stored within the up/dn connection.)
+      if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id) .eqv. PETSC_TRUE) cycle
+      endif
       ! count all ghosted connections (dual_id < 0)
       ! only count connection with cells of larger ids to avoid double counts
 !geh: we need to count all local connections, but just once (local_id < dual_id) and all
@@ -1547,12 +1615,20 @@ function UGridComputeInternConnect(unstructured_grid, &
 
   allocate(unstructured_grid%face_area(face_count))
   allocate(unstructured_grid%connection_to_face(nconn))
+  allocate(face_to_connection(face_count))
   unstructured_grid%connection_to_face = 0
+  face_to_connection = 0
 
   ! loop over connection again
   iconn = 0
   do local_id = 1, unstructured_grid%nlmax
     do idual = 1, unstructured_grid%cell_neighbors_local_ghosted(0,local_id)
+      ! Connection should only be created for direct full-face neighbours, not anisotropic neighbours.
+      ! So if local_id, idual are related by anisotropy (i.e. do not share a common face)  then skip.
+      ! (Anisotropy info. calculated later in call to UGridComputeAnisoData.)
+      if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id) .eqv. PETSC_TRUE) cycle
+      endif
       dual_local_id = &
         unstructured_grid%cell_neighbors_local_ghosted(idual,local_id)
       ! abs(dual_local_id) to accommodate connections to ghost cells where
@@ -1574,6 +1650,7 @@ function UGridComputeInternConnect(unstructured_grid, &
         enddo
         if (found) then
           unstructured_grid%connection_to_face(iconn) = face_id
+          face_to_connection(face_id) = iconn
         else
           write(string,*) option%myrank,local_id,dual_local_id
           option%io_buffer = 'face not found in connection loop' // trim(string)
@@ -1603,132 +1680,28 @@ function UGridComputeInternConnect(unstructured_grid, &
           option%io_buffer = 'global face not found' // trim(string)
           call PrintErrMsg(option)
         endif
-        connections%id_up(iconn) = local_id
-        connections%id_dn(iconn) = abs(dual_local_id)
-        connections%face_id(iconn) = cell_to_face(iface,local_id)
-        if (face_type == LINE_FACE_TYPE) then
 
-          point_up%x = grid_x(local_id)
-          point_up%y = grid_y(local_id)
-          point_up%z = grid_z(local_id)
-          point_dn%x = grid_x(abs(dual_local_id))
-          point_dn%y = grid_y(abs(dual_local_id))
-          point_dn%z = grid_z(abs(dual_local_id))
-          point1 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(1,face_id))
-          point2 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(2,face_id))
-
-          call UcellGetLineIntercept(point1,point2,point_up,intercept1)
-          call UcellGetLineIntercept(point1,point2,point_dn,intercept2)
-          intercept%x = 0.5d0*(intercept1%x + intercept2%x)
-          intercept%y = 0.5d0*(intercept1%y + intercept2%y)
-          intercept%z = 0.5d0*(intercept1%z + intercept2%z)
-
-          !v1(1) = point_dn%x-point_up%x
-          !v1(2) = point_dn%y-point_up%y
-          !v1(3) = point_dn%z-point_up%z
-          v1(1) = point1%x-point2%x
-          v1(2) = point1%y-point2%y
-          v1(3) = point1%z-point2%z
-
-          area1 = sqrt(DotProduct(v1,v1))
-          area2 = 0.d0
-        else
-
-          ! need to add the surface areas, distance, etc.
-          point1 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(1,face_id))
-          point2 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(2,face_id))
-          point3 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(3,face_id))
-          if (face_type == QUAD_FACE_TYPE) then
-            point4 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(4,face_id))
-          endif
-
-          call GeometryComputePlaneWithPoints(plane1,point1,point2,point3)
-
-          point_up%x = grid_x(local_id)
-          point_up%y = grid_y(local_id)
-          point_up%z = grid_z(local_id)
-          point_dn%x = grid_x(abs(dual_local_id))
-          point_dn%y = grid_y(abs(dual_local_id))
-          point_dn%z = grid_z(abs(dual_local_id))
-          v1(1) = point_dn%x-point_up%x
-          v1(2) = point_dn%y-point_up%y
-          v1(3) = point_dn%z-point_up%z
-          n_up_dn = v1 / sqrt(DotProduct(v1,v1))
-          call GeometryGetPlaneIntercept(plane1,point_up,point_dn,intercept1)
-
-          v1(1) = point3%x-point2%x
-          v1(2) = point3%y-point2%y
-          v1(3) = point3%z-point2%z
-          v2(1) = point1%x-point2%x
-          v2(2) = point1%y-point2%y
-          v2(3) = point1%z-point2%z
-          !geh: area = 0.5 * |v1 x v2|
-          vcross = CrossProduct(v1,v2)
-          !geh: but then we have to project the area onto the vector between
-          !     the cell centers (n_up_dn)
-          magnitude = sqrt(DotProduct(vcross,vcross))
-          n1 = vcross/magnitude
-          area1 = 0.5d0*magnitude
-          !added by Moise Rousseau (01-13-2021)
-          if (unstructured_grid%project_face_area_along_normal) &
-            area1 = dabs(area1*DotProduct(n1,n_up_dn))
-          !else TRUE_AREA, do not project // end addition
-          !geh: The below does not project onto the vector between cell centers.
-          !gehbug area1 = 0.5d0*sqrt(DotProduct(n1,n1))
-
-          if (face_type == QUAD_FACE_TYPE) then
-            call GeometryComputePlaneWithPoints(plane2,point3,point4,point1)
-            call GeometryGetPlaneIntercept(plane2,point_up,point_dn,intercept2)
-            v1(1) = point1%x-point4%x
-            v1(2) = point1%y-point4%y
-            v1(3) = point1%z-point4%z
-            v2(1) = point3%x-point4%x
-            v2(2) = point3%y-point4%y
-            v2(3) = point3%z-point4%z
-            vcross = CrossProduct(v1,v2)
-            magnitude = sqrt(DotProduct(vcross,vcross))
-            n2 = vcross/magnitude
-            area2 = 0.5d0*magnitude
-            if (unstructured_grid%project_face_area_along_normal) &
-              area2 = dabs(area2*DotProduct(n2,n_up_dn))
-          else
-            area2 = 0.d0
-          endif
-
-          if (face_type == QUAD_FACE_TYPE) then
-            intercept%x = 0.5d0*(intercept1%x + intercept2%x)
-            intercept%y = 0.5d0*(intercept1%y + intercept2%y)
-            intercept%z = 0.5d0*(intercept1%z + intercept2%z)
-          else
-            intercept%x = intercept1%x
-            intercept%y = intercept1%y
-            intercept%z = intercept1%z
-          endif
-        endif
-
-        !geh: this is very crude, but for now use average location of intercept
-        v1(1) = intercept%x-point_up%x
-        v1(2) = intercept%y-point_up%y
-        v1(3) = intercept%z-point_up%z
-        v2(1) = point_dn%x-intercept%x
-        v2(2) = point_dn%y-intercept%y
-        v2(3) = point_dn%z-intercept%z
-        dist_up = sqrt(DotProduct(v1,v1))
-        dist_dn = sqrt(DotProduct(v2,v2))
-
-        connections%dist(-1:3,iconn) = 0.d0
-        connections%dist(-1,iconn) = dist_up/(dist_up+dist_dn)
-        connections%dist(0,iconn) = dist_up + dist_dn
-        v3 = v1 + v2
-        connections%dist(1:3,iconn) = v3/sqrt(DotProduct(v3,v3))
-        connections%area(iconn) = area1 + area2
-        connections%intercp(1,iconn) = intercept%x
-        connections%intercp(2,iconn) = intercept%y
-        connections%intercp(3,iconn) = intercept%z
-
+        ! Populate connection with ids, geometry (distance, area, ...) etc
+        call UGridComputeGeomData(iconn,connections, &
+                              grid_x,grid_y,grid_z, &
+                              local_id,dual_local_id,face_id,face_type,&
+                              option,unstructured_grid)
       endif
     enddo
   enddo
+
+  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+    ! Construct data needed for handling anisotropy connections.
+    call UGridComputeAnisoData(unstructured_grid, &
+                               grid_x,grid_y,grid_z, &
+                               connections, &
+                               cell_to_face, &
+                               face_to_cell, &
+                               face_to_connection, &
+                               nconn, &
+                               face_count, &
+                               option)
+  endif
 
   ! Save area and centroid of faces
   allocate(unstructured_grid%face_centroid(face_count))
@@ -1834,10 +1807,598 @@ function UGridComputeInternConnect(unstructured_grid, &
   deallocate(cell_to_face)
   deallocate(face_to_cell)
   deallocate(vertex_to_cell)
+  deallocate(face_to_connection)
 
   UGridComputeInternConnect => connections
 
 end function UGridComputeInternConnect
+
+! ************************************************************************** !
+subroutine UGridComputeGeomData(iconn,connections,&
+                              grid_x, grid_y, grid_z, &
+                              local_id, dual_local_id, face_id, face_type,&
+                              option, unstructured_grid)
+  !
+  ! Computes details of connection (area, dist, etc)
+  !
+  ! Moved from UGridComputeInternConnect to allow to be called in
+  ! anisotropy calculations (avoids duplication)
+
+  use Connection_module
+  use Option_module
+  use Utility_module, only : DotProduct, CrossProduct
+  use Geometry_module
+
+  implicit none
+
+  PetscInt :: iconn
+  type(connection_set_type), pointer :: connections
+  PetscReal :: grid_x(*), grid_y(*), grid_z(*)
+  PetscInt :: local_id, dual_local_id, face_id
+  PetscInt :: face_type
+  type(option_type) :: option
+  type(grid_unstructured_type) :: unstructured_grid
+
+
+  type(point3d_type) :: point_up, point_dn
+  type(point3d_type) :: point1, point2, point3, point4
+  type(point3d_type) :: intercept1, intercept2, intercept
+  type(plane_type) :: plane1, plane2
+  PetscReal :: v1(3), v2(3), v3(3), n1(3), n2(3), n_up_dn(3), vcross(3)
+  PetscReal :: area1, area2, magnitude, dist_up, dist_dn
+
+  connections%id_up(iconn) = local_id
+  connections%id_dn(iconn) = abs(dual_local_id)
+  connections%face_id(iconn) = face_id
+
+  if (face_type == LINE_FACE_TYPE) then
+
+    point_up%x = grid_x(local_id)
+    point_up%y = grid_y(local_id)
+    point_up%z = grid_z(local_id)
+    point_dn%x = grid_x(abs(dual_local_id))
+    point_dn%y = grid_y(abs(dual_local_id))
+    point_dn%z = grid_z(abs(dual_local_id))
+    point1 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(1,face_id))
+    point2 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(2,face_id))
+
+    call UcellGetLineIntercept(point1,point2,point_up,intercept1)
+    call UcellGetLineIntercept(point1,point2,point_dn,intercept2)
+    intercept%x = 0.5d0*(intercept1%x + intercept2%x)
+    intercept%y = 0.5d0*(intercept1%y + intercept2%y)
+    intercept%z = 0.5d0*(intercept1%z + intercept2%z)
+
+    !v1(1) = point_dn%x-point_up%x
+    !v1(2) = point_dn%y-point_up%y
+    !v1(3) = point_dn%z-point_up%z
+    v1(1) = point1%x-point2%x
+    v1(2) = point1%y-point2%y
+    v1(3) = point1%z-point2%z
+
+    area1 = sqrt(DotProduct(v1,v1))
+    area2 = 0.d0
+  else
+
+    ! need to add the surface areas, distance, etc.
+    point1 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(1,face_id))
+    point2 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(2,face_id))
+    point3 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(3,face_id))
+    if (face_type == QUAD_FACE_TYPE) then
+      point4 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(4,face_id))
+    endif
+
+    call GeometryComputePlaneWithPoints(plane1,point1,point2,point3)
+
+    point_up%x = grid_x(local_id)
+    point_up%y = grid_y(local_id)
+    point_up%z = grid_z(local_id)
+    point_dn%x = grid_x(abs(dual_local_id))
+    point_dn%y = grid_y(abs(dual_local_id))
+    point_dn%z = grid_z(abs(dual_local_id))
+    v1(1) = point_dn%x-point_up%x
+    v1(2) = point_dn%y-point_up%y
+    v1(3) = point_dn%z-point_up%z
+    n_up_dn = v1 / sqrt(DotProduct(v1,v1))
+    call GeometryGetPlaneIntercept(plane1,point_up,point_dn,intercept1)
+
+    v1(1) = point3%x-point2%x
+    v1(2) = point3%y-point2%y
+    v1(3) = point3%z-point2%z
+    v2(1) = point1%x-point2%x
+    v2(2) = point1%y-point2%y
+    v2(3) = point1%z-point2%z
+    !geh: area = 0.5 * |v1 x v2|
+    vcross = CrossProduct(v1,v2)
+    !geh: but then we have to project the area onto the vector between
+    !     the cell centers (n_up_dn)
+    magnitude = sqrt(DotProduct(vcross,vcross))
+    n1 = vcross/magnitude
+    area1 = 0.5d0*magnitude
+    !added by Moise Rousseau (01-13-2021)
+    if (unstructured_grid%project_face_area_along_normal) &
+      area1 = dabs(area1*DotProduct(n1,n_up_dn))
+    !else TRUE_AREA, do not project // end addition
+    !geh: The below does not project onto the vector between cell centers.
+    !gehbug area1 = 0.5d0*sqrt(DotProduct(n1,n1))
+
+    if (face_type == QUAD_FACE_TYPE) then
+      call GeometryComputePlaneWithPoints(plane2,point3,point4,point1)
+      call GeometryGetPlaneIntercept(plane2,point_up,point_dn,intercept2)
+      v1(1) = point1%x-point4%x
+      v1(2) = point1%y-point4%y
+      v1(3) = point1%z-point4%z
+      v2(1) = point3%x-point4%x
+      v2(2) = point3%y-point4%y
+      v2(3) = point3%z-point4%z
+      vcross = CrossProduct(v1,v2)
+      magnitude = sqrt(DotProduct(vcross,vcross))
+      n2 = vcross/magnitude
+      area2 = 0.5d0*magnitude
+      if (unstructured_grid%project_face_area_along_normal) &
+        area2 = dabs(area2*DotProduct(n2,n_up_dn))
+    else
+      area2 = 0.d0
+    endif
+
+    if (face_type == QUAD_FACE_TYPE) then
+      intercept%x = 0.5d0*(intercept1%x + intercept2%x)
+      intercept%y = 0.5d0*(intercept1%y + intercept2%y)
+      intercept%z = 0.5d0*(intercept1%z + intercept2%z)
+    else
+      intercept%x = intercept1%x
+      intercept%y = intercept1%y
+      intercept%z = intercept1%z
+    endif
+  endif
+
+  !geh: this is very crude, but for now use average location of intercept
+  v1(1) = intercept%x-point_up%x
+  v1(2) = intercept%y-point_up%y
+  v1(3) = intercept%z-point_up%z
+  v2(1) = point_dn%x-intercept%x
+  v2(2) = point_dn%y-intercept%y
+  v2(3) = point_dn%z-intercept%z
+  dist_up = sqrt(DotProduct(v1,v1))
+  dist_dn = sqrt(DotProduct(v2,v2))
+
+  connections%dist(-1:3,iconn) = 0.d0
+  connections%dist(-1,iconn) = dist_up/(dist_up+dist_dn)
+  connections%dist(0,iconn) = dist_up + dist_dn
+  v3 = v1 + v2
+  connections%dist(1:3,iconn) = v3/sqrt(DotProduct(v3,v3))
+  connections%area(iconn) = area1 + area2
+  connections%intercp(1,iconn) = intercept%x
+  connections%intercp(2,iconn) = intercept%y
+  connections%intercp(3,iconn) = intercept%z
+
+end subroutine UGridComputeGeomData
+
+! ************************************************************************** !
+
+subroutine UGridComputeAnisoData(unstructured_grid, &
+                                 grid_x,grid_y,grid_z, &
+                                 connections, &
+                                 cell_to_face, &
+                                 face_to_cell, &
+                                 face_to_connection, &
+                                 nconn, &
+                                 face_count, &
+                                 option)
+  ! Compute connectivity and geometry information required for
+  ! anisotropy calculations
+  !
+  ! Author: Steve Benbow
+  ! Date: 01/06/20
+
+  use Connection_module
+  use Option_module
+  use Utility_module, only : DotProduct, CrossProduct
+  use Geometry_module
+  use String_module
+
+  implicit none
+
+  type(grid_unstructured_type) :: unstructured_grid
+  PetscReal :: grid_x(*), grid_y(*), grid_z(*)
+  type(connection_set_type), pointer :: connections
+  PetscInt :: cell_to_face(:,:)
+  PetscInt :: face_to_cell(:,:)
+  PetscInt :: face_to_connection(:)
+  type(option_type) :: option
+
+  PetscInt :: nconn
+  PetscInt :: face_count
+
+  type(connection_set_type), pointer :: connectionsgg
+
+  PetscInt, allocatable :: face_to_connectiongg(:)
+  PetscInt, allocatable :: face_to_ghost(:,:)
+
+  PetscInt :: nconngg, iconngg
+  PetscInt :: iconn
+
+  PetscInt :: nfaces, nfaces2, nvertices, nvertices2, cell_type, cell_type2
+  PetscInt :: cell_id, cell_id2
+  PetscInt :: face_id, face_id2
+  PetscInt :: local_id, local_id2
+  PetscInt :: dual_local_id
+  PetscInt :: ghosted_id, ghosted_id2
+  PetscInt :: vertex_ids4(4), vertex_ids4_2(4)
+  PetscInt :: vertex_id, vertex_id2
+  PetscInt :: ivertex, ivertex2
+  PetscInt :: iface, iface2, iside
+  PetscInt :: face_type, face_type2
+
+  PetscBool :: found, found_all
+
+  type(aniso_geom_data_type), pointer :: aniso_geom
+  type(aniso_cell_data_type), pointer :: aniso_updn
+
+  PetscReal :: v1(3), v2(3)
+  PetscReal :: vcross(3)
+  type(point3d_type) :: point1, point2
+
+  PetscInt :: iupdn, conn_id
+
+  character(len=MAXSTRINGLENGTH) :: string
+
+
+  ! Anisotropy requires some ghost-ghost connections for calculating gradients,
+  ! in addition to local-local and local-ghost connections, which have already been
+  ! identified.
+
+  ! An inefficient loop is used here, but only triangular over ghost-ghost pairs, so
+  ! should not be too inefficient, i.e. considers num_ghost*(num_ghost-1) pairs.
+
+  allocate(face_to_ghost(2,face_count)) ! use for ghost_ghost_face_to_cell
+  face_to_ghost = 0
+
+  allocate(face_to_connectiongg(face_count)) ! ghost-ghost face -> connectiongg
+
+  nconngg = 0
+  do ghosted_id = unstructured_grid%nlmax+1, unstructured_grid%ngmax
+    cell_type = unstructured_grid%cell_type(ghosted_id)
+    nfaces = UCellGetNFaces(cell_type,option)
+    do ghosted_id2 = ghosted_id+1, unstructured_grid%ngmax
+      cell_type2 = unstructured_grid%cell_type(ghosted_id2)
+      nfaces2 = UCellGetNFaces(cell_type2,option)
+      do iface = 1, nfaces
+        call UCellGetNFaceVertsandVerts(option,cell_type,iface, &
+                                        nvertices, vertex_ids4)
+        do iface2 = 1, nfaces2
+          call UCellGetNFaceVertsandVerts(option,cell_type2,iface2, &
+                                          nvertices2, vertex_ids4_2)
+
+          ! check whether all vertices are common to both faces
+
+          if(nvertices .ne. nvertices2) cycle ! not a common face
+
+          found_all = PETSC_TRUE
+          do ivertex = 1, nvertices
+            found = PETSC_FALSE
+            do ivertex2 = 1, nvertices2
+              if( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
+                .eq. unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
+                found = PETSC_TRUE
+                exit
+              endif
+            enddo
+            ! if vertex isn't found then skip to next face
+            if( .not. found) then
+              found_all = PETSC_FALSE
+              exit ! skip to next face2
+            endif
+          enddo
+
+          if( .not. found_all ) cycle ! not a common face
+
+          ! loop below for removing duplicates removes the duplicate face with the
+          ! largest id, so store the smallest face id here for the ghost-ghost connection.
+          if( cell_to_face(iface,ghosted_id) .lt. cell_to_face(iface2,ghosted_id2) ) then
+            face_id = cell_to_face(iface,ghosted_id)
+            cell_to_face(iface2,ghosted_id2) = face_id ! reset face id for cell 2 to be the same
+          else
+            face_id = cell_to_face(iface2,ghosted_id2)
+            cell_to_face(iface,ghosted_id) = face_id ! reset face id for cell 1 to be the same
+          endif
+
+          nconngg = nconngg + 1
+
+          face_to_ghost(1,face_id) = ghosted_id
+          face_to_ghost(2,face_id) = ghosted_id2
+        enddo
+      enddo
+    enddo
+  enddo
+
+  ! Create temporary connections for computing aniso quantities on ghost-ghost connections.
+  connectionsgg => ConnectionCreate(nconngg,INTERNAL_FACE_CONNECTION_TYPE, &
+                                IMPLICIT_UNSTRUCTURED_GRID)
+
+  iconngg = 0
+  do ghosted_id = unstructured_grid%nlmax+1, unstructured_grid%ngmax
+    cell_type = unstructured_grid%cell_type(ghosted_id)
+    nfaces = UCellGetNFaces(cell_type,option)
+    do ghosted_id2 = ghosted_id+1, unstructured_grid%ngmax
+      cell_type2 = unstructured_grid%cell_type(ghosted_id2)
+      nfaces2 = UCellGetNFaces(cell_type2,option)
+      do iface = 1, nfaces
+        call UCellGetNFaceVertsandVerts(option,cell_type,iface, &
+                                        nvertices, vertex_ids4)
+        do iface2 = 1, nfaces2
+          call UCellGetNFaceVertsandVerts(option,cell_type2,iface2, &
+                                          nvertices2, vertex_ids4_2)
+
+          if(nvertices .ne. nvertices2) cycle ! not a common face
+
+          found_all = PETSC_TRUE
+          do ivertex = 1, nvertices
+            found = PETSC_FALSE
+            do ivertex2 = 1, nvertices2
+              if( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
+                .eq. unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
+                found = PETSC_TRUE
+                exit
+              endif
+            enddo
+            ! if vertex isn't found then skip to next face
+            if( .not. found) then
+              found_all = PETSC_FALSE
+              exit ! skip to next face2
+            endif
+          enddo
+
+          if( .not. found_all ) cycle ! not a common face
+
+          ! loop below for removing duplicates removes the duplicate face with the
+          ! largest id, so store the smallest face id here for the ghost-ghost connection.
+          face_id = min( cell_to_face(iface,ghosted_id) , cell_to_face(iface2,ghosted_id2) )
+
+          ! Populate ghost-ghost connection with ids, geometry (distance, area, ...) etc
+          iconngg = iconngg + 1
+          face_type = UCellGetFaceType(cell_type,iface,option)
+          call UGridComputeGeomData(iconngg,connectionsgg, &
+                                    grid_x,grid_y,grid_z, &
+                                    ghosted_id,ghosted_id2,face_id,face_type,&
+                                    option,unstructured_grid)
+
+          face_to_connectiongg(face_id) = iconngg
+        enddo
+      enddo
+    enddo
+  enddo
+
+  ! Populate aniso_geom with data needed for handling anisotropy calculations
+  allocate(connections%aniso_geom(nconn))
+  allocate(connectionsgg%aniso_geom(nconngg))
+
+  ! Loop over ALL connections (standard ones for local-local and local-ghost and extra ones for ghost-ghost)
+  do iconn = 1,nconn+nconngg
+    if(iconn .le. nconn) then
+      ! local-local or local-ghost connection, from the standard set
+      aniso_geom => connections%aniso_geom(iconn)
+    else
+      ! ghost-ghost connection, from the extended set
+      aniso_geom => connectionsgg%aniso_geom(iconn-nconn)
+    endif
+
+    ! Allocate storage for aniso data for this connection
+    if (.not. aniso_geom%is_initialised) then
+      ! there are up to MAX_VERT_PER_FACE cells adjacent to up/dn cells
+      call aniso_geom%InitialiseMembers(MAX_VERT_PER_FACE)
+    endif
+
+    ! store face_id
+    if(iconn .le. nconn) then
+      face_id = connections%face_id(iconn)
+    else
+      face_id = connectionsgg%face_id(iconn-nconn)
+    endif
+    aniso_geom%conn_face_id = face_id
+
+    do iupdn = 1,2
+      if (iupdn==1) then
+        ! upstream
+        if(iconn .le. nconn) then
+          local_id = connections%id_up(iconn)
+        else
+          local_id = connectionsgg%id_up(iconn-nconn)
+        endif
+      else
+        ! downstream
+        if(iconn .le. nconn) then
+          local_id = connections%id_dn(iconn)
+        else
+          local_id = connectionsgg%id_dn(iconn-nconn)
+        endif
+      endif
+
+      ! Gravity terms up/dn
+      v1 = (/ grid_x(local_id), grid_y(local_id), grid_z(local_id) /)
+      if (iupdn==1) then
+        ! upstream
+        aniso_geom%up%cell_id = local_id
+        aniso_geom%up%cell_pos = v1
+        aniso_geom%up%loc_gravity = DotProduct(option%gravity,v1)
+      else
+        ! downstream
+        aniso_geom%dn%cell_id = local_id
+        aniso_geom%dn%cell_pos = v1
+        aniso_geom%dn%loc_gravity = DotProduct(option%gravity,v1)
+      endif
+
+      if(iconn .le. nconn) then
+        ! Loop over faces of cell - determine adjacency
+        cell_type = unstructured_grid%cell_type(local_id)
+        nfaces = UCellGetNFaces(cell_type,option)
+        do iface = 1, nfaces
+          face_id2 = cell_to_face(iface,local_id)
+          ! Identify faces of the cell that share a vertex with current connection.  Skip the connection face
+          if (face_id2 == face_id) cycle
+          found = PETSC_FALSE
+          do ivertex = 1,MAX_VERT_PER_FACE
+            vertex_id = unstructured_grid%face_to_vertex(ivertex,face_id)
+            if (vertex_id == 0) cycle
+            do ivertex2 =1,MAX_VERT_PER_FACE
+              vertex_id2 = unstructured_grid%face_to_vertex(ivertex2,face_id2)
+              if (vertex_id2 == 0) cycle
+              if (vertex_id == vertex_id2) then
+                ! cell face shares a vertex with the connection, so other cell joined by the face is an anisotropy neighbour
+                found = PETSC_TRUE
+                exit
+              endif
+            enddo
+            if (found) then
+              exit
+            endif
+          enddo
+
+          if (found) then
+            ! cell face shares a vertex with the connection, so other cell joined by the face is an anisotropy neighbour
+            found = PETSC_FALSE
+            if( local_id .le. unstructured_grid%nlmax) then
+              ! local-local or local-ghost
+              ! (face_to_cell is set for local-local and local-ghost faces, so use that)
+              do iside = 1,2
+                cell_id2 = face_to_cell(iside,face_id2)
+                if (cell_id2 .ne. local_id) then
+                  found = PETSC_TRUE
+                  exit
+                endif
+              enddo
+            else
+              ! ghost-local or ghost-ghost
+              ! first try ghost-local
+              do iside = 1,2
+                cell_id2 = face_to_cell(iside,face_id2)
+                if(cell_id2 .ne. local_id .and. cell_id2 .ne. 0) then
+                  found = PETSC_TRUE
+                  if( cell_id2 .le. unstructured_grid%nlmax ) then
+                    ! ghost-local
+                  else
+                    ! ghost-ghost - store with negative ids as flags
+                    face_id2 = -face_id2
+                    cell_id2 = -cell_id2
+                  endif
+                  exit
+                else
+                  ! (face_to_ghost is set for ghost-ghost faces)
+                  cell_id2 = face_to_ghost(iside,face_id2)
+                  if (cell_id2 .ne. local_id .and. cell_id2 .ne. 0) then
+                    found = PETSC_TRUE
+                    ! store with negative ids as flags
+                    face_id2 = -face_id2
+                    cell_id2 = -cell_id2
+                    exit
+                  endif
+                endif
+              enddo
+            endif
+
+            if (found) then
+              if(cell_id2 .ne. 0) then ! only store interior interfaces - not boundaries
+                ! store adjacency info., since cell_id2 is adjacent to the up/dn cell
+                if (iupdn==1) then
+                  aniso_geom%up%num_adj = aniso_geom%up%num_adj + 1
+                  aniso_geom%up%cell_id_adj(aniso_geom%up%num_adj) = cell_id2
+                  aniso_geom%up%face_id_adj(aniso_geom%up%num_adj) = face_id2
+                else
+                  aniso_geom%dn%num_adj = aniso_geom%dn%num_adj + 1
+                  aniso_geom%dn%cell_id_adj(aniso_geom%dn%num_adj) = cell_id2
+                  aniso_geom%dn%face_id_adj(aniso_geom%dn%num_adj) = face_id2
+                endif
+              endif
+            else
+              if( local_id .le. unstructured_grid%nlmax) then
+                write(string,*) option%myrank,local_id,dual_local_id
+                option%io_buffer = 'adjacent aniso cell not found in connection loop' // trim(string)
+                call PrintErrMsg(option)
+              endif
+            endif
+          endif
+        enddo
+      endif
+    enddo
+
+    ! compute (u,v,w) coord vecs
+
+    ! take u to be in the 'dist direction', e.g. in which the isotropic Darcy flux is notionally directed
+    if(iconn .le. nconn) then
+      v1 = connections%dist(1:3,iconn)
+    else
+      v1 = connectionsgg%dist(1:3,iconn-nconn)
+    endif
+    aniso_geom%uvec = v1/sqrt(DotProduct(v1,v1))
+
+    ! set v based on two of the face vertices, resolved to be perpendicular to u
+    point1 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(1,face_id))
+    point2 = unstructured_grid%vertices(unstructured_grid%face_to_vertex(2,face_id))
+    v1(1) = point2%x-point1%x
+    v1(2) = point2%y-point1%y
+    v1(3) = point2%z-point1%z
+    v2 = v1 - DotProduct(v1,aniso_geom%uvec)*aniso_geom%uvec
+    aniso_geom%vvec = v2/sqrt(DotProduct(v2,v2))
+
+    ! set w perpendicular to u,v
+    vcross = CrossProduct(aniso_geom%uvec,aniso_geom%vvec)
+    aniso_geom%wvec = vcross / sqrt(DotProduct(vcross,vcross))
+  enddo
+
+  ! Loop over connections again and construct interpolation machinery parameters
+  do iconn = 1,nconn
+    aniso_geom => connections%aniso_geom(iconn)
+    ! SJB - would be better to not be using MAX_VERT_PER_FACE here - could get nfaces for up/dn cells
+    do iface = 1,MAX_VERT_PER_FACE
+      ! up
+      face_id = aniso_geom%up%face_id_adj(iface)
+      if(face_id .gt. 0) then
+        ! local-local or local-ghost
+        conn_id = face_to_connection(face_id)
+        if( aniso_geom%up%cell_id == connections%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
+          aniso_geom%up%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%dn%loc_gravity
+        else ! up is adj
+          aniso_geom%up%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%up%loc_gravity
+        endif
+      else if(face_id .lt. 0) then
+        ! ghost-ghost
+        conn_id = face_to_connectiongg(-face_id)
+        if( aniso_geom%up%cell_id == connectionsgg%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
+          aniso_geom%up%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%dn%loc_gravity
+        else ! up is adj
+          aniso_geom%up%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%up%loc_gravity
+        endif
+      endif
+      ! dn
+      face_id = aniso_geom%dn%face_id_adj(iface)
+      if(face_id .gt. 0) then
+        ! local-local or local-ghost
+        conn_id = face_to_connection(face_id)
+        if( aniso_geom%dn%cell_id == connections%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
+          aniso_geom%dn%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%up%loc_gravity
+        else ! dn is adj
+          aniso_geom%dn%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%dn%loc_gravity
+        endif
+      else if(face_id .lt. 0) then
+        ! ghost-ghost
+        conn_id = face_to_connectiongg(-face_id)
+        if( aniso_geom%dn%cell_id == connectionsgg%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
+          aniso_geom%dn%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%up%loc_gravity
+        else ! dn is adj
+          aniso_geom%dn%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%dn%loc_gravity
+        endif
+      endif
+    enddo
+
+    call aniso_geom%MakeInterpolationParams(grid_x,grid_y,grid_z)
+
+  enddo
+
+  deallocate(face_to_connectiongg)
+  deallocate(face_to_ghost)
+
+  call ConnectionDestroy(connectionsgg)
+
+end subroutine UGridComputeAnisoData
 
 ! ************************************************************************** !
 

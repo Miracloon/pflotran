@@ -37,6 +37,7 @@ module Richards_module
          RichardsSetup, &
          RichardsInitializeTimestep, &
          RichardsUpdateAuxVars, &
+         RichardsUpdateAnisoData, &
          RichardsMaxChange, &
          RichardsUpdateSolution, &
          RichardsComputeMassBalance, &
@@ -720,6 +721,102 @@ subroutine RichardsUpdateAuxVars(realization,pm_well)
   call RichardsUpdateAuxVarsPatch(realization,pm_well)
 
 end subroutine RichardsUpdateAuxVars
+
+! ************************************************************************** !
+
+subroutine RichardsUpdateAnisoData(global_auxvars,material_auxvars,&
+                                    aniso_rich)
+  !
+  ! Updates the adjacent pressure etc in the anisotropy_richards_data structure
+  ! the Richards problem
+  !
+  ! Author: Steve Benbow
+  ! Date: 05/12/19
+  !
+
+  use Global_Aux_module
+  use Anisotropy_Geom_Data_module
+  use Anisotropy_Richards_Data_module
+  use Material_Aux_module
+
+  implicit none
+
+  type(global_auxvar_type), pointer :: global_auxvars(:)
+  type(material_auxvar_type), pointer ::material_auxvars(:)
+  type(aniso_richards_data_type), pointer :: aniso_rich
+
+  PetscInt, pointer :: ghosted_id_adj(:)
+  PetscReal, pointer :: ghosted_pres_adj(:)
+  PetscInt :: i, sz_up, sz_dn
+
+  PetscReal, pointer :: perm(:)
+  PetscInt :: ghosted_id
+
+
+
+  if(.not. aniso_rich%is_allocated) then
+    call aniso_rich%Initialise()
+  endif
+
+  ! Pressure adjacency data
+  do i=1,aniso_rich%aniso_geom%up%num_adj
+    ! Note adjacent cell ids are -ve if they are ghost cells, hence abs
+    aniso_rich%up%pres_adj(i) = global_auxvars(abs(aniso_rich%aniso_geom%up%cell_id_adj(i)))%pres(1)
+  enddo
+  do i=1,aniso_rich%aniso_geom%dn%num_adj
+    ! Note adjacent cell ids are -ve if they are ghost cells, hence abs
+    aniso_rich%dn%pres_adj(i) = global_auxvars(abs(aniso_rich%aniso_geom%dn%cell_id_adj(i)))%pres(1)
+  enddo
+
+  ! compute K' = J K J^T in up/dnstream cells, where J = transformation (x,y,z) -> (u,v,w)
+  ! NOTE performing this update for every step - expensive.  Could omit if permeabilty was
+  ! known to be constant.
+
+  ! up
+  ghosted_id = aniso_rich%aniso_geom%up%cell_id
+  perm => material_auxvars(ghosted_id)%permeability
+  aniso_rich%up%perm_uu = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%uvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%up%perm_vv = PermInnerProd(aniso_rich%aniso_geom%vvec,aniso_rich%aniso_geom%vvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%up%perm_ww = PermInnerProd(aniso_rich%aniso_geom%wvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%up%perm_uv = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%vvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%up%perm_uw = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%up%perm_vw = PermInnerProd(aniso_rich%aniso_geom%vvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+
+  ! dn
+  ghosted_id = aniso_rich%aniso_geom%dn%cell_id
+  perm => material_auxvars(ghosted_id)%permeability
+  aniso_rich%dn%perm_uu = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%uvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%dn%perm_vv = PermInnerProd(aniso_rich%aniso_geom%vvec,aniso_rich%aniso_geom%vvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%dn%perm_ww = PermInnerProd(aniso_rich%aniso_geom%wvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%dn%perm_uv = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%vvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%dn%perm_uw = PermInnerProd(aniso_rich%aniso_geom%uvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+  aniso_rich%dn%perm_vw = PermInnerProd(aniso_rich%aniso_geom%vvec,aniso_rich%aniso_geom%wvec, &
+    perm(perm_xx_index),perm(perm_yy_index),perm(perm_zz_index),&
+    perm(perm_xy_index),perm(perm_xz_index),perm(perm_yz_index))
+
+end subroutine RichardsUpdateAnisoData
 
 ! ************************************************************************** !
 
@@ -1515,6 +1612,8 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
   !
 
   use Connection_module
+  use Anisotropy_Geom_Data_module
+  use Anisotropy_Richards_Data_module
   use Realization_Subsurface_class
   use Patch_module
   use Grid_module
@@ -1541,6 +1640,7 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
   type(inlinesurface_auxvar_type), pointer :: insurf_auxvars(:)
   type(connection_set_list_type), pointer :: connection_set_list
   type(connection_set_type), pointer :: cur_connection_set
+  type(aniso_richards_data_type), pointer :: aniso_rich
 
   PetscInt :: istart
   PetscInt :: local_id_up
@@ -1555,6 +1655,8 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
   PetscReal :: Res(realization%option%nflowdof)
   PetscReal :: v_darcy
   PetscReal, pointer :: r_p(:)
+
+  nullify(aniso_rich) ! default = not used
 
   patch => realization%patch
   grid => patch%grid
@@ -1575,6 +1677,14 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
   sum_connection = 0
   do
     if (.not.associated(cur_connection_set)) exit
+
+    ! Initialise Richards anisotropy data, if needed
+    if (associated(cur_connection_set%aniso_geom)) then
+      if (.not.associated(patch%aux%Richards%aniso_richards_data)) then
+        allocate( patch%aux%Richards%aniso_richards_data(cur_connection_set%num_connections) )
+      endif
+    endif
+
     do iconn = 1, cur_connection_set%num_connections
       sum_connection = sum_connection + 1
 
@@ -1594,6 +1704,13 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
       icc_up = patch%cc_id(ghosted_id_up)
       icc_dn = patch%cc_id(ghosted_id_dn)
 
+      if (associated(cur_connection_set%aniso_geom)) then
+        aniso_rich => patch%aux%Richards%aniso_richards_data(iconn)
+        aniso_rich%aniso_geom => cur_connection_set%aniso_geom(iconn)
+        call RichardsUpdateAnisoData(global_auxvars,material_auxvars,aniso_rich)
+      endif
+
+
       call RichardsFlux(rich_auxvars(ghosted_id_up), &
                       global_auxvars(ghosted_id_up), &
                       material_auxvars(ghosted_id_up), &
@@ -1602,6 +1719,7 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
                       material_auxvars(ghosted_id_dn), &
                       cur_connection_set%area(iconn), &
                       cur_connection_set%dist(:,iconn), &
+                      aniso_rich, &
                       option,v_darcy,Res)
 
       patch%internal_velocities(1,sum_connection) = v_darcy
@@ -2421,6 +2539,8 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   !
 
   use Connection_module
+  use Anisotropy_Geom_Data_module
+  use Anisotropy_Richards_Data_module
   use Realization_Subsurface_class
   use Option_module
   use Patch_module
@@ -2465,6 +2585,8 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   type(material_auxvar_type), pointer :: material_auxvars(:)
   type(richards_parameter_type), pointer :: richards_parameter
   type(inlinesurface_auxvar_type), pointer :: insurf_auxvars(:)
+  type(aniso_richards_data_type), pointer :: aniso_rich
+  PetscInt :: iadj
 
   patch => realization%patch
   grid => patch%grid
@@ -2478,6 +2600,8 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
   if (option%flow%inline_surface_flow) then
     insurf_auxvars => patch%aux%InlineSurface%auxvars
   endif
+
+  nullify(aniso_rich)
 
 #ifdef BUFFER_MATRIX
   if (option%use_matrix_buffer) then
@@ -2518,6 +2642,11 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
       icc_up = patch%cc_id(ghosted_id_up)
       icc_dn = patch%cc_id(ghosted_id_dn)
 
+      if (associated(cur_connection_set%aniso_geom)) then
+        aniso_rich => patch%aux%Richards%aniso_richards_data(iconn)
+        call RichardsUpdateAnisoData(global_auxvars,material_auxvars,aniso_rich)
+      endif
+
       call RichardsFluxDerivative(rich_auxvars(ghosted_id_up), &
                      global_auxvars(ghosted_id_up), &
                      material_auxvars(ghosted_id_up), &
@@ -2527,6 +2656,7 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
                      richards_parameter, &
                      cur_connection_set%area(iconn), &
                      cur_connection_set%dist(-1:3,iconn),&
+                     aniso_rich, &
                      option,&
                      patch%characteristic_curves_array(icc_up)%ptr, &
                      patch%characteristic_curves_array(icc_dn)%ptr, &
@@ -2549,6 +2679,28 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
                                  ierr);CHKERRQ(ierr)
           call PUMSetValuesLocal(A,1,istart_up-1,1,istart_dn-1,Jdn,ADD_VALUES, &
                                  ierr);CHKERRQ(ierr)
+
+          if(associated(aniso_rich)) then
+            ! Anisotropic case J terms are stored in aniso_rich%Jup/dn_adj
+            ! aniso_rich%aniso_geom%up%cell_id_adj%cell_id_adj are ghosted ids, 1-indexed, -ve=>ghost
+            do iadj=1,aniso_rich%aniso_geom%up%num_adj
+              if(aniso_rich%Jup_adj(iadj) .ne. 0.d0) then
+                call PUMSetValuesLocal(A,1,istart_up-1, 1, &
+                          (abs(aniso_rich%aniso_geom%up%cell_id_adj(iadj))-1)*option%nflowdof, &
+                          aniso_rich%Jup_adj(iadj), &
+                          ADD_VALUES,ierr);CHKERRQ(ierr)
+              endif
+            enddo
+            do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+              if(aniso_rich%Jdn_adj(iadj) .ne. 0.d0) then
+                call PUMSetValuesLocal(A,1,istart_up-1, 1, &
+                          (abs(aniso_rich%aniso_geom%dn%cell_id_adj(iadj))-1)*option%nflowdof, &
+                          aniso_rich%Jdn_adj(iadj), &
+                          ADD_VALUES,ierr);CHKERRQ(ierr)
+              endif
+            enddo
+          endif
+
 #ifdef BUFFER_MATRIX
         endif
 #endif
@@ -2572,6 +2724,29 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
                                  ierr);CHKERRQ(ierr)
           call PUMSetValuesLocal(A,1,istart_dn-1,1,istart_up-1,Jup,ADD_VALUES, &
                                  ierr);CHKERRQ(ierr)
+
+          if(associated(aniso_rich)) then
+            ! Anisotropic case J terms are stored in aniso_rich%Jup/dn_adj
+            ! aniso_rich%aniso_geom%up%cell_id_adj%cell_id_adj are ghosted ids, 1-indexed, -ve=>ghost
+            do iadj=1,aniso_rich%aniso_geom%up%num_adj
+              if(aniso_rich%Jup_adj(iadj) .ne. 0.d0) then
+                call PUMSetValuesLocal(A,1,istart_dn-1, 1, &
+                          (abs(aniso_rich%aniso_geom%up%cell_id_adj(iadj))-1)*option%nflowdof, &
+                          -1.d0 * aniso_rich%Jup_adj(iadj), &
+                          ADD_VALUES,ierr);CHKERRQ(ierr)
+              endif
+            enddo
+            do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+              if(aniso_rich%Jdn_adj(iadj) .ne. 0.d0) then
+                call PUMSetValuesLocal(A,1,istart_dn-1, 1, &
+                          (abs(aniso_rich%aniso_geom%dn%cell_id_adj(iadj))-1)*option%nflowdof, &
+                          -1.d0 * aniso_rich%Jdn_adj(iadj), &
+                          ADD_VALUES,ierr);CHKERRQ(ierr)
+              endif
+            enddo
+          endif
+
+
 #ifdef BUFFER_MATRIX
         endif
 #endif
@@ -3557,10 +3732,34 @@ subroutine RichardsDestroy(realization)
   !
 
   use Realization_Subsurface_class
+  use Patch_module
+  use Grid_module
+  use Connection_module
+  use Anisotropy_Richards_Data_module
 
   implicit none
 
   class(realization_subsurface_type) :: realization
+  type(patch_type), pointer :: patch
+  type(grid_type), pointer :: grid
+  type(connection_set_list_type), pointer :: connection_set_list
+  type(connection_set_type), pointer :: cur_connection_set
+
+  PetscInt :: iconn
+
+  patch => realization%patch
+  grid => patch%grid
+  connection_set_list => grid%internal_connection_set_list
+  cur_connection_set => connection_set_list%first
+
+  if (associated(cur_connection_set)) then
+    if (associated(cur_connection_set%aniso_geom)) then
+      do iconn = 1, cur_connection_set%num_connections
+        call patch%aux%Richards%aniso_richards_data(iconn)%Destroy()
+      enddo
+      deallocate(patch%aux%Richards%aniso_richards_data)
+    endif
+  endif
 
   call RichardsDestroyPatch(realization)
 

@@ -165,6 +165,9 @@ module Option_module
     PetscBool :: print_ekg
     PetscReal :: inactive_cell_volume_threshold
 
+    ! flag to control whether grid connections should compute anisotropy data
+    PetscBool :: connections_with_aniso_data
+
   end type option_type
 
   interface OptionCreate
@@ -582,6 +585,8 @@ subroutine OptionInitRealization(option)
   option%print_ekg = PETSC_FALSE
 
   option%inactive_cell_volume_threshold = UNINITIALIZED_DOUBLE
+
+  option%connections_with_aniso_data = PETSC_FALSE
 
   option%coupled_well = PETSC_FALSE
 
