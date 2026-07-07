@@ -650,7 +650,7 @@ subroutine RTComputeMassBalance(realization,num_cells,max_size,sum_mol,cell_ids)
                liquid_saturation*porosity*volume*1.d3
 
     ! equilibrium sorption (sum_mol_sb)
-    if (reaction%neqsorb > 0) then
+    if (associated(rt_auxvars(ghosted_id)%total_sorb_eq)) then
       sum_mol_sb(1:naqcomp) = sum_mol_sb(1:naqcomp) + &
           rt_auxvars(ghosted_id)%total_sorb_eq(:) * volume
     endif
