@@ -736,7 +736,7 @@ subroutine RichardsUpdateAnisoData(global_auxvars,material_auxvars,&
 
   use Global_Aux_module
   use Anisotropy_Geom_Data_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
   use Material_Aux_module
 
   implicit none
@@ -745,25 +745,20 @@ subroutine RichardsUpdateAnisoData(global_auxvars,material_auxvars,&
   type(material_auxvar_type), pointer ::material_auxvars(:)
   type(aniso_richards_data_type), pointer :: aniso_rich
 
-  PetscInt, pointer :: ghosted_id_adj(:)
-  PetscReal, pointer :: ghosted_pres_adj(:)
-  PetscInt :: i, sz_up, sz_dn
-
+  PetscInt :: i
   PetscReal, pointer :: perm(:)
   PetscInt :: ghosted_id
 
-
-
-  if(.not. aniso_rich%is_allocated) then
+  if (.not.aniso_rich%is_allocated) then
     call aniso_rich%Initialise()
   endif
 
   ! Pressure adjacency data
-  do i=1,aniso_rich%aniso_geom%up%num_adj
+  do i = 1, aniso_rich%aniso_geom%up%num_adj
     ! Note adjacent cell ids are -ve if they are ghost cells, hence abs
     aniso_rich%up%pres_adj(i) = global_auxvars(abs(aniso_rich%aniso_geom%up%cell_id_adj(i)))%pres(1)
   enddo
-  do i=1,aniso_rich%aniso_geom%dn%num_adj
+  do i = 1, aniso_rich%aniso_geom%dn%num_adj
     ! Note adjacent cell ids are -ve if they are ghost cells, hence abs
     aniso_rich%dn%pres_adj(i) = global_auxvars(abs(aniso_rich%aniso_geom%dn%cell_id_adj(i)))%pres(1)
   enddo
@@ -1613,7 +1608,7 @@ subroutine RichardsResidualInternalConn(r,realization,skip_conn_type,ierr)
 
   use Connection_module
   use Anisotropy_Geom_Data_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
   use Realization_Subsurface_class
   use Patch_module
   use Grid_module
@@ -2540,7 +2535,7 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
 
   use Connection_module
   use Anisotropy_Geom_Data_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
   use Realization_Subsurface_class
   use Option_module
   use Patch_module
@@ -2680,19 +2675,19 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
           call PUMSetValuesLocal(A,1,istart_up-1,1,istart_dn-1,Jdn,ADD_VALUES, &
                                  ierr);CHKERRQ(ierr)
 
-          if(associated(aniso_rich)) then
+          if (associated(aniso_rich)) then
             ! Anisotropic case J terms are stored in aniso_rich%Jup/dn_adj
             ! aniso_rich%aniso_geom%up%cell_id_adj%cell_id_adj are ghosted ids, 1-indexed, -ve=>ghost
-            do iadj=1,aniso_rich%aniso_geom%up%num_adj
-              if(aniso_rich%Jup_adj(iadj) .ne. 0.d0) then
+            do iadj = 1,aniso_rich%aniso_geom%up%num_adj
+              if (aniso_rich%Jup_adj(iadj) /= 0.d0) then
                 call PUMSetValuesLocal(A,1,istart_up-1, 1, &
                           (abs(aniso_rich%aniso_geom%up%cell_id_adj(iadj))-1)*option%nflowdof, &
                           aniso_rich%Jup_adj(iadj), &
                           ADD_VALUES,ierr);CHKERRQ(ierr)
               endif
             enddo
-            do iadj=1,aniso_rich%aniso_geom%dn%num_adj
-              if(aniso_rich%Jdn_adj(iadj) .ne. 0.d0) then
+            do iadj = 1,aniso_rich%aniso_geom%dn%num_adj
+              if (aniso_rich%Jdn_adj(iadj) /= 0.d0) then
                 call PUMSetValuesLocal(A,1,istart_up-1, 1, &
                           (abs(aniso_rich%aniso_geom%dn%cell_id_adj(iadj))-1)*option%nflowdof, &
                           aniso_rich%Jdn_adj(iadj), &
@@ -2725,19 +2720,19 @@ subroutine RichardsJacobianInternalConn(A,realization,debug,ierr)
           call PUMSetValuesLocal(A,1,istart_dn-1,1,istart_up-1,Jup,ADD_VALUES, &
                                  ierr);CHKERRQ(ierr)
 
-          if(associated(aniso_rich)) then
+          if (associated(aniso_rich)) then
             ! Anisotropic case J terms are stored in aniso_rich%Jup/dn_adj
             ! aniso_rich%aniso_geom%up%cell_id_adj%cell_id_adj are ghosted ids, 1-indexed, -ve=>ghost
-            do iadj=1,aniso_rich%aniso_geom%up%num_adj
-              if(aniso_rich%Jup_adj(iadj) .ne. 0.d0) then
+            do iadj = 1,aniso_rich%aniso_geom%up%num_adj
+              if (aniso_rich%Jup_adj(iadj) /= 0.d0) then
                 call PUMSetValuesLocal(A,1,istart_dn-1, 1, &
                           (abs(aniso_rich%aniso_geom%up%cell_id_adj(iadj))-1)*option%nflowdof, &
                           -1.d0 * aniso_rich%Jup_adj(iadj), &
                           ADD_VALUES,ierr);CHKERRQ(ierr)
               endif
             enddo
-            do iadj=1,aniso_rich%aniso_geom%dn%num_adj
-              if(aniso_rich%Jdn_adj(iadj) .ne. 0.d0) then
+            do iadj = 1,aniso_rich%aniso_geom%dn%num_adj
+              if (aniso_rich%Jdn_adj(iadj) /= 0.d0) then
                 call PUMSetValuesLocal(A,1,istart_dn-1, 1, &
                           (abs(aniso_rich%aniso_geom%dn%cell_id_adj(iadj))-1)*option%nflowdof, &
                           -1.d0 * aniso_rich%Jdn_adj(iadj), &
@@ -3735,7 +3730,7 @@ subroutine RichardsDestroy(realization)
   use Patch_module
   use Grid_module
   use Connection_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
 
   implicit none
 

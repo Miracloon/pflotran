@@ -846,7 +846,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
 
   PetscReal, parameter :: Pi=3.141592653590d0
 
-  PetscInt :: i, j, k, iconn, id_up, id_dn, id_up2, id_dn2, iupdn
+  PetscInt :: i, j, k, iconn, id_up, id_dn, id_up2, id_dn2
   PetscInt :: nconn
   PetscInt :: lenx, leny, lenz
   PetscInt :: tvd_ghost_offset, ghost_count
@@ -858,12 +858,10 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
 
   ! these used in aniso calcs
   type(aniso_geom_data_type), pointer :: aniso_geom_data
-  type(aniso_cell_data_type), pointer :: aniso_updn
   PetscReal :: distvec(1:3)
   PetscInt :: id, iadj
 
   nullify(aniso_geom_data)
-  nullify(aniso_updn)
 
   radius => xc
 
@@ -892,7 +890,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
     connections%id_dn2 = 0
   endif
 
-  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+  if (option%connections_with_aniso_data) then
     allocate(connections%aniso_geom(nconn))
   endif
 
@@ -944,7 +942,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               if (associated(connections%aniso_geom)) then
                 ! Set up prperties for anisotropy calculations
                 aniso_geom_data => connections%aniso_geom(iconn)
-                if (.not. aniso_geom_data%is_initialised) then
+                if (.not.aniso_geom_data%is_initialised) then
                   ! there are up to 4 cells adjacent to up/dn cells
                   call aniso_geom_data%InitialiseMembers(4)
                 endif
@@ -1135,7 +1133,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               if (associated(connections%aniso_geom)) then
                 ! Set up prperties for anisotropy calculations
                 aniso_geom_data => connections%aniso_geom(iconn)
-                if (.not. aniso_geom_data%is_initialised) then
+                if (.not.aniso_geom_data%is_initialised) then
                   ! there are up to 4 cells adjacent to up/dn cells
                   call aniso_geom_data%InitialiseMembers(4)
                 endif
@@ -1291,7 +1289,7 @@ function StructGridComputeInternConnect(struct_grid, xc, yc, zc, option)
               if (associated(connections%aniso_geom)) then
                 ! Set up prperties for anisotropy calculations
                 aniso_geom_data => connections%aniso_geom(iconn)
-                if (.not. aniso_geom_data%is_initialised) then
+                if (.not.aniso_geom_data%is_initialised) then
                   ! there are up to 4 cells adjacent to up/dn cells
                   call aniso_geom_data%InitialiseMembers(4)
                 endif

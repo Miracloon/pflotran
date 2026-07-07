@@ -120,7 +120,7 @@ module Anisotropy_Geom_Data_module
     subroutine DestroyMembers(self)
       class(aniso_geom_data_type) :: self
 
-      if( self%is_initialised) then
+      if ( self%is_initialised) then
         deallocate(self%uvec)
         deallocate(self%vvec)
         deallocate(self%wvec)
@@ -181,7 +181,7 @@ module Anisotropy_Geom_Data_module
 
       ! Calculate distances up/dn->adj in (u,v,w) coords
       do iupdn = 1,2
-        if (iupdn==1) then
+        if (iupdn == 1) then
           ! upstream
           aniso_updn => self%up
         else
@@ -189,8 +189,8 @@ module Anisotropy_Geom_Data_module
           aniso_updn => self%dn
         endif
 
-        aniso_updn%dists_u = 0.d0 ! )
-        aniso_updn%dists_vw = 0.d0 ! )
+        aniso_updn%dists_u = 0.d0
+        aniso_updn%dists_vw = 0.d0
 
         point1%x = xc(aniso_updn%cell_id)
         point1%y = yc(aniso_updn%cell_id)
@@ -200,7 +200,7 @@ module Anisotropy_Geom_Data_module
         no_w_contrib = PETSC_TRUE ! reset below if neighbour in w direction is found
 
         ! loop over adjacent cells that will contribute to anisotropy, calculate (v,w) dist
-        do iadj = 1,aniso_updn%num_adj
+        do iadj = 1, aniso_updn%num_adj
           ! adj cells have -ve cell id if they are ghost cells, hence abs(..) here
           point2%x = xc(abs(aniso_updn%cell_id_adj(iadj)))
           point2%y = yc(abs(aniso_updn%cell_id_adj(iadj)))
@@ -216,14 +216,14 @@ module Anisotropy_Geom_Data_module
           aniso_updn%dists_vw(1,iadj) = DotProduct(v1,self%vvec)
           aniso_updn%dists_vw(2,iadj) = DotProduct(v1,self%wvec)
 
-          if(aniso_updn%dists_vw(1,iadj) .ne. 0.d0) no_v_contrib = PETSC_FALSE
-          if(aniso_updn%dists_vw(2,iadj) .ne. 0.d0) no_w_contrib = PETSC_FALSE
+          if (aniso_updn%dists_vw(1,iadj) /= 0.d0) no_v_contrib = PETSC_FALSE
+          if (aniso_updn%dists_vw(2,iadj) /= 0.d0) no_w_contrib = PETSC_FALSE
         enddo
 
-        if(aniso_updn%num_adj>1) then
+        if (aniso_updn%num_adj>1) then
           ! compute least-squares mtx (sum of outer product of dists_vw vectors)
           MLS = 0.d0 ! Initialise 2x2 least-squares mtx
-          do iadj = 1,aniso_updn%num_adj
+          do iadj = 1, aniso_updn%num_adj
             dot = aniso_updn%dists_vw(1,iadj)*aniso_updn%dists_vw(1,iadj) &
                   + aniso_updn%dists_vw(2,iadj)*aniso_updn%dists_vw(2,iadj)
             MLS(1,1) = MLS(1,1) + aniso_updn%dists_vw(1,iadj)*aniso_updn%dists_vw(1,iadj)/dot
@@ -233,16 +233,16 @@ module Anisotropy_Geom_Data_module
           enddo
 
           ! invert least-squares mtx (handling singular cases - ok for LS solution)
-          if(no_v_contrib) then      ! MLS only has non-zero (2,2) entry
+          if (no_v_contrib) then      ! MLS only has non-zero (2,2) entry
             aniso_updn%LSMatInv = 0
             aniso_updn%LSMatInv(2,2) = 1.d0 / MLS(2,2)
-          elseif(no_w_contrib) then  ! MLS only has non-zero (1,1) entry
+          elseif (no_w_contrib) then  ! MLS only has non-zero (1,1) entry
             aniso_updn%LSMatInv = 0
             aniso_updn%LSMatInv(1,1) = 1.d0 / MLS(1,1)
           else
             ! 2x2 case
             det = MLS(1,1)*MLS(2,2) - MLS(1,2)*MLS(2,1)
-            if(det .eq. 0.d0) then
+            if (det == 0.d0) then
               ! singular case - cell->neighbour vectors are parallel.
               ! introduce a small perturbation
               ! (could improve - e.g. calculate grad in cell->neighbour direction and assume zero orthogonal to this)

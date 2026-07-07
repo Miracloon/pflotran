@@ -756,7 +756,7 @@ subroutine UGridDecompose(unstructured_grid,option)
 #endif
 
 #if defined(PETSC_HAVE_PARMETIS) || defined(PETSC_HAVE_METIS)
-  if(option%connections_with_aniso_data .eqv. PETSC_FALSE) then
+  if (.not.option%connections_with_aniso_data) then
     call MatMeshToCellGraph(Adj_mat,num_common_vertices,Dual_mat, &
                             ierr);CHKERRQ(ierr)
   else
@@ -1269,17 +1269,12 @@ function UGridComputeInternConnect(unstructured_grid, &
   PetscInt :: face_type, face_type2
   PetscBool :: face_found, vertex_found, is_aniso_neighbour
 
-  PetscReal :: v1(3), v2(3), v3(3), n1(3), n2(3), n_up_dn(3)
-  PetscReal :: vcross(3), magnitude
+  PetscReal :: v1(3), v2(3), n1(3), n2(3)
   PetscReal :: area1, area2
-  PetscReal :: dist_up, dist_dn
   PetscInt :: ivert
   PetscInt :: num_common_vertices, num_common_vertices_max, num_common_vertices_reqd
 
-  type(plane_type) :: plane1, plane2
   type(point3d_type) :: point1, point2, point3, point4
-  type(point3d_type) :: point_up, point_dn
-  type(point3d_type) :: intercept1, intercept2, intercept
 
   character(len=MAXSTRINGLENGTH) :: string
 
@@ -1345,7 +1340,7 @@ function UGridComputeInternConnect(unstructured_grid, &
   !       faces 4-5 have 3 vertices
   !
 
-  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+  if (option%connections_with_aniso_data) then
     ! Neighbours by virtue of anisotropy must be marked.
     ! Uses the same indexing as %cell_neighbors_local_ghosted
     allocate(unstructured_grid%cell_neighbors_local_aniso( &
@@ -1406,13 +1401,13 @@ function UGridComputeInternConnect(unstructured_grid, &
           ! If not considering anisotropy, can skip iterating over the remaing vertices of iface.
           ! But when anisotropy is considerd, only a common edge (3D) or vertex (2D) will be
           ! shared between cells for off-diagonal connections.  In this case we cannot skip yet.
-          if (.not.vertex_found .and. .not. (option%connections_with_aniso_data  .eqv. PETSC_TRUE)) exit
+          if (.not.vertex_found .and. .not.option%connections_with_aniso_data) exit
         enddo
 
         ! If all vertices are found on both faces then iface is the shared face.
         ! If num_common_vertices<nvertices then this is an anisotropy connection
         ! with only a common edge (3D) or vertex (2D).
-        if (num_common_vertices .eq. nvertices) then ! shared face
+        if (num_common_vertices == nvertices) then ! shared face
           face_found = PETSC_TRUE
 
           ! Now, we have to find iface2 that corresponds to iface
@@ -1420,7 +1415,7 @@ function UGridComputeInternConnect(unstructured_grid, &
             face_id2 = cell_to_face(iface2,cell_id2)
             !geh nvertices2 = 4
             !gehcomment: I believe that cell_type and iface on next line shoudl be the "2" versions
-            !geh if ((cell_type == WEDGE_TYPE).and.(iface.gt.3)) nvertices2 = 3
+            !geh if ((cell_type == WEDGE_TYPE).and.(iface>3)) nvertices2 = 3
             nvertices2 = UCellGetNFaceVertices(cell_type2,iface2,option)
             ! Both iface and iface2 need to have same number of vertices
             if (nvertices == nvertices2) then
@@ -1486,13 +1481,13 @@ function UGridComputeInternConnect(unstructured_grid, &
       ! number of vertices req'd to be an aniso neighbour to be sure.
       if (.not. face_found) then
         is_aniso_neighbour = PETSC_FALSE
-        if(option%connections_with_aniso_data  .eqv. PETSC_TRUE) then
-          if (nvertices .eq. 2) then ! 2D case - need only a shared vertex
+        if (option%connections_with_aniso_data) then
+          if (nvertices == 2) then ! 2D case - need only a shared vertex
             num_common_vertices_reqd = 1
           else  ! 3D case - need only a shared edge
             num_common_vertices_reqd = 2
           endif
-          if(num_common_vertices_max .eq. num_common_vertices_reqd) then
+          if (num_common_vertices_max == num_common_vertices_reqd) then
             ! Found an anisotropic neighbour
             ! NOTE, this is only populated for cases when the cell_id_dual>local_id
             ! (where cell_id_dual is the cell_id corresponding to idual)
@@ -1500,7 +1495,7 @@ function UGridComputeInternConnect(unstructured_grid, &
             is_aniso_neighbour = PETSC_TRUE
           endif
         endif
-        if(is_aniso_neighbour .eqv. PETSC_FALSE) then
+        if (.not.is_aniso_neighbour) then
           ! Common face wasn't found and isn't an aniso neighbour - error
           ! cell_id is both local and ghosted as they are same for unstructured
           call UCellPrintCellInfo(unstructured_grid,cell_id,nG2A(cell_id),option)
@@ -1596,8 +1591,8 @@ function UGridComputeInternConnect(unstructured_grid, &
       ! Connection should only counted for direct full-face neighbours, not anisotropic neighbours.
       ! So if local_id, idual are related by anisotropy (i.e. do not share a common face)  then skip.
       ! (Anisotropy info. is eventually stored within the up/dn connection.)
-      if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
-        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id) .eqv. PETSC_TRUE) cycle
+      if (option%connections_with_aniso_data) then
+        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id)) cycle
       endif
       ! count all ghosted connections (dual_id < 0)
       ! only count connection with cells of larger ids to avoid double counts
@@ -1626,8 +1621,8 @@ function UGridComputeInternConnect(unstructured_grid, &
       ! Connection should only be created for direct full-face neighbours, not anisotropic neighbours.
       ! So if local_id, idual are related by anisotropy (i.e. do not share a common face)  then skip.
       ! (Anisotropy info. calculated later in call to UGridComputeAnisoData.)
-      if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
-        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id) .eqv. PETSC_TRUE) cycle
+      if (option%connections_with_aniso_data) then
+        if (unstructured_grid%cell_neighbors_local_aniso(idual,local_id)) cycle
       endif
       dual_local_id = &
         unstructured_grid%cell_neighbors_local_ghosted(idual,local_id)
@@ -1690,7 +1685,7 @@ function UGridComputeInternConnect(unstructured_grid, &
     enddo
   enddo
 
-  if (option%connections_with_aniso_data .eqv. PETSC_TRUE) then
+  if (option%connections_with_aniso_data) then
     ! Construct data needed for handling anisotropy connections.
     call UGridComputeAnisoData(unstructured_grid, &
                                grid_x,grid_y,grid_z, &
@@ -2009,30 +2004,30 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
   PetscInt :: nconn
   PetscInt :: face_count
 
-  type(connection_set_type), pointer :: connectionsgg
+  ! ghost to ghost connections
+  type(connection_set_type), pointer :: connections_gtog
 
-  PetscInt, allocatable :: face_to_connectiongg(:)
+  PetscInt, allocatable :: face_to_connection_aniso(:)
   PetscInt, allocatable :: face_to_ghost(:,:)
 
   PetscInt :: nconngg, iconngg
   PetscInt :: iconn
 
   PetscInt :: nfaces, nfaces2, nvertices, nvertices2, cell_type, cell_type2
-  PetscInt :: cell_id, cell_id2
+  PetscInt :: cell_id2
   PetscInt :: face_id, face_id2
-  PetscInt :: local_id, local_id2
+  PetscInt :: local_id
   PetscInt :: dual_local_id
   PetscInt :: ghosted_id, ghosted_id2
   PetscInt :: vertex_ids4(4), vertex_ids4_2(4)
   PetscInt :: vertex_id, vertex_id2
   PetscInt :: ivertex, ivertex2
   PetscInt :: iface, iface2, iside
-  PetscInt :: face_type, face_type2
+  PetscInt :: face_type
 
   PetscBool :: found, found_all
 
   type(aniso_geom_data_type), pointer :: aniso_geom
-  type(aniso_cell_data_type), pointer :: aniso_updn
 
   PetscReal :: v1(3), v2(3)
   PetscReal :: vcross(3)
@@ -2053,7 +2048,7 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
   allocate(face_to_ghost(2,face_count)) ! use for ghost_ghost_face_to_cell
   face_to_ghost = 0
 
-  allocate(face_to_connectiongg(face_count)) ! ghost-ghost face -> connectiongg
+  allocate(face_to_connection_aniso(face_count)) ! ghost-ghost face -> connection_aniso
 
   nconngg = 0
   do ghosted_id = unstructured_grid%nlmax+1, unstructured_grid%ngmax
@@ -2071,30 +2066,30 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
 
           ! check whether all vertices are common to both faces
 
-          if(nvertices .ne. nvertices2) cycle ! not a common face
+          if (nvertices /= nvertices2) cycle ! not a common face
 
           found_all = PETSC_TRUE
           do ivertex = 1, nvertices
             found = PETSC_FALSE
             do ivertex2 = 1, nvertices2
-              if( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
-                .eq. unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
+              if ( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
+                == unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
                 found = PETSC_TRUE
                 exit
               endif
             enddo
             ! if vertex isn't found then skip to next face
-            if( .not. found) then
+            if ( .not. found) then
               found_all = PETSC_FALSE
               exit ! skip to next face2
             endif
           enddo
 
-          if( .not. found_all ) cycle ! not a common face
+          if ( .not. found_all ) cycle ! not a common face
 
           ! loop below for removing duplicates removes the duplicate face with the
           ! largest id, so store the smallest face id here for the ghost-ghost connection.
-          if( cell_to_face(iface,ghosted_id) .lt. cell_to_face(iface2,ghosted_id2) ) then
+          if ( cell_to_face(iface,ghosted_id) < cell_to_face(iface2,ghosted_id2) ) then
             face_id = cell_to_face(iface,ghosted_id)
             cell_to_face(iface2,ghosted_id2) = face_id ! reset face id for cell 2 to be the same
           else
@@ -2112,7 +2107,7 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
   enddo
 
   ! Create temporary connections for computing aniso quantities on ghost-ghost connections.
-  connectionsgg => ConnectionCreate(nconngg,INTERNAL_FACE_CONNECTION_TYPE, &
+  connections_gtog => ConnectionCreate(nconngg,INTERNAL_FACE_CONNECTION_TYPE, &
                                 IMPLICIT_UNSTRUCTURED_GRID)
 
   iconngg = 0
@@ -2129,26 +2124,26 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
           call UCellGetNFaceVertsandVerts(option,cell_type2,iface2, &
                                           nvertices2, vertex_ids4_2)
 
-          if(nvertices .ne. nvertices2) cycle ! not a common face
+          if (nvertices /= nvertices2) cycle ! not a common face
 
           found_all = PETSC_TRUE
           do ivertex = 1, nvertices
             found = PETSC_FALSE
             do ivertex2 = 1, nvertices2
-              if( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
-                .eq. unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
+              if ( unstructured_grid%cell_vertices(vertex_ids4(ivertex),ghosted_id) &
+                == unstructured_grid%cell_vertices(vertex_ids4_2(ivertex2),ghosted_id2) ) then
                 found = PETSC_TRUE
                 exit
               endif
             enddo
             ! if vertex isn't found then skip to next face
-            if( .not. found) then
+            if ( .not. found) then
               found_all = PETSC_FALSE
               exit ! skip to next face2
             endif
           enddo
 
-          if( .not. found_all ) cycle ! not a common face
+          if ( .not. found_all ) cycle ! not a common face
 
           ! loop below for removing duplicates removes the duplicate face with the
           ! largest id, so store the smallest face id here for the ghost-ghost connection.
@@ -2157,12 +2152,12 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
           ! Populate ghost-ghost connection with ids, geometry (distance, area, ...) etc
           iconngg = iconngg + 1
           face_type = UCellGetFaceType(cell_type,iface,option)
-          call UGridComputeGeomData(iconngg,connectionsgg, &
+          call UGridComputeGeomData(iconngg,connections_gtog, &
                                     grid_x,grid_y,grid_z, &
                                     ghosted_id,ghosted_id2,face_id,face_type,&
                                     option,unstructured_grid)
 
-          face_to_connectiongg(face_id) = iconngg
+          face_to_connection_aniso(face_id) = iconngg
         enddo
       enddo
     enddo
@@ -2170,52 +2165,52 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
 
   ! Populate aniso_geom with data needed for handling anisotropy calculations
   allocate(connections%aniso_geom(nconn))
-  allocate(connectionsgg%aniso_geom(nconngg))
+  allocate(connections_gtog%aniso_geom(nconngg))
 
   ! Loop over ALL connections (standard ones for local-local and local-ghost and extra ones for ghost-ghost)
   do iconn = 1,nconn+nconngg
-    if(iconn .le. nconn) then
+    if (iconn <= nconn) then
       ! local-local or local-ghost connection, from the standard set
       aniso_geom => connections%aniso_geom(iconn)
     else
       ! ghost-ghost connection, from the extended set
-      aniso_geom => connectionsgg%aniso_geom(iconn-nconn)
+      aniso_geom => connections_gtog%aniso_geom(iconn-nconn)
     endif
 
     ! Allocate storage for aniso data for this connection
-    if (.not. aniso_geom%is_initialised) then
+    if (.not.aniso_geom%is_initialised) then
       ! there are up to MAX_VERT_PER_FACE cells adjacent to up/dn cells
       call aniso_geom%InitialiseMembers(MAX_VERT_PER_FACE)
     endif
 
     ! store face_id
-    if(iconn .le. nconn) then
+    if (iconn <= nconn) then
       face_id = connections%face_id(iconn)
     else
-      face_id = connectionsgg%face_id(iconn-nconn)
+      face_id = connections_gtog%face_id(iconn-nconn)
     endif
     aniso_geom%conn_face_id = face_id
 
     do iupdn = 1,2
-      if (iupdn==1) then
+      if (iupdn == 1) then
         ! upstream
-        if(iconn .le. nconn) then
+        if (iconn <= nconn) then
           local_id = connections%id_up(iconn)
         else
-          local_id = connectionsgg%id_up(iconn-nconn)
+          local_id = connections_gtog%id_up(iconn-nconn)
         endif
       else
         ! downstream
-        if(iconn .le. nconn) then
+        if (iconn <= nconn) then
           local_id = connections%id_dn(iconn)
         else
-          local_id = connectionsgg%id_dn(iconn-nconn)
+          local_id = connections_gtog%id_dn(iconn-nconn)
         endif
       endif
 
       ! Gravity terms up/dn
       v1 = (/ grid_x(local_id), grid_y(local_id), grid_z(local_id) /)
-      if (iupdn==1) then
+      if (iupdn == 1) then
         ! upstream
         aniso_geom%up%cell_id = local_id
         aniso_geom%up%cell_pos = v1
@@ -2227,7 +2222,7 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
         aniso_geom%dn%loc_gravity = DotProduct(option%gravity,v1)
       endif
 
-      if(iconn .le. nconn) then
+      if (iconn <= nconn) then
         ! Loop over faces of cell - determine adjacency
         cell_type = unstructured_grid%cell_type(local_id)
         nfaces = UCellGetNFaces(cell_type,option)
@@ -2256,12 +2251,12 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
           if (found) then
             ! cell face shares a vertex with the connection, so other cell joined by the face is an anisotropy neighbour
             found = PETSC_FALSE
-            if( local_id .le. unstructured_grid%nlmax) then
+            if ( local_id <= unstructured_grid%nlmax) then
               ! local-local or local-ghost
               ! (face_to_cell is set for local-local and local-ghost faces, so use that)
               do iside = 1,2
                 cell_id2 = face_to_cell(iside,face_id2)
-                if (cell_id2 .ne. local_id) then
+                if (cell_id2 /= local_id) then
                   found = PETSC_TRUE
                   exit
                 endif
@@ -2271,9 +2266,9 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
               ! first try ghost-local
               do iside = 1,2
                 cell_id2 = face_to_cell(iside,face_id2)
-                if(cell_id2 .ne. local_id .and. cell_id2 .ne. 0) then
+                if (cell_id2 /= local_id .and. cell_id2 /= 0) then
                   found = PETSC_TRUE
-                  if( cell_id2 .le. unstructured_grid%nlmax ) then
+                  if ( cell_id2 <= unstructured_grid%nlmax ) then
                     ! ghost-local
                   else
                     ! ghost-ghost - store with negative ids as flags
@@ -2284,7 +2279,7 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
                 else
                   ! (face_to_ghost is set for ghost-ghost faces)
                   cell_id2 = face_to_ghost(iside,face_id2)
-                  if (cell_id2 .ne. local_id .and. cell_id2 .ne. 0) then
+                  if (cell_id2 /= local_id .and. cell_id2 /= 0) then
                     found = PETSC_TRUE
                     ! store with negative ids as flags
                     face_id2 = -face_id2
@@ -2296,9 +2291,9 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
             endif
 
             if (found) then
-              if(cell_id2 .ne. 0) then ! only store interior interfaces - not boundaries
+              if (cell_id2 /= 0) then ! only store interior interfaces - not boundaries
                 ! store adjacency info., since cell_id2 is adjacent to the up/dn cell
-                if (iupdn==1) then
+                if (iupdn == 1) then
                   aniso_geom%up%num_adj = aniso_geom%up%num_adj + 1
                   aniso_geom%up%cell_id_adj(aniso_geom%up%num_adj) = cell_id2
                   aniso_geom%up%face_id_adj(aniso_geom%up%num_adj) = face_id2
@@ -2309,7 +2304,7 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
                 endif
               endif
             else
-              if( local_id .le. unstructured_grid%nlmax) then
+              if ( local_id <= unstructured_grid%nlmax) then
                 write(string,*) option%myrank,local_id,dual_local_id
                 option%io_buffer = 'adjacent aniso cell not found in connection loop' // trim(string)
                 call PrintErrMsg(option)
@@ -2323,10 +2318,10 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
     ! compute (u,v,w) coord vecs
 
     ! take u to be in the 'dist direction', e.g. in which the isotropic Darcy flux is notionally directed
-    if(iconn .le. nconn) then
+    if (iconn <= nconn) then
       v1 = connections%dist(1:3,iconn)
     else
-      v1 = connectionsgg%dist(1:3,iconn-nconn)
+      v1 = connections_gtog%dist(1:3,iconn-nconn)
     endif
     aniso_geom%uvec = v1/sqrt(DotProduct(v1,v1))
 
@@ -2351,40 +2346,40 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
     do iface = 1,MAX_VERT_PER_FACE
       ! up
       face_id = aniso_geom%up%face_id_adj(iface)
-      if(face_id .gt. 0) then
+      if (face_id > 0) then
         ! local-local or local-ghost
         conn_id = face_to_connection(face_id)
-        if( aniso_geom%up%cell_id == connections%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
+        if ( aniso_geom%up%cell_id == connections%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
           aniso_geom%up%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%dn%loc_gravity
         else ! up is adj
           aniso_geom%up%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%up%loc_gravity
         endif
-      else if(face_id .lt. 0) then
+      elseif (face_id < 0) then
         ! ghost-ghost
-        conn_id = face_to_connectiongg(-face_id)
-        if( aniso_geom%up%cell_id == connectionsgg%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
-          aniso_geom%up%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%dn%loc_gravity
+        conn_id = face_to_connection_aniso(-face_id)
+        if ( aniso_geom%up%cell_id == connections_gtog%aniso_geom(conn_id)%up%cell_id ) then ! dn is adj
+          aniso_geom%up%loc_gravity_adj(iface) = connections_gtog%aniso_geom(conn_id)%dn%loc_gravity
         else ! up is adj
-          aniso_geom%up%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%up%loc_gravity
+          aniso_geom%up%loc_gravity_adj(iface) = connections_gtog%aniso_geom(conn_id)%up%loc_gravity
         endif
       endif
       ! dn
       face_id = aniso_geom%dn%face_id_adj(iface)
-      if(face_id .gt. 0) then
+      if (face_id > 0) then
         ! local-local or local-ghost
         conn_id = face_to_connection(face_id)
-        if( aniso_geom%dn%cell_id == connections%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
+        if ( aniso_geom%dn%cell_id == connections%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
           aniso_geom%dn%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%up%loc_gravity
         else ! dn is adj
           aniso_geom%dn%loc_gravity_adj(iface) = connections%aniso_geom(conn_id)%dn%loc_gravity
         endif
-      else if(face_id .lt. 0) then
+      elseif (face_id < 0) then
         ! ghost-ghost
-        conn_id = face_to_connectiongg(-face_id)
-        if( aniso_geom%dn%cell_id == connectionsgg%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
-          aniso_geom%dn%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%up%loc_gravity
+        conn_id = face_to_connection_aniso(-face_id)
+        if ( aniso_geom%dn%cell_id == connections_gtog%aniso_geom(conn_id)%dn%cell_id ) then ! up is adj
+          aniso_geom%dn%loc_gravity_adj(iface) = connections_gtog%aniso_geom(conn_id)%up%loc_gravity
         else ! dn is adj
-          aniso_geom%dn%loc_gravity_adj(iface) = connectionsgg%aniso_geom(conn_id)%dn%loc_gravity
+          aniso_geom%dn%loc_gravity_adj(iface) = connections_gtog%aniso_geom(conn_id)%dn%loc_gravity
         endif
       endif
     enddo
@@ -2393,10 +2388,10 @@ subroutine UGridComputeAnisoData(unstructured_grid, &
 
   enddo
 
-  deallocate(face_to_connectiongg)
+  deallocate(face_to_connection_aniso)
   deallocate(face_to_ghost)
 
-  call ConnectionDestroy(connectionsgg)
+  call ConnectionDestroy(connections_gtog)
 
 end subroutine UGridComputeAnisoData
 

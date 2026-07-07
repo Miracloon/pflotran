@@ -308,7 +308,7 @@ subroutine ConnectionDestroy(connection)
 
   nullify(connection%next)
 
-  if( associated(connection%aniso_geom) ) then
+  if ( associated(connection%aniso_geom) ) then
     nconn = size(connection%aniso_geom)
     do iconn = 1, nconn
       call connection%aniso_geom(iconn)%DestroyMembers()

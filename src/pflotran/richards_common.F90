@@ -174,7 +174,7 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
   use Characteristic_Curves_module
   use Material_Aux_module
   use Connection_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
 
   implicit none
 
@@ -244,7 +244,7 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
   call ConnectionCalculateDistances(dist,option%gravity,dd_up,dd_dn, &
                                     dist_gravity,upweight)
 
-  if(.not. associated(aniso_rich)) then
+  if (.not.associated(aniso_rich)) then
     call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
     call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
   else
@@ -307,9 +307,9 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
       Jup(1,1) = (dq_dp_up*density_ave+q*dden_ave_dp_up)
       Jdn(1,1) = (dq_dp_dn*density_ave+q*dden_ave_dp_dn)
 
-      if(associated(aniso_rich)) then
+      if (associated(aniso_rich)) then
         ! Calculate anisotropic contributions with RichardsFluxAniso with calc_derivs=PETSC_TRUE
-        Call RichardsFluxAniso( aniso_rich, &
+        call RichardsFluxAniso( aniso_rich, &
                                 material_auxvar_up,material_auxvar_dn,&
                                 global_auxvar_up,global_auxvar_dn,&
                                 option,dist,&
@@ -329,10 +329,10 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
         allocate(dq_aniso_dp_up_adj(aniso_rich%aniso_geom%up%num_adj))
         allocate(dq_aniso_dp_dn_adj(aniso_rich%aniso_geom%dn%num_adj))
 
-        do iadj=1,aniso_rich%aniso_geom%up%num_adj
+        do iadj = 1, aniso_rich%aniso_geom%up%num_adj
           dq_aniso_dp_up_adj(iadj) = aniso_rich%dv_darcy_aniso_dp_up_adj(iadj) * area
         enddo
-        do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+        do iadj = 1, aniso_rich%aniso_geom%dn%num_adj
           dq_aniso_dp_dn_adj(iadj) = aniso_rich%dv_darcy_aniso_dp_dn_adj(iadj) * area
         enddo
 
@@ -343,10 +343,10 @@ subroutine RichardsFluxDerivative(rich_auxvar_up,global_auxvar_up, &
         ! Calculate J terms for derivatives w.r.t. cells adj to up/dn
         ! Note dden_ave_dp_up_adj etc. assumed = 0 so no dden_... terms below
         ! (The quantities below are used in RichardsJacobianInternalConn when constructing J)
-        do iadj=1,aniso_rich%aniso_geom%up%num_adj
+        do iadj = 1, aniso_rich%aniso_geom%up%num_adj
           aniso_rich%Jup_adj(iadj) = dq_aniso_dp_up_adj(iadj) * density_ave
         enddo
-        do iadj=1,aniso_rich%aniso_geom%dn%num_adj
+        do iadj = 1, aniso_rich%aniso_geom%dn%num_adj
           aniso_rich%Jdn_adj(iadj) = dq_aniso_dp_dn_adj(iadj) * density_ave
         enddo
 
@@ -446,7 +446,7 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
   use Option_module
   use Material_Aux_module
   use Connection_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
 
   implicit none
 
@@ -473,7 +473,7 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
   call ConnectionCalculateDistances(dist,option%gravity,dd_up,dd_dn, &
                                     dist_gravity,upweight)
 
-  if(.not. associated(aniso_rich)) then
+  if (.not.associated(aniso_rich)) then
     call PermeabilityTensorToScalar(material_auxvar_up,dist,perm_up)
     call PermeabilityTensorToScalar(material_auxvar_dn,dist,perm_dn)
   else
@@ -518,9 +518,9 @@ subroutine RichardsFlux(rich_auxvar_up,global_auxvar_up, &
       v_darcy= Dq * ukvr * dphi
 
       ! add anisotropic contributions
-      if(associated(aniso_rich)) then
+      if (associated(aniso_rich)) then
         ! Calculate anisotropic contributions with RichardsFluxAniso with calc_derivs=PETSC_FALSE
-        Call RichardsFluxAniso(   aniso_rich,material_auxvar_up,material_auxvar_dn,&
+        call RichardsFluxAniso(   aniso_rich,material_auxvar_up,material_auxvar_dn,&
                                   global_auxvar_up,global_auxvar_dn,&
                                   option,dist,&
                                   ukvr,0.d0,0.d0,&

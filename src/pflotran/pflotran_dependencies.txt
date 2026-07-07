@@ -2,14 +2,6 @@ anisodata.o : \
   geometry.o \
   pflotran_constants.o \
   utility.o
-anisodata_richards.o : \
-  anisodata.o \
-  connection.o \
-  global_aux.o \
-  material_aux.o \
-  option.o \
-  pflotran_constants.o \
-  variables.o
 auxiliary.o : \
   ert_aux.o \
   general_aux.o \
@@ -3703,7 +3695,6 @@ regression.o : \
   utility.o
 richards.o : \
   anisodata.o \
-  anisodata_richards.o \
   condition.o \
   connection.o \
   coupler.o \
@@ -3729,6 +3720,7 @@ richards.o : \
   realization_base.o \
   realization_subsurface.o \
   region.o \
+  richards_aniso.o \
   richards_aux.o \
   richards_common.o \
   srcsink_sandbox.o \
@@ -3738,8 +3730,13 @@ richards.o : \
   string.o \
   utility.o \
   variables.o
+richards_aniso.o : \
+  anisodata.o \
+  global_aux.o \
+  material_aux.o \
+  option.o \
+  pflotran_constants.o
 richards_aux.o : \
-  anisodata_richards.o \
   characteristic_curves.o \
   characteristic_curves_common.o \
   eos_water.o \
@@ -3750,9 +3747,9 @@ richards_aux.o : \
   matrix_zeroing.o \
   option.o \
   pflotran_constants.o \
+  richards_aniso.o \
   utility.o
 richards_common.o : \
-  anisodata_richards.o \
   characteristic_curves.o \
   connection.o \
   eos_water.o \
@@ -3761,6 +3758,7 @@ richards_common.o : \
   option.o \
   parameter.o \
   pflotran_constants.o \
+  richards_aniso.o \
   richards_aux.o \
   utility.o
 saturation_function.o : \

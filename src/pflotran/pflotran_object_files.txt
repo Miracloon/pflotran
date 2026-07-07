@@ -107,6 +107,7 @@ mode_obj = \
 	${common_src}pnf.o \
 	${common_src}reactive_transport.o \
 	${common_src}richards.o \
+	${common_src}richards_aniso.o \
 	${common_src}richards_common.o \
 	${common_src}sco2.o \
 	${common_src}sco2_common.o \
@@ -191,7 +192,6 @@ chem_obj = \
 
 grid_obj = \
 	${common_src}anisodata.o \
-	${common_src}anisodata_richards.o \
 	${common_src}connection.o \
 	${common_src}communicator_base.o \
 	${common_src}communicator_structured.o \

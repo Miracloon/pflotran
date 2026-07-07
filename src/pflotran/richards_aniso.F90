@@ -1,4 +1,4 @@
-module Anisotropy_Richards_Data_module
+module Richards_Aniso_module
 
   ! Module for managing additional data needed in Richards' flux calculations to
   ! deal with full (off-diagonal) anisotropy terms
@@ -95,7 +95,7 @@ module Anisotropy_Richards_Data_module
     end function PermInnerProd
 
     subroutine Initialise(self)
-      class(aniso_richards_data_type), intent(inout):: self
+      class(aniso_richards_data_type), intent(inout) :: self
       PetscInt :: sz_up
       PetscInt :: sz_dn
 
@@ -125,7 +125,7 @@ module Anisotropy_Richards_Data_module
     end subroutine Initialise
 
     subroutine Destroy(self)
-      class(aniso_richards_data_type), intent(inout):: self
+      class(aniso_richards_data_type), intent(inout) :: self
 
       if (self%is_allocated) then
         deallocate(self%dv_darcy_aniso_dp_up_adj)
@@ -168,11 +168,7 @@ module Anisotropy_Richards_Data_module
 
       use Option_module
       use Material_Aux_module
-      use Anisotropy_Geom_Data_module
-      use Variables_module
-      use Connection_module
       use Global_Aux_module
-
 
       ! inputs
       type(aniso_richards_data_type), pointer :: aniso_rich
@@ -193,11 +189,8 @@ module Anisotropy_Richards_Data_module
       PetscReal :: v_darcy_aniso
 
       ! local
-      PetscReal :: mu_up, mu_dn, rho_up, rho_dn, dummy
+      PetscReal :: mu_up, mu_dn, rho_up, rho_dn
       PetscReal :: v_darcy_aniso_up, v_darcy_aniso_dn
-      PetscReal :: dist_gravity  ! distance along gravity vector
-      PetscReal :: gravity
-
 
       ! anisotropy work variables
       type(aniso_geom_data_type), pointer :: aniso_geom
@@ -205,8 +198,7 @@ module Anisotropy_Richards_Data_module
       type(aniso_richards_work_type), pointer :: aniso_richw
       type(aniso_richards_cell_type), pointer :: aniso_richupdn
       PetscReal :: pres_updn, rho_updn
-      PetscReal, target :: dphi_dv_up, dphi_dv_dn, dphi_dw_up, dphi_dw_dn
-      PetscReal, pointer :: dphi, ddphi_dp, ddphi_dp_adj
+      PetscReal :: dphi_dv_up, dphi_dv_dn, dphi_dw_up, dphi_dw_dn
       PetscInt :: iupdn, iadj
       PetscReal :: LSrhs(2), dot, res, dres_dp_up, dres_dp_dn, dres_dp_adj
       PetscReal :: dphi_du, d2phi_du_dp_up, d2phi_du_dp_dn
@@ -215,10 +207,6 @@ module Anisotropy_Richards_Data_module
       nullify(aniso_geomupdn)
       nullify(aniso_richw)
       nullify(aniso_richupdn)
-
-      nullify(dphi)
-      nullify(ddphi_dp)
-      nullify(ddphi_dp_adj)
 
       ! Initialise output
       v_darcy_aniso = 0.d0
@@ -256,9 +244,9 @@ module Anisotropy_Richards_Data_module
         aniso_richw%d2phi_dw_dn_dp_dn_adj = 0 ! array
       endif
 
-      do iupdn=1,2
+      do iupdn = 1, 2
 
-        if (iupdn==1) then
+        if (iupdn == 1) then
           ! upstream
           aniso_geomupdn => aniso_geom%up
           aniso_richupdn => aniso_rich%up
@@ -300,7 +288,7 @@ module Anisotropy_Richards_Data_module
         ! be more easily accumulated when calculating Jacobian entries.
 
         ! Loop over cells adjacent to up/dn
-        do iadj = 1,aniso_geomupdn%num_adj
+        do iadj = 1, aniso_geomupdn%num_adj
           dot = aniso_geomupdn%dists_vw(1,iadj)*aniso_geomupdn%dists_vw(1,iadj) &
                 + aniso_geomupdn%dists_vw(2,iadj)*aniso_geomupdn%dists_vw(2,iadj)
           res = (aniso_richupdn%pres_adj(iadj) - rho_updn*aniso_geomupdn%loc_gravity_adj(iadj) ) &
@@ -310,7 +298,7 @@ module Anisotropy_Richards_Data_module
           LSrhs(1) = (1.d0/dot) * aniso_geomupdn%dists_vw(1,iadj)
           LSrhs(2) = (1.d0/dot) * aniso_geomupdn%dists_vw(2,iadj)
 
-          if (iupdn==1) then
+          if (iupdn == 1) then
             ! upstream
             ! apply inverse of LS matrix-residual
             dphi_dv_up = dphi_dv_up + aniso_geomupdn%LSMatInv(1,1)*LSrhs(1)*res + aniso_geomupdn%LSMatInv(1,2)*LSrhs(2)*res
@@ -404,12 +392,12 @@ module Anisotropy_Richards_Data_module
                                                     + aniso_rich%up%perm_uw * aniso_richw%d2phi_dw_up_dp_dn) * ukvr &
                                           -1.0d0 * (aniso_rich%up%perm_uv * dphi_dv_up &
                                                     + aniso_rich%up%perm_uw * dphi_dw_up) * dukvr_dp_dn)
-        do iadj=1,aniso_geom%up%num_adj
+        do iadj = 1, aniso_geom%up%num_adj
           aniso_rich%dv_darcy_aniso_dp_up_adj(iadj) = (mu_up/(mu_up+mu_dn)) * &
                                     -1.0d0 * (  aniso_rich%up%perm_uv * aniso_richw%d2phi_dv_up_dp_up_adj(iadj) &
                                               + aniso_rich%up%perm_uw * aniso_richw%d2phi_dw_up_dp_up_adj(iadj)) * ukvr
         enddo
-        do iadj=1,aniso_geom%dn%num_adj
+        do iadj = 1, aniso_geom%dn%num_adj
           aniso_rich%dv_darcy_aniso_dp_dn_adj(iadj) = (mu_dn/(mu_up+mu_dn)) * &
                                     -1.0d0 * (  aniso_rich%dn%perm_uv * aniso_richw%d2phi_dv_dn_dp_dn_adj(iadj) &
                                               + aniso_rich%dn%perm_uw * aniso_richw%d2phi_dw_dn_dp_dn_adj(iadj)) * ukvr
@@ -426,5 +414,5 @@ module Anisotropy_Richards_Data_module
 
     end subroutine RichardsFluxAniso
 
-end module Anisotropy_Richards_Data_module
+end module Richards_Aniso_module
 

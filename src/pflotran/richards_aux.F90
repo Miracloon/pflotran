@@ -9,7 +9,7 @@ module Richards_Aux_module
 
   use PFLOTRAN_Constants_module
   use Matrix_Zeroing_module
-  use Anisotropy_Richards_Data_module
+  use Richards_Aniso_module
   use Geomechanics_Linear_Aux_module
 
   implicit none
