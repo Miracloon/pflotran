@@ -2993,7 +2993,7 @@ subroutine OutputMassBalance(realization_base)
          case(G_MODE)
             cell_ids = (/ (i, i=1, grid%nlmax) /)
             call GeneralComputeMassBalance(realization_base,grid%nlmax, &
-                                           cell_ids,sum_kg(:,:))
+                                           cell_ids,sum_kg(:,:),dummy_energy)
           case(H_MODE)
             call HydrateComputeMassBalance(realization_base,sum_kg(:,:))
           case(WF_MODE)
@@ -3002,7 +3002,7 @@ subroutine OutputMassBalance(realization_base)
             call ImmiscibleComputeMassBalance(realization_base,sum_kg(:,1))
           case(SCO2_MODE)
             call SCO2ComputeMassBalance(realization_base,sum_kg(:,:), &
-                                          sum_trapped(:))
+                                          sum_trapped(:),dummy_energy)
         end select
       class default
         option%io_buffer = 'Unrecognized realization class in MassBalance().'
@@ -3013,7 +3013,7 @@ subroutine OutputMassBalance(realization_base)
     call MPI_Reduce(sum_kg,sum_kg_global,int_mpi,MPI_DOUBLE_PRECISION,MPI_SUM, &
                     option%comm%io_rank,option%mycomm,ierr);CHKERRQ(ierr)
 
-    if (option%iflowmode == MPH_MODE) then
+    if (option%iflowmode == MPH_MODE .or. option%iflowmode == SCO2_MODE) then
 !     call MPI_Barrier(option%mycomm,ierr)
       int_mpi = option%nphase
       call MPI_Reduce(sum_trapped,sum_trapped_global,int_mpi, &
@@ -3748,7 +3748,7 @@ subroutine OutputMassBalance(realization_base)
                 call GeneralComputeMassBalance(realization_base, &
                                                cur_mbr%num_cells, &
                                                cur_mbr%region_cell_ids, &
-                                               total_mass(:,:))
+                                               total_mass(:,:),dummy_energy)
 
               case(SCO2_MODE)
                 deallocate(total_mass,global_total_mass)

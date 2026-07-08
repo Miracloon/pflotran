@@ -826,7 +826,7 @@ subroutine NWTResidual(snes,xx,r,realization,pmwell_ptr,debug,ierr)
       r_p(istart:iend) = r_p(istart:iend) - Res(1:nspecies)
 
       if (associated(realization%patch%ss_tran_fluxes)) then
-        realization%patch%ss_tran_fluxes(:,sum_connection) = - Res(:)
+        realization%patch%ss_tran_fluxes(:,sum_connection) = Res(:)
       endif
       if (option%compute_mass_balance_new) then
         ! contribution to boundary

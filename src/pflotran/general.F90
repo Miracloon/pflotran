@@ -506,7 +506,7 @@ end subroutine GeneralNumericalJacobianTest
 ! ************************************************************************** !
 
 subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
-                                     mass_balance)
+                                     mass_balance,energy_balance)
   !
   ! Initializes mass balance
   !
@@ -528,6 +528,7 @@ subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
                             realization%option%nphase)
   PetscInt :: num_cells
   PetscInt :: cell_ids(:)
+  PetscReal :: energy_balance
 
   type(option_type), pointer :: option
   type(patch_type), pointer :: patch
@@ -535,11 +536,14 @@ subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
   type(grid_type), pointer :: grid
   type(general_auxvar_type), pointer :: general_auxvars(:,:)
   type(material_auxvar_type), pointer :: material_auxvars(:)
+  type(material_parameter_type), pointer :: material_parameter
 
   PetscInt :: local_id, k
   PetscInt :: ghosted_id
-  PetscInt :: iphase, icomp
+  PetscInt :: iphase, icomp, imat
   PetscReal :: vol_phase
+  PetscReal :: porosity
+  PetscReal :: volume
 
   option => realization%option
   patch => realization%patch
@@ -548,20 +552,24 @@ subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
 
   general_auxvars => patch%aux%General%auxvars
   material_auxvars => patch%aux%Material%auxvars
+  material_parameter => patch%aux%Material%material_parameter
 
   mass_balance = 0.d0
+  energy_balance = 0.d0
 
   do k = 1, num_cells
     local_id = cell_ids(k)
     ghosted_id = grid%nL2G(local_id)
+    imat = patch%imat(ghosted_id)
     !geh - Ignore inactive cells with inactive materials
-    if (patch%imat(ghosted_id) <= 0) cycle
+    if (imat <= 0) cycle
+    volume = material_auxvars(ghosted_id)%volume
+    porosity = general_auxvars(ZERO_INTEGER,ghosted_id)%effective_porosity
     do iphase = 1, option%nphase
       ! volume_phase = saturation*porosity*volume
       vol_phase = &
         general_auxvars(ZERO_INTEGER,ghosted_id)%sat(iphase)* &
-        general_auxvars(ZERO_INTEGER,ghosted_id)%effective_porosity* &
-        material_auxvars(ghosted_id)%volume
+        porosity*volume
       ! mass = volume_phase*density
       do icomp = 1, option%nflowspec
         mass_balance(icomp,iphase) = mass_balance(icomp,iphase) + &
@@ -569,7 +577,19 @@ subroutine GeneralComputeMassBalance(realization,num_cells,cell_ids, &
           general_auxvars(ZERO_INTEGER,ghosted_id)%xmol(icomp,iphase) * &
           fmw_comp(icomp)*vol_phase
       enddo
+      ! energy [MJ] = sat * den [kmol/m^3] * U [MJ/kmol] * por * vol
+      energy_balance = energy_balance + &
+        general_auxvars(ZERO_INTEGER,ghosted_id)%sat(iphase)* &
+        general_auxvars(ZERO_INTEGER,ghosted_id)%den(iphase)* &
+        general_auxvars(ZERO_INTEGER,ghosted_id)%U(iphase)* &
+        porosity*volume
     enddo
+    ! rock energy [MJ]
+    energy_balance = energy_balance + &
+      (1.d0 - porosity)* &
+      material_auxvars(ghosted_id)%soil_particle_density* &
+      material_parameter%soil_heat_capacity(imat)* &
+      general_auxvars(ZERO_INTEGER,ghosted_id)%temp*volume
   enddo
 
 end subroutine GeneralComputeMassBalance

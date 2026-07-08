@@ -2956,7 +2956,7 @@ subroutine RTResidualNonFlux(snes,xx,r,realization,ierr)
       iendall = offset + reaction%ncomp
       r_p(istartall:iendall) = r_p(istartall:iendall) + Res(1:reaction%ncomp)
       if (associated(patch%ss_tran_fluxes)) then
-        patch%ss_tran_fluxes(:,sum_connection) = Res(:)
+        patch%ss_tran_fluxes(:,sum_connection) = -Res(:)
       endif
       if (option%compute_mass_balance_new) then
         ! contribution to boundary
