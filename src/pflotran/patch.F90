@@ -951,6 +951,7 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
   use WIPP_Flow_Aux_module
   use Immiscible_Aux_module
   use ZFlow_Aux_module
+  use THC_Aux_module
 
   implicit none
 
@@ -1051,6 +1052,25 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
                 coupler%flow_aux_real_var = 0.d0
                 !coupler%flow_aux_int_var = 0
                 coupler%flow_aux_mapping => ZFlowAuxMapConditionIndices(iflag)
+
+              case(THC_MODE)
+                ndof = option%nflowdof
+                temp_int = 0
+                iflag = PETSC_FALSE
+                select case(coupler%flow_condition%pressure%itype)
+                  case(HYDROSTATIC_CONDUCTANCE_BC, &
+                       DIRICHLET_CONDUCTANCE_BC, &
+                       HET_HYDROSTATIC_CONDUCTANCE_BC)
+                    temp_int = temp_int + 1
+                    iflag = PETSC_TRUE
+                end select
+                allocate(coupler%flow_bc_type(ndof+temp_int))
+                allocate(coupler%flow_aux_real_var(ndof+temp_int, &
+                                                   num_connections))
+                coupler%flow_bc_type = 0
+                coupler%flow_aux_real_var = 0.d0
+                coupler%flow_aux_mapping => &
+                  THCAuxMapConditionIndices(iflag)
 
               case(PNF_MODE)
                 allocate(coupler%flow_bc_type(1))
@@ -1158,7 +1178,8 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
 
           if (associated(coupler%flow_condition%rate)) then
 
-            if (option%iflowmode == ZFLOW_MODE) then
+            if (option%iflowmode == ZFLOW_MODE .or. &
+                option%iflowmode == THC_MODE) then
               ndof = option%nflowdof
               iflag = PETSC_FALSE
               temp_int = 0
@@ -1169,15 +1190,20 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
                 case(SCALED_MASS_RATE_SS,MASS_RATE_SS, &
                      HET_VOL_RATE_SS,HET_MASS_RATE_SS)
                   option%io_buffer = 'Mass rate source/sinks not &
-                    &supported in ZFLOW mode.'
+                    &supported in ZFLOW/THC mode.'
                   call PrintErrMsg(option)
               end select
               allocate(coupler%flow_bc_type(ndof+temp_int))
               allocate(coupler%flow_aux_real_var(ndof+temp_int,num_connections))
               coupler%flow_bc_type = 0
               coupler%flow_aux_real_var = 0.d0
-              coupler%flow_aux_mapping => &
-                ZFlowAuxMapConditionIndices(iflag)
+              if (option%iflowmode == ZFLOW_MODE) then
+                coupler%flow_aux_mapping => &
+                  ZFlowAuxMapConditionIndices(iflag)
+              else
+                coupler%flow_aux_mapping => &
+                  THCAuxMapConditionIndices(iflag)
+              endif
             else
               select case(coupler%flow_condition%rate%itype)
                 case(SCALED_MASS_RATE_SS,SCALED_VOLUMETRIC_RATE_SS, &
@@ -1380,6 +1406,8 @@ subroutine PatchUpdateCouplerAuxVars(patch,coupler_list,force_update_flag, &
             call PatchUpdateCouplerAuxVarsRich(patch,coupler,option)
           case(ZFLOW_MODE)
             call PatchUpdateCouplerAuxVarsZFlow(patch,coupler,option)
+          case(THC_MODE)
+            call PatchUpdateCouplerAuxVarsTHC(patch,coupler,option)
           case(IMMISCIBLE_MODE)
             call PatchUpdateCouplerAuxVarsImmis(patch,coupler,option)
           case(PNF_MODE)
@@ -4618,6 +4646,150 @@ end subroutine PatchUpdateCouplerAuxVarsZFlow
 
 ! ************************************************************************** !
 
+subroutine PatchUpdateCouplerAuxVarsTHC(patch,coupler,option)
+  !
+  ! Updates flow auxiliary variables associated
+  ! with a coupler for THC_MODE.  THC always has three fixed DOF
+  ! (liquid flow, energy, solute), so each sub-condition is always mapped.
+  !
+  ! Author: Piyoosh Jaysaval
+  ! Date: 06/09/26
+  !
+
+  use Option_module
+  use Condition_module
+  use Hydrostatic_module
+  use THC_Aux_module
+
+  use Grid_module
+  use Dataset_Common_HDF5_class
+  use Dataset_Gridded_HDF5_class
+  use Dataset_Ascii_class
+  use Dataset_module
+
+  implicit none
+
+  type(patch_type) :: patch
+  type(coupler_type), pointer :: coupler
+  type(option_type) :: option
+
+  type(flow_condition_type), pointer :: flow_condition
+  PetscInt :: water_index, water_aux_index, energy_index, solute_index
+  PetscInt :: num_connections
+  PetscBool :: hydrostatic_update_called
+
+  hydrostatic_update_called = PETSC_FALSE
+  num_connections = coupler%connection_set%num_connections
+
+  water_index = coupler%flow_aux_mapping(THC_COND_WATER_INDEX)
+  water_aux_index = coupler%flow_aux_mapping(THC_COND_WATER_AUX_INDEX)
+  energy_index = coupler%flow_aux_mapping(THC_COND_ENERGY_INDEX)
+  solute_index = coupler%flow_aux_mapping(THC_COND_SOLUTE_INDEX)
+
+  flow_condition => coupler%flow_condition
+
+  ! ---- liquid flow DOF (pressure or rate) --------------------------------
+  if (associated(flow_condition%pressure)) then
+    coupler%flow_bc_type(water_index) = flow_condition%pressure%itype
+    select case(flow_condition%pressure%itype)
+      case(DIRICHLET_BC,NEUMANN_BC,ZERO_GRADIENT_BC, &
+           DIRICHLET_SEEPAGE_BC,DIRICHLET_CONDUCTANCE_BC)
+        select type(dataset => &
+                    flow_condition%pressure%dataset)
+          class is(dataset_ascii_type)
+            coupler%flow_aux_real_var(water_index,1:num_connections) = &
+              dataset%rarray(1)
+          class is(dataset_gridded_hdf5_type)
+            call PatchUpdateCouplerGridDataset(coupler,option,patch%grid, &
+                                               dataset,water_index)
+          class is(dataset_common_hdf5_type)
+            ! skip cell indexed datasets used in initial conditions
+          class default
+            call PrintMsg(option,'pressure%itype,DIRICHLET-type')
+            call DatasetUnknownClass(dataset,option, &
+                                     'PatchUpdateCouplerAuxVarsTHC')
+        end select
+        select case(flow_condition%pressure%itype)
+          case(DIRICHLET_CONDUCTANCE_BC)
+            coupler%flow_aux_real_var(water_aux_index,1:num_connections) = &
+                                           flow_condition%pressure%aux_real(1)
+        end select
+      case(HYDROSTATIC_BC,HYDROSTATIC_SEEPAGE_BC,HYDROSTATIC_CONDUCTANCE_BC)
+        hydrostatic_update_called = PETSC_TRUE
+        call HydrostaticUpdateCoupler(coupler,option,patch%grid)
+      case(HET_DIRICHLET_BC,HET_HYDROSTATIC_SEEPAGE_BC, &
+           HET_HYDROSTATIC_CONDUCTANCE_BC)
+        call PatchUpdateHetroCouplerAuxVars(patch,coupler, &
+                flow_condition%pressure%dataset, &
+                water_index,option)
+        if (flow_condition%pressure%itype == &
+            HET_HYDROSTATIC_CONDUCTANCE_BC) then
+          coupler%flow_aux_real_var(water_aux_index, &
+                                    1:num_connections) = &
+            flow_condition%pressure%aux_real(1)
+        endif
+    end select
+  endif
+
+  if (associated(flow_condition%rate)) then
+    coupler%flow_bc_type(water_index) = flow_condition%rate%itype
+    coupler%flow_aux_real_var(water_index,1:num_connections) = &
+          flow_condition%rate%dataset%rarray(1)
+    select case(flow_condition%rate%itype)
+      case(SCALED_VOLUMETRIC_RATE_SS)
+        call PatchScaleSourceSink(patch,coupler,flow_condition%rate%isubtype, &
+                                  water_aux_index,option)
+      case default
+    end select
+  endif
+
+  ! ---- energy DOF (temperature or heat flux) -----------------------------
+  if (associated(flow_condition%temperature)) then
+    coupler%flow_bc_type(energy_index) = flow_condition%temperature%itype
+    select case(flow_condition%temperature%itype)
+      case(DIRICHLET_BC,NEUMANN_BC,ZERO_GRADIENT_BC)
+        if (flow_condition%temperature%itype == DIRICHLET_BC .or. &
+            .not.hydrostatic_update_called) then
+          select type(dataset => &
+                      flow_condition%temperature%dataset)
+            class is(dataset_ascii_type)
+              coupler%flow_aux_real_var(energy_index,1:num_connections) = &
+                dataset%rarray(1)
+            class is(dataset_gridded_hdf5_type)
+              call PatchUpdateCouplerGridDataset(coupler,option,patch%grid, &
+                                                 dataset,energy_index)
+            class is(dataset_common_hdf5_type)
+              ! skip cell indexed datasets used in initial conditions
+            class default
+              call PrintMsg(option,'temperature%itype,DIRICHLET-type')
+              call DatasetUnknownClass(dataset,option, &
+                                       'PatchUpdateCouplerAuxVarsTHC')
+          end select
+        endif
+    end select
+  endif
+
+  ! ---- solute DOF (concentration) ----------------------------------------
+  if (associated(flow_condition%concentration)) then
+    coupler%flow_bc_type(solute_index) = flow_condition%concentration%itype
+    select case(flow_condition%concentration%itype)
+      case(DIRICHLET_BC,ZERO_GRADIENT_BC)
+        if (flow_condition%concentration%itype == DIRICHLET_BC .or. &
+            .not.hydrostatic_update_called) then
+          coupler%flow_aux_real_var(solute_index,1:num_connections) = &
+            flow_condition%concentration%dataset%rarray(1)
+        endif
+      case(NEUMANN_BC)
+        option%io_buffer = &
+          'NEUMANN_BC not supported for THC concentration'
+        call PrintErrMsg(option)
+    end select
+  endif
+
+end subroutine PatchUpdateCouplerAuxVarsTHC
+
+! ************************************************************************** !
+
 subroutine PatchUpdateCouplerAuxVarsImmis(patch,coupler,option)
   !
   ! Updates flow auxiliary variables associated with a coupler for
@@ -6086,7 +6258,7 @@ subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
       !geh: This is a scaling factor that is stored that would be applied to
       !     all phases.
       case(RICHARDS_MODE,RICHARDS_TS_MODE,G_MODE,H_MODE,TH_MODE,TH_TS_MODE, &
-           WF_MODE,SCO2_MODE,IMMISCIBLE_MODE)
+           WF_MODE,SCO2_MODE,IMMISCIBLE_MODE,THC_MODE)
         source_sink%flow_aux_real_var(index_,iconn) = vec_ptr(local_id)
       case(ZFLOW_MODE)
         if (zflow_calc_adjoint .and. iscale_type /= SCALE_BY_VOLUME) then
@@ -6661,6 +6833,7 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
                                  G_STATE, L_STATE
   use WIPP_Flow_Aux_module, only : WIPPFloScalePerm
   use ZFlow_Aux_module
+  use THC_Aux_module
   use SCO2_Aux_module, only : sco2_fmw => fmw_comp, &
                               SCO2_LIQUID_STATE, SCO2_GAS_STATE
   use Immiscible_Aux_module
@@ -6973,6 +7146,61 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
             end select
           case default
             call PatchUnsupportedVariable('ZFLOW',ivar,option)
+        end select
+
+      else if (associated(patch%aux%THC)) then
+
+        select case(ivar)
+          case(LIQUID_PRESSURE,MAXIMUM_PRESSURE)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%pres
+            enddo
+          case(CAPILLARY_PRESSURE)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%pc
+            enddo
+          case(LIQUID_SATURATION)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%sat
+            enddo
+          case(TEMPERATURE)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%temp
+            enddo
+          case(SOLUTE_CONCENTRATION)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%conc
+            enddo
+          case(LIQUID_DENSITY)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER, &
+                                          grid%nL2G(local_id))%den_kg
+            enddo
+          case(LIQUID_VISCOSITY)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%vis
+            enddo
+          case(THERMAL_CONDUCTIVITY)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER, &
+                                          grid%nL2G(local_id))%therm_cond_eff
+            enddo
+          case(POROSITY)
+            do local_id=1,grid%nlmax
+              vec_ptr(local_id) = &
+                patch%aux%THC%auxvars(ZERO_INTEGER, &
+                                          grid%nL2G(local_id))%effective_porosity
+            enddo
+          case default
+            call PatchUnsupportedVariable('THC',ivar,option)
         end select
 
       else if (associated(patch%aux%Immiscible)) then
@@ -8389,6 +8617,11 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
             vec_ptr(local_id) = &
               patch%aux%ZFlow%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%kr
           enddo
+        case(THC_MODE)
+          do local_id=1,grid%nlmax
+            vec_ptr(local_id) = &
+              patch%aux%THC%auxvars(ZERO_INTEGER,grid%nL2G(local_id))%kr
+          enddo
         case(TH_MODE,TH_TS_MODE)
           do local_id=1,grid%nlmax
             vec_ptr(local_id) = &
@@ -8504,6 +8737,12 @@ subroutine PatchGetVariable1(patch,field,reaction_base,option, &
                             patch%aux%General%auxvars(ZERO_INTEGER,&
                             ghosted_id)%effective_porosity, & !effective porosity
                             vec_ptr(local_id),dummy1,dummy2,option)
+          enddo
+        case(THC_MODE)
+          do local_id=1,grid%nlmax
+            vec_ptr(local_id) = &
+              patch%aux%THC%auxvars(ZERO_INTEGER, &
+                                        grid%nL2G(local_id))%therm_cond_eff
           enddo
         case default
           call PatchUnsupportedVariable(ivar,option)
@@ -8818,6 +9057,7 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
                                  G_STATE, L_STATE
   use WIPP_Flow_Aux_module, only : WIPPFloScalePerm
   use ZFlow_Aux_module
+  use THC_Aux_module
   use SCO2_Aux_module
   use Immiscible_Aux_module
   use Material_Aux_module
@@ -9025,6 +9265,31 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
             end select
           case default
             call PatchUnsupportedVariable('ZFLOW',ivar,option)
+        end select
+      else if (associated(patch%aux%THC)) then
+        select case(ivar)
+          case(LIQUID_PRESSURE,MAXIMUM_PRESSURE)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%pres
+          case(CAPILLARY_PRESSURE)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%pc
+          case(LIQUID_SATURATION)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%sat
+          case(TEMPERATURE)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%temp
+          case(SOLUTE_CONCENTRATION)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%conc
+          case(LIQUID_DENSITY)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%den_kg
+          case(LIQUID_VISCOSITY)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%vis
+          case(THERMAL_CONDUCTIVITY)
+            value = &
+              patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%therm_cond_eff
+          case(POROSITY)
+            value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)% &
+                      effective_porosity
+          case default
+            call PatchUnsupportedVariable('THC',ivar,option)
         end select
       else if (associated(patch%aux%Immiscible)) then
         select case(ivar)
@@ -9869,6 +10134,8 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
           value = patch%aux%Richards%auxvars(ghosted_id)%kr
         case(ZFLOW_MODE)
           value = patch%aux%ZFlow%auxvars(ZERO_INTEGER,ghosted_id)%kr
+        case(THC_MODE)
+          value = patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%kr
         case(TH_MODE,TH_TS_MODE)
           value = patch%aux%TH%auxvars(ghosted_id)%mobility / &
                   patch%aux%TH%auxvars(ghosted_id)%vis
@@ -9936,6 +10203,9 @@ function PatchGetVariableValueAtCell(patch,field,reaction_base,option, &
                             ghosted_id)%effective_porosity, & !effective porosity
                             value,dummy1,dummy2,option)
           enddo
+        case(THC_MODE)
+          value = &
+            patch%aux%THC%auxvars(ZERO_INTEGER,ghosted_id)%therm_cond_eff
         case default
           call PatchUnsupportedVariable(ivar,option)
       end select

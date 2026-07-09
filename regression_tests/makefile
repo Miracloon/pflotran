@@ -135,6 +135,7 @@ STANDARD_CFG = \
 	shortcourse/electron_tower/electron_tower.cfg \
 	surfaceflow/inlinesurface/inlinesurface.cfg \
 	templates/templates.cfg \
+	thc/thc.cfg \
 	ufd/ufd.cfg \
 	well_model/heat_pipe/heat_pipe.cfg \
 	well_model/richards/richards.cfg \
@@ -210,7 +211,8 @@ FLOW_CFG = \
 	pnf/unit_cube/unit_cube.cfg \
 	ntrdc/ntrdc.cfg \
 	shortcourse/1D_variably_saturated_flow/vsat_flow.cfg \
-	shortcourse/copper_leaching/cu_leaching.cfg
+	shortcourse/copper_leaching/cu_leaching.cfg \
+	thc/thc.cfg
 
 TRANSPORT_CFG = \
 	default/543/543.cfg \

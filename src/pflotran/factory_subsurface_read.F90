@@ -45,6 +45,7 @@ subroutine FactorySubsurfReadFlowPM(input,option,pm)
   use PM_Richards_TS_class
   use PM_TH_TS_class
   use PM_ZFlow_class
+  use PM_THC_class
   use PM_PNF_class
   use PM_SCO2_class
   use PM_Immiscible_class
@@ -106,6 +107,8 @@ subroutine FactorySubsurfReadFlowPM(input,option,pm)
             pm => PMTHTSCreate()
           case ('ZFLOW')
             pm => PMZFlowCreate()
+          case ('THC')
+            pm => PMTHCCreate()
           case ('PORE_FLOW')
             pm => PMPNFCreate()
           case ('STOMP-CO2','SCO2')

@@ -777,7 +777,7 @@ subroutine GlobalWeightAuxVars(realization,weight)
   end select
 
   select case(option%iflowmode)
-    case(TH_MODE,G_MODE,H_MODE,SCO2_MODE)
+    case(TH_MODE,TH_TS_MODE,THC_MODE,G_MODE,H_MODE,SCO2_MODE)
       do ghosted_id = 1, realization%patch%aux%Global%num_aux
         auxvars(ghosted_id)%pres(:) = &
           (weight*auxvars(ghosted_id)%pres_store(:,TIME_TpDT)+ &
@@ -907,7 +907,7 @@ subroutine GlobalSetAuxVarsAtTimeLevel(realization,time_level,time)
   ! gas saturation
   flag = PETSC_FALSE
   select case(option%iflowmode)
-    case(RICHARDS_MODE,TH_MODE,TH_TS_MODE,ZFLOW_MODE)
+    case(RICHARDS_MODE,TH_MODE,TH_TS_MODE,THC_MODE,ZFLOW_MODE)
       if (option%transport%nphase > 1) flag = PETSC_TRUE
     case default
       flag = PETSC_TRUE
@@ -925,7 +925,7 @@ subroutine GlobalSetAuxVarsAtTimeLevel(realization,time_level,time)
       call GlobalUpdateSingleAuxVar(realization,GAS_PRESSURE,time_level)
       call GlobalUpdateSingleAuxVar(realization,TEMPERATURE,time_level)
       call GlobalUpdateSingleAuxVar(realization,SC_FUGA_COEFF,time_level)
-    case(TH_MODE,TH_TS_MODE)
+    case(TH_MODE,TH_TS_MODE,THC_MODE)
       call GlobalUpdateSingleAuxVar(realization,LIQUID_PRESSURE,time_level)
       call GlobalUpdateSingleAuxVar(realization,LIQUID_DENSITY,time_level)
       call GlobalUpdateSingleAuxVar(realization,TEMPERATURE,time_level)

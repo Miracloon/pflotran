@@ -1,0 +1,190 @@
+#Description: 1D thermal advection with PER-MATERIAL thermal properties.  This
+#             deck is identical to thermal_1d.in (MODE THC) except that the
+#             solid thermal properties are supplied through MATERIAL_PROPERTY
+#             (TH-style cards) instead of the mode OPTIONS block:
+#               OPTIONS SOLID_DENSITY 2650        -> ROCK_DENSITY 2650
+#               OPTIONS SOLID_HEAT_CAPACITY 800   -> SPECIFIC_HEAT 800
+#               OPTIONS THERMAL_CONDUCTIVITY_SOLID 3.0 (grain conductivity; the
+#                 grain-Somerton effective saturated value is
+#                 3^(1-phi)*0.6^phi = 2.0062209149293 at phi = 0.25)
+#                                                 -> THERMAL_CONDUCTIVITY_DRY/WET
+#                                                    2.0062209149293
+#             The fluid heat capacity (LIQUID_HEAT_CAPACITY) stays a global
+#             OPTIONS property, mirroring TH.  Because the column is fully
+#             saturated everywhere, the TH-style bulk conductivity
+#             kappa_eff = ckdry + sqrt(S_l)*(ckwet-ckdry) reduces to ckwet, which
+#             equals the grain-Somerton effective value used by thermal_1d.in, so
+#             the two temperature breakthroughs agree to round-off.  This test
+#             exercises the per-material thermal-property path and demonstrates
+#             OPTIONS <-> MATERIAL_PROPERTY interchangeability.
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE THC
+      OPTIONS
+        SPECIFIC_HEAT_LIQUID 4184.d0 J/kg-C
+      /
+    /
+  /
+END
+
+SUBSURFACE
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+
+  NEWTON_SOLVER
+    MAX_ALLOW_LIQ_PRES_CHANGE_NI 1.d0
+  /
+
+  LINEAR_SOLVER
+    SOLVER DIRECT
+  /
+
+END
+
+#=========================== regression =======================================
+REGRESSION
+  CELLS_PER_PROCESS 5
+END
+
+#=========================== discretization ===================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 100 1 1
+  BOUNDS
+    0.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+#=========================== material properties ==============================
+# Solid thermal properties live here (TH-style) instead of the mode OPTIONS
+# block.  ROCK_DENSITY * SPECIFIC_HEAT supplies rho_s*c_s; the bulk dry/wet
+# conductivities supply the effective porous-medium conductivity directly.
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  ROCK_DENSITY 2650.d0
+  SPECIFIC_HEAT 800.d0
+  THERMAL_CONDUCTIVITY_DRY 2.0062209149293d0
+  THERMAL_CONDUCTIVITY_WET 2.0062209149293d0
+  PERMEABILITY
+    PERM_ISO 1.d-10
+  /
+  CHARACTERISTIC_CURVES cc1
+END
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES cc1
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    ALPHA 1.d-4
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== output options ===================================
+OUTPUT
+  TIMES d 1.0 2.0 3.0
+  FORMAT TECPLOT POINT
+END
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 4.d0 d
+  INITIAL_TIMESTEP_SIZE 1.d0 h
+  MAXIMUM_TIMESTEP_SIZE 2.d0 h
+END
+
+#=========================== regions ==========================================
+REGION all
+  COORDINATES
+    0.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+REGION west
+  FACE WEST
+  COORDINATES
+    0.d0 0.d0 0.d0
+    0.d0 1.d0 1.d0
+  /
+END
+
+REGION east
+  FACE EAST
+  COORDINATES
+    10.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+#=========================== flow conditions ==================================
+# Initially cold, saturated column at uniform pressure
+FLOW_CONDITION initial
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_PRESSURE 101325.d0
+  TEMPERATURE 20.d0
+  CONCENTRATION 0.d0
+END
+
+# Hot water injected at the inlet at a fixed Darcy flux
+FLOW_CONDITION inlet
+  TYPE
+    LIQUID_FLUX NEUMANN
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_FLUX 1.d0 m/d
+  TEMPERATURE 80.d0
+  CONCENTRATION 0.d0
+END
+
+# Outlet pressure held; outgoing temperature/concentration advected out
+FLOW_CONDITION outlet
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE ZERO_GRADIENT
+    CONCENTRATION ZERO_GRADIENT
+  /
+  LIQUID_PRESSURE 101325.d0
+  TEMPERATURE 20.d0
+  CONCENTRATION 0.d0
+END
+
+#=========================== condition couplers ===============================
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION all
+END
+
+BOUNDARY_CONDITION inlet
+  FLOW_CONDITION inlet
+  REGION west
+END
+
+BOUNDARY_CONDITION outlet
+  FLOW_CONDITION outlet
+  REGION east
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+
+END_SUBSURFACE

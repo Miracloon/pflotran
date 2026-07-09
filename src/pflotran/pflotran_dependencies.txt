@@ -17,6 +17,7 @@ auxiliary.o : \
   sco2_aux.o \
   secondary_continuum_aux.o \
   th_aux.o \
+  thc_aux.o \
   wipp_flow_aux.o \
   zflow_aux.o
 block_solve.o :
@@ -576,6 +577,7 @@ factory_subsurface.o : \
   pm_subsurface_flow.o \
   pm_th.o \
   pm_th_ts.o \
+  pm_thc.o \
   pm_ufd_biosphere.o \
   pm_ufd_decay.o \
   pm_unittest.o \
@@ -708,6 +710,7 @@ factory_subsurface_read.o : \
   pm_sco2.o \
   pm_th.o \
   pm_th_ts.o \
+  pm_thc.o \
   pm_ufd_biosphere.o \
   pm_ufd_decay.o \
   pm_waste_form.o \
@@ -2638,6 +2641,27 @@ pm_th_ts.o : \
   realization_subsurface.o \
   th.o \
   th_aux.o
+pm_thc.o : \
+  checkpoint.o \
+  convergence.o \
+  debug.o \
+  field.o \
+  global.o \
+  grid.o \
+  input_aux.o \
+  material_aux.o \
+  option.o \
+  patch.o \
+  pflotran_constants.o \
+  pm_base.o \
+  pm_subsurface_flow.o \
+  realization_base.o \
+  realization_subsurface.o \
+  string.o \
+  thc.o \
+  thc_aux.o \
+  utility.o \
+  variables.o
 pm_ufd_biosphere.o : \
   coupler.o \
   global_aux.o \
@@ -4122,6 +4146,50 @@ th_well.o : \
   realization_subsurface.o \
   string.o \
   th_aux.o
+thc.o : \
+  characteristic_curves.o \
+  connection.o \
+  coupler.o \
+  debug.o \
+  discretization.o \
+  field.o \
+  fluid.o \
+  global_aux.o \
+  grid.o \
+  material.o \
+  material_aux.o \
+  matrix_zeroing.o \
+  option.o \
+  output_aux.o \
+  patch.o \
+  petsc_utility.o \
+  pflotran_constants.o \
+  realization_subsurface.o \
+  thc_aux.o \
+  thc_common.o \
+  upwind_direction.o \
+  variables.o
+thc_aux.o : \
+  characteristic_curves.o \
+  eos_water.o \
+  global_aux.o \
+  material_aux.o \
+  matrix_zeroing.o \
+  option.o \
+  pflotran_constants.o \
+  thc_eos_utils.o \
+  utility.o
+thc_common.o : \
+  connection.o \
+  global_aux.o \
+  material_aux.o \
+  option.o \
+  pflotran_constants.o \
+  string.o \
+  thc_aux.o
+thc_eos_utils.o : \
+  eos_water.o \
+  pflotran_constants.o
 time_storage.o : \
   option.o \
   pflotran_constants.o

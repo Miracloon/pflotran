@@ -1,0 +1,174 @@
+#Description: 1D thermal advection.  Water at a fixed flux carries a thermal
+#             front through an initially cold, fully saturated column.  Hot
+#             water (T = 80 C) is injected at the inlet while the column starts
+#             at T = 20 C.  Same as thermal_1d but using the TH-equivalent
+#             ENERGY_FORMULATION FULL_EOS (EOS internal energy u(P,T) in the
+#             accumulation term and EOS enthalpy h(P,T) in the advective flux).
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE THC
+      OPTIONS
+        SPECIFIC_HEAT_LIQUID 4184.d0 J/kg-C
+        SPECIFIC_HEAT_SOLID 800.d0 J/kg-C
+        SOLID_DENSITY 2650.d0 kg/m^3
+        THERMAL_CONDUCTIVITY_SOLID 3.d0 W/m-C
+        ENERGY_FORMULATION FULL_EOS
+      /
+    /
+  /
+END
+
+SUBSURFACE
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+
+  NEWTON_SOLVER
+    MAX_ALLOW_LIQ_PRES_CHANGE_NI 1.d0
+  /
+
+  LINEAR_SOLVER
+    SOLVER DIRECT
+  /
+
+END
+
+#=========================== regression =======================================
+REGRESSION
+  CELLS_PER_PROCESS 5
+END
+
+#=========================== discretization ===================================
+GRID
+  TYPE STRUCTURED
+  NXYZ 100 1 1
+  BOUNDS
+    0.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.25d0
+  PERMEABILITY
+    PERM_ISO 1.d-10
+  /
+  CHARACTERISTIC_CURVES cc1
+END
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES cc1
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    ALPHA 1.d-4
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== output options ===================================
+OUTPUT
+  TIMES d 1.0 2.0 3.0
+  FORMAT TECPLOT POINT
+END
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 4.d0 d
+  INITIAL_TIMESTEP_SIZE 1.d0 h
+  MAXIMUM_TIMESTEP_SIZE 2.d0 h
+END
+
+#=========================== regions ==========================================
+REGION all
+  COORDINATES
+    0.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+REGION west
+  FACE WEST
+  COORDINATES
+    0.d0 0.d0 0.d0
+    0.d0 1.d0 1.d0
+  /
+END
+
+REGION east
+  FACE EAST
+  COORDINATES
+    10.d0 0.d0 0.d0
+    10.d0 1.d0 1.d0
+  /
+END
+
+#=========================== flow conditions ==================================
+# Initially cold, saturated column at uniform pressure
+FLOW_CONDITION initial
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_PRESSURE 101325.d0
+  TEMPERATURE 20.d0
+  CONCENTRATION 0.d0
+END
+
+# Hot water injected at the inlet at a fixed Darcy flux
+FLOW_CONDITION inlet
+  TYPE
+    LIQUID_FLUX NEUMANN
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_FLUX 1.d0 m/d
+  TEMPERATURE 80.d0
+  CONCENTRATION 0.d0
+END
+
+# Outlet pressure held; outgoing temperature/concentration advected out
+FLOW_CONDITION outlet
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE ZERO_GRADIENT
+    CONCENTRATION ZERO_GRADIENT
+  /
+  LIQUID_PRESSURE 101325.d0
+  TEMPERATURE 20.d0
+  CONCENTRATION 0.d0
+END
+
+#=========================== condition couplers ===============================
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION all
+END
+
+BOUNDARY_CONDITION inlet
+  FLOW_CONDITION inlet
+  REGION west
+END
+
+BOUNDARY_CONDITION outlet
+  FLOW_CONDITION outlet
+  REGION east
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+
+END_SUBSURFACE

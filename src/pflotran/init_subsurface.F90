@@ -81,7 +81,7 @@ subroutine SubsurfAllocMatPropDataStructs(realization)
     patch%imat = UNINITIALIZED_INTEGER
     select case(option%iflowmode)
       case(NULL_MODE,PNF_MODE)
-      case(RICHARDS_MODE,WF_MODE,ZFLOW_MODE,IMMISCIBLE_MODE)
+      case(RICHARDS_MODE,WF_MODE,ZFLOW_MODE,THC_MODE,IMMISCIBLE_MODE)
         allocate(patch%cc_id(grid%ngmax))
         patch%cc_id = UNINITIALIZED_INTEGER
       case default

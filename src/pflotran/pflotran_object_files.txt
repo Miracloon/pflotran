@@ -39,7 +39,8 @@ eos_obj = \
 	${common_src}co2_span_wagner_spline.o \
 	${common_src}eos.o \
 	${common_src}eos_gas.o \
-	${common_src}gas_eos_mod.o
+	${common_src}gas_eos_mod.o \
+	${common_src}thc_eos_utils.o
 
 mode_aux_obj = \
 	${common_src}auxiliary.o \
@@ -54,6 +55,7 @@ mode_aux_obj = \
 	${common_src}sco2_aux.o \
 	${common_src}th_aux.o \
 	${common_src}wipp_flow_aux.o \
+	${common_src}thc_aux.o \
 	${common_src}zflow_aux.o
 
 mode_process_model_obj = \
@@ -87,6 +89,7 @@ mode_process_model_obj = \
 	${common_src}pm_well.o \
 	${common_src}pm_wipp_flow.o \
 	${common_src}pm_wipp_srcsink.o \
+	${common_src}pm_thc.o \
 	${common_src}pm_zflow.o
 
 mode_obj = \
@@ -109,6 +112,8 @@ mode_obj = \
 	${common_src}sco2_common.o \
 	${common_src}th.o \
 	${common_src}th_well.o \
+	${common_src}thc.o \
+	${common_src}thc_common.o \
 	${common_src}wipp_flow.o \
 	${common_src}wipp_flow_common.o \
 	${common_src}wipp_well.o \

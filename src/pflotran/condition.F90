@@ -1582,7 +1582,7 @@ subroutine FlowConditionRead(condition,input,option)
   !     DIRICHLET_CONDUCTANCE_BC are only used in TH and RICHARDS
   if (associated(pressure)) then
     select case(option%iflowmode)
-      case(RICHARDS_MODE,TH_MODE,ZFLOW_MODE)
+      case(RICHARDS_MODE,TH_MODE,ZFLOW_MODE,THC_MODE)
       case(PNF_MODE)
         if (.not.(pressure%itype == DIRICHLET_BC .or. &
                   pressure%itype == NEUMANN_BC)) then
@@ -1991,6 +1991,62 @@ subroutine FlowConditionRead(condition,input,option)
           condition%sub_condition_ptr(idof)%ptr => concentration
         endif
       endif
+
+      allocate(condition%itype(idof))
+      do idof = 1, size(condition%itype)
+        condition%itype(idof) = condition%sub_condition_ptr(idof)%ptr%itype
+      enddo
+
+    case(THC_MODE)
+
+      ! THC always has exactly 3 fixed DOF: liquid flow (P or rate),
+      ! energy (T), and solute (C).  Unlike ZFLOW, no equation-activation
+      ! flags are needed -- every sub-condition is always present.
+      call DeallocateArray(condition%itype)
+
+      condition%num_sub_conditions = 3
+
+      if (.not.associated(pressure) .and. .not.associated(rate)) then
+        option%io_buffer = 'Pressure or rate null in flow condition "' // &
+          trim(condition%name) // '". Please add a TYPE and value for &
+          &LIQUID_PRESSURE/LIQUID_FLUX within the FLOW_CONDITION.'
+        call PrintErrMsg(option)
+      endif
+      if (.not.associated(temperature)) then
+        option%io_buffer = 'Temperature null in flow condition "' // &
+          trim(condition%name) // '". Please add a TYPE and value for &
+          &TEMPERATURE within the FLOW_CONDITION.'
+        call PrintErrMsg(option)
+      endif
+      if (.not.associated(concentration)) then
+        option%io_buffer = 'Concentration null in flow condition "' // &
+          trim(condition%name) // '". Please add a TYPE and value for &
+          &CONCENTRATION within the FLOW_CONDITION.'
+        call PrintErrMsg(option)
+      endif
+
+      allocate(condition%sub_condition_ptr(condition%num_sub_conditions))
+      do idof = 1, condition%num_sub_conditions
+        nullify(condition%sub_condition_ptr(idof)%ptr)
+      enddo
+
+      idof = 0
+      idof = idof + 1
+      if (associated(pressure)) then
+        condition%pressure => pressure
+        condition%sub_condition_ptr(idof)%ptr => pressure
+      elseif (associated(rate)) then
+        condition%rate => rate
+        condition%sub_condition_ptr(idof)%ptr => rate
+      endif
+
+      idof = idof + 1
+      condition%temperature => temperature
+      condition%sub_condition_ptr(idof)%ptr => temperature
+
+      idof = idof + 1
+      condition%concentration => concentration
+      condition%sub_condition_ptr(idof)%ptr => concentration
 
       allocate(condition%itype(idof))
       do idof = 1, size(condition%itype)

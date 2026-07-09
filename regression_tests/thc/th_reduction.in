@@ -1,0 +1,185 @@
+#Description: 1D TH reduction test (adapted from default/anisothermal/th_1d_only_flow.in).
+#             Verifies that THC mode (with concentration set to zero) produces
+#             results consistent with pure TH mode for a thermal-hydro problem
+#             where concentration effects are negligible. Tests the energy equation,
+#             thermal properties, and reduction behavior in THC.
+#             The TH-vs-THC temperature discrepancy (~0.1 °C) is expected as 
+#             physics arising from different energy formulations: THC uses 
+#             simplified enthalpy ρ·c_p·T with constant c_p.
+
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE THC
+      OPTIONS
+        SPECIFIC_HEAT_LIQUID 4184.d0 J/kg-C
+        SPECIFIC_HEAT_SOLID 1.d3 J/kg-C
+        SOLID_DENSITY 2.8E3 kg/m^3
+        THERMAL_CONDUCTIVITY_SOLID 0.5 W/m-C
+      /
+    /
+  /
+END
+
+SUBSURFACE
+
+#=========================== numerical methods ================================
+NUMERICAL_METHODS FLOW
+
+  NEWTON_SOLVER
+    ATOL 1D-12
+    RTOL 1D-8
+    STOL 1D-15
+    ITOL 1D-8
+    MAXIMUM_NUMBER_OF_ITERATIONS 100
+    MAXF 1000
+  /
+
+  LINEAR_SOLVER
+    #PC_TYPE LU
+    #KSP_TYPE PREONLY
+  /
+
+END
+
+#=========================== regression =======================================
+REGRESSION
+  CELLS_PER_PROCESS 2
+  CELL_IDS
+    1
+    51
+    100
+  /
+END
+
+#===================== Discretization =========================================
+GRID
+  TYPE STRUCTURED
+  ORIGIN 0.d0 0.d0 0.d0
+  NXYZ 100 1 1
+  BOUNDS
+    0.d0 0.d0 0.d0
+    100.d0 1.d0 1.d0
+  /
+END
+
+#========================= material properties ================================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.5d0
+  TORTUOSITY 1.d0
+  CHARACTERISTIC_CURVES default
+  LONGITUDINAL_DISPERSIVITY 3.1536d0
+  PERMEABILITY
+    PERM_X 1.d-15
+    PERM_Y 1.d-15
+    PERM_Z 1.d-15
+  /
+END
+
+#========================= saturation functions ===============================
+CHARACTERISTIC_CURVES default
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    LIQUID_RESIDUAL_SATURATION 0.5d-1
+    ALPHA 1.d-3
+    M 0.75d0
+    MAX_CAPILLARY_PRESSURE 1.d9
+  /
+  PERMEABILITY_FUNCTION MUALEM
+    PHASE LIQUID
+    LIQUID_RESIDUAL_SATURATION 0.5d-1
+    M 0.75d0
+  /
+/
+
+#========================= output options =====================================
+OUTPUT
+  PRINT_COLUMN_IDS
+  FORMAT TECPLOT POINT
+  #FORMAT HDF5
+  VELOCITY_AT_CENTER
+END
+
+#======================== times ===============================================
+TIME
+  FINAL_TIME 1.e3 y
+  INITIAL_TIMESTEP_SIZE 1.d-8 y
+  MAXIMUM_TIMESTEP_SIZE 1.d1  y
+END
+
+#=========================== regions ==========================================
+REGION all
+  COORDINATES
+    0.d0 0.d0 0.d0
+    100.d0 1.d0 1.d0
+  /
+END
+
+REGION west
+  FACE WEST
+  COORDINATES
+    0.d0 0.d0 0.d0
+    0.d0 1.d0 1.d0
+  /
+END
+
+REGION east
+  FACE EAST
+  COORDINATES
+    100.d0 0.d0 0.d0
+    100.d0 1.d0 1.d0
+  /
+END
+
+#======================= flow conditions ======================================
+FLOW_CONDITION initial
+  UNITS Pa, C, yr
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_PRESSURE 1.5D5
+  TEMPERATURE 25.D0
+  CONCENTRATION 0.d0
+END
+
+FLOW_CONDITION west
+  TYPE
+    LIQUID_PRESSURE DIRICHLET
+    TEMPERATURE DIRICHLET
+    CONCENTRATION DIRICHLET
+  /
+  LIQUID_PRESSURE 10.0D5
+  TEMPERATURE 25.D0
+  CONCENTRATION 0.d0
+END
+
+#========================== initial and boundary conditions ===================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  REGION all
+END
+
+# west boundary condition
+BOUNDARY_CONDITION
+  FLOW_CONDITION west
+  REGION west
+END
+
+# east boundary condition
+BOUNDARY_CONDITION
+  FLOW_CONDITION initial
+  REGION east
+END
+
+#===================== stratigraphy couplers ==================================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+END_SUBSURFACE

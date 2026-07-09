@@ -186,6 +186,8 @@ subroutine PMCSubsurfaceSetupSolvers_TimestepperSNES(this)
           string = " mode = PNF: h"
         case(ZFLOW_MODE)
           string = " mode = ZFlow: p"
+        case(THC_MODE)
+          string = " mode = THC: p, T, C"
         case(G_MODE)
           string = " mode = General: p, sg/X, T"
         case(H_MODE)

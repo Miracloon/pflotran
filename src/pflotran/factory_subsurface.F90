@@ -173,6 +173,7 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
   use PM_Richards_TS_class
   use PM_TH_TS_class
   use PM_ZFlow_class
+  use PM_THC_class
   use PM_SCO2_class
   use ZFlow_Aux_module
   use PM_PNF_class
@@ -248,6 +249,13 @@ subroutine FactorySubsurfaceSetFlowMode(pm_flow,pm_well,option)
           &OPTIONS,PROCESSES.'
         call PrintErrMsg(option)
       endif
+    class is (pm_thc_type)
+      option%iflowmode = THC_MODE
+      option%flowmode = 'thc'
+      option%nphase = 1
+      option%nflowdof = 3
+      option%nflowspec = 1
+      option%flow%isothermal = PETSC_FALSE
     class is (pm_immiscible_type)
       option%iflowmode = IMMISCIBLE_MODE
       option%nphase = 2
