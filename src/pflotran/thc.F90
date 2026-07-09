@@ -47,6 +47,7 @@ subroutine THCSetup(realization)
   use Output_Aux_module
   use Characteristic_Curves_module
   use Matrix_Zeroing_module
+  use EOS_Water_module, only : EOSWaterSetViscosity
 
   implicit none
 
@@ -75,6 +76,8 @@ subroutine THCSetup(realization)
   option => realization%option
   patch => realization%patch
   grid => patch%grid
+
+  call EOSWaterSetViscosity('BATZLE_AND_WANG')
 
   patch%aux%THC => THCAuxCreate(option)
   thc_parameter => patch%aux%THC%thc_parameter

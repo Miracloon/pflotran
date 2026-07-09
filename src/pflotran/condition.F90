@@ -1999,9 +1999,6 @@ subroutine FlowConditionRead(condition,input,option)
 
     case(THC_MODE)
 
-      ! THC always has exactly 3 fixed DOF: liquid flow (P or rate),
-      ! energy (T), and solute (C).  Unlike ZFLOW, no equation-activation
-      ! flags are needed -- every sub-condition is always present.
       call DeallocateArray(condition%itype)
 
       condition%num_sub_conditions = 3

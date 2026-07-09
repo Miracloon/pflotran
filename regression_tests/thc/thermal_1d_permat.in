@@ -1,22 +1,5 @@
-#Description: 1D thermal advection with PER-MATERIAL thermal properties.  This
-#             deck is identical to thermal_1d.in (MODE THC) except that the
-#             solid thermal properties are supplied through MATERIAL_PROPERTY
-#             (TH-style cards) instead of the mode OPTIONS block:
-#               OPTIONS SOLID_DENSITY 2650        -> ROCK_DENSITY 2650
-#               OPTIONS SOLID_HEAT_CAPACITY 800   -> SPECIFIC_HEAT 800
-#               OPTIONS THERMAL_CONDUCTIVITY_SOLID 3.0 (grain conductivity; the
-#                 grain-Somerton effective saturated value is
-#                 3^(1-phi)*0.6^phi = 2.0062209149293 at phi = 0.25)
-#                                                 -> THERMAL_CONDUCTIVITY_DRY/WET
-#                                                    2.0062209149293
-#             The fluid heat capacity (LIQUID_HEAT_CAPACITY) stays a global
-#             OPTIONS property, mirroring TH.  Because the column is fully
-#             saturated everywhere, the TH-style bulk conductivity
-#             kappa_eff = ckdry + sqrt(S_l)*(ckwet-ckdry) reduces to ckwet, which
-#             equals the grain-Somerton effective value used by thermal_1d.in, so
-#             the two temperature breakthroughs agree to round-off.  This test
-#             exercises the per-material thermal-property path and demonstrates
-#             OPTIONS <-> MATERIAL_PROPERTY interchangeability.
+#Description: 1D thermal advection with solid thermal properties from
+#             MATERIAL_PROPERTY
 
 SIMULATION
   SIMULATION_TYPE SUBSURFACE
@@ -94,6 +77,12 @@ END
 OUTPUT
   TIMES d 1.0 2.0 3.0
   FORMAT TECPLOT POINT
+  VARIABLES
+    LIQUID_PRESSURE
+    TEMPERATURE
+    LIQUID_DENSITY
+    LIQUID_VISCOSITY
+  /
 END
 
 #=========================== times ============================================

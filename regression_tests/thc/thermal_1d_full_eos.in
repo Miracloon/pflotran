@@ -1,9 +1,4 @@
-#Description: 1D thermal advection.  Water at a fixed flux carries a thermal
-#             front through an initially cold, fully saturated column.  Hot
-#             water (T = 80 C) is injected at the inlet while the column starts
-#             at T = 20 C.  Same as thermal_1d but using the TH-equivalent
-#             ENERGY_FORMULATION FULL_EOS (EOS internal energy u(P,T) in the
-#             accumulation term and EOS enthalpy h(P,T) in the advective flux).
+#Description: 1D thermal advection using ENERGY_FORMULATION FULL_EOS
 
 SIMULATION
   SIMULATION_TYPE SUBSURFACE
@@ -78,6 +73,12 @@ END
 OUTPUT
   TIMES d 1.0 2.0 3.0
   FORMAT TECPLOT POINT
+  VARIABLES
+    LIQUID_PRESSURE
+    TEMPERATURE
+    LIQUID_DENSITY
+    LIQUID_VISCOSITY
+  /
 END
 
 #=========================== times ============================================

@@ -4648,9 +4648,7 @@ end subroutine PatchUpdateCouplerAuxVarsZFlow
 
 subroutine PatchUpdateCouplerAuxVarsTHC(patch,coupler,option)
   !
-  ! Updates flow auxiliary variables associated
-  ! with a coupler for THC_MODE.  THC always has three fixed DOF
-  ! (liquid flow, energy, solute), so each sub-condition is always mapped.
+  ! Updates flow auxiliary variables associated with a coupler for THC_MODE.
   !
   ! Author: Piyoosh Jaysaval
   ! Date: 06/09/26

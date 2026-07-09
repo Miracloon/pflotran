@@ -301,9 +301,6 @@ module EOS_Water_module
 
   public :: EOSWaterThermalConductivityIF97
 
-  public :: EOSWaterDensityBatzleAndWangExt, &
-            EOSWaterViscosityBatzleAndWangExt
-
   public :: TestEOSWaterBatzleAndWang, &
             EOSWaterTest, &
             EOSWaterSteamTest

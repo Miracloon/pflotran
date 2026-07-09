@@ -1,12 +1,4 @@
-#Description: 1D variably saturated flow using THC configured for
-#             direct comparison against RICHARDS with constant fluid
-#             properties (isothermal + zero concentration).
-#             With uniform fixed temperature and C=0 the THC energy
-#             and solute equations are inert. The liquid flow solution
-#             should closely reproduce a RICHARDS run that uses an
-#             explicit constant-density EOS WATER block.
-#             Companion Richards input: default/zflow/vsat_richards.in
-
+#Description: 1D THC isothermal reduction of RICHARDS variably saturated flow
 
 SIMULATION
   SIMULATION_TYPE SUBSURFACE
@@ -80,6 +72,14 @@ END
 OUTPUT
   TIMES y 0.01 0.1 1.0
   FORMAT TECPLOT POINT
+  VARIABLES
+    LIQUID_PRESSURE
+    LIQUID_SATURATION
+    LIQUID_DENSITY
+    THERMAL_CONDUCTIVITY
+    CAPILLARY_PRESSURE
+    LIQUID_RELATIVE_PERMEABILITY
+  /
 END
 
 #=========================== times ============================================

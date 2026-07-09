@@ -1,10 +1,5 @@
-#Description: 1D thermal advection.  Water at a fixed flux carries a thermal
-#             front through an initially cold, fully saturated column.  Hot
-#             water (T = 80 C) is injected at the inlet while the column starts
-#             at T = 20 C.  The temperature breakthrough at the outlet is
-#             compared against the analytical advection-dominated solution for
-#             a retarded thermal front travelling at the energy velocity
-#             v_T = (rho_l c_l v_l) / (phi rho_l c_l + (1-phi) rho_s c_s).
+#Description: 1D thermal advection through a saturated column for analytical
+#             energy-velocity comparison
 
 SIMULATION
   SIMULATION_TYPE SUBSURFACE
@@ -78,6 +73,12 @@ END
 OUTPUT
   TIMES d 1.0 2.0 3.0
   FORMAT TECPLOT POINT
+  VARIABLES
+    LIQUID_PRESSURE
+    TEMPERATURE
+    LIQUID_DENSITY
+    LIQUID_VISCOSITY
+  /
 END
 
 #=========================== times ============================================

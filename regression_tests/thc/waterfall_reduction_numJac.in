@@ -1,16 +1,4 @@
-#Description: 1D variably saturated flow problem (THC reduction of the ZFLOW
-#             waterfall-np4 test).
-#
-#             To "reduce" toward ZFLOW-like behavior for the flow part:
-#             - Constant temperature (25°C) is imposed everywhere so
-#               the energy equation is inert.
-#             - Concentration is kept varying (as in the original) to
-#               exercise the solute transport part under THC (this
-#               will activate some variable-density effects from C, which
-#               is a feature of THC not present in constant-property ZFLOW).
-#
-#             Companion ZFLOW test: default/zflow/waterfall-np4.in
-
+#Description: 1D THC reduction of ZFLOW waterfall-np4 using a numerical Jacobian
 
 SIMULATION
   SIMULATION_TYPE SUBSURFACE

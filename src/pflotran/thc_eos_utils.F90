@@ -3,15 +3,13 @@ module THC_EOS_Utils_module
 ! ----------------------------------------------------------------------------
 ! THC EOS utility routines.
 !
-! Thin wrappers around the existing EOS_Water_module Batzle & Wang routines,
-! plus the Somerton effective-thermal-conductivity mixing model, providing the
-! exact property + derivative set THC needs for its 3x3 (P,T,C) Jacobian.
+! Thin wrappers around the EOS_Water_module extended density and viscosity
+! interfaces (procedure pointers set in THCSetup), plus the Somerton
+! effective-thermal-conductivity mixing model, providing the property +
+! derivative set THC needs for its 3x3 (P,T,C) Jacobian.
 !
-!   * Density  -> EOSWaterDensityBatzleAndWangExt   (Batzle & Wang Eq 27b)
-!   * Viscosity-> EOSWaterViscosityBatzleAndWangExt (Batzle & Wang Eq 32)
-!     Both are called DIRECTLY rather than through the generic *Ext interfaces,
-!     because the default extended viscosity pointer is Kestin, which hard-stops
-!     when derivatives are requested.
+!   * Density  -> EOSWaterDensityExt
+!   * Viscosity-> EOSWaterViscosityExt
 !   * The EOS returns MOLAR-density derivative (dwp/dwt are d(rho_kmol)/dP,/dT);
 !     they are converted here to MASS-density derivatives via FMWH2O so the
 !     outputs match the documented auxvar units kg/(m^3 . X)
@@ -28,8 +26,8 @@ module THC_EOS_Utils_module
 #include "petsc/finclude/petscsys.h"
   use petscsys
   use PFLOTRAN_Constants_module, only : FMWH2O
-  use EOS_Water_module, only : EOSWaterDensityBatzleAndWangExt, &
-                               EOSWaterViscosityBatzleAndWangExt, &
+  use EOS_Water_module, only : EOSWaterDensityExt, &
+                               EOSWaterViscosityExt, &
                                EOSWaterSaturationPressure
 
   implicit none
@@ -94,7 +92,7 @@ subroutine THCDensityAndDerivs(T, P, C, den_kg, den_kmol, &
                                    dden_dp, dden_dT, dden_dC, ierr)
   !
   ! Liquid density rho_l(P,T,C) and all derivatives needed for the THC
-  ! Jacobian, via Batzle & Wang Eq 27b (EOSWaterDensityBatzleAndWangExt).
+  ! Jacobian, via EOSWaterDensityExt.
   !
   ! The EOS returns dwp/dwt = d(rho_kmol)/dP,/dT; these are
   ! converted to MASS-density derivatives via rho_kg = rho_kmol * FMWH2O.
@@ -128,8 +126,7 @@ subroutine THCDensityAndDerivs(T, P, C, den_kg, den_kmol, &
   aux1(1) = s
 
   ! Density with analytic P,T derivatives (molar-density basis).
-  call EOSWaterDensityBatzleAndWangExt(T, P, aux1, PETSC_TRUE, &
-                                       dw, dwmol, dwp, dwt, ierr)
+  call EOSWaterDensityExt(T, P, aux1, dw, dwmol, dwp, dwt, ierr)
   den_kg   = dw
   den_kmol = dwmol
 
@@ -139,9 +136,8 @@ subroutine THCDensityAndDerivs(T, P, C, den_kg, den_kmol, &
 
   ! d(rho)/dC by chain rule, d(rho)/ds via one-sided finite difference.
   aux1(1) = s + thc_salinity_perturbation
-  call EOSWaterDensityBatzleAndWangExt(T, P, aux1, PETSC_FALSE, &
-                                       dw_pert, dwmol_pert, dwp_pert, dwt_pert,&
-                                       ierr)
+  call EOSWaterDensityExt(T, P, aux1, dw_pert, dwmol_pert, dwp_pert, &
+                          dwt_pert, ierr)
   dden_ds = (dw_pert - dw) / thc_salinity_perturbation
   dden_dC = dden_ds * ds_dC
 
@@ -151,15 +147,7 @@ end subroutine THCDensityAndDerivs
 subroutine THCViscosityAndDerivs(T, P, C, vis, dvis_dT, dvis_dC, ierr)
   !
   ! Liquid dynamic viscosity mu_l(T,C) and the derivatives needed for the
-  ! THC Jacobian, via Batzle & Wang Eq32 (EOSWaterViscosityBatzleAndWangExt)
-  !
-  ! NOTE: the default extended viscosity pointer
-  ! EOSWaterViscosityExtPtr is Kestin, which hard-stops when derivatives are
-  ! requested. We therefore call the Batzle & Wang Ext routine DIRECTLY so the
-  ! T derivative is guaranteed. Equivalently, THC setup may repoint
-  !   EOSWaterViscosityExtPtr => EOSWaterViscosityBatzleAndWangExt
-  ! (e.g. EOS,WATER,VISCOSITY BATZLE_AND_WANG) and go through the generic
-  ! interface; calling directly avoids depending on that global pointer state.
+  ! THC Jacobian, via EOSWaterViscosityExt.
   !
   ! The viscosity interface requires saturation pressure inputs (PS, dPS_dT).
   ! Batzle & Wang Eq 32 does not actually use them, but they
@@ -197,15 +185,15 @@ subroutine THCViscosityAndDerivs(T, P, C, vis, dvis_dT, dvis_dC, ierr)
   call EOSWaterSaturationPressure(T, PS, dPS_dT, ierr)
 
   ! Viscosity with analytic T derivative (dVW_dP is hard-set to 0 by the EOS).
-  call EOSWaterViscosityBatzleAndWangExt(T, P, PS, dPS_dT, aux1, PETSC_TRUE, &
-                                         VW, dVW_dT, dVW_dP, ierr)
+  call EOSWaterViscosityExt(T, P, PS, dPS_dT, aux1, VW, dVW_dT, dVW_dP, &
+                            ierr)
   vis     = VW
   dvis_dT = dVW_dT
 
   ! d(mu)/dC by chain rule, d(mu)/ds via one-sided finite difference.
   aux1(1) = s + thc_salinity_perturbation
-  call EOSWaterViscosityBatzleAndWangExt(T, P, PS, dPS_dT, aux1, PETSC_FALSE, &
-                                         VW_pert, dVW_dT_pert, dVW_dP_pert, ierr)
+  call EOSWaterViscosityExt(T, P, PS, dPS_dT, aux1, VW_pert, dVW_dT_pert, &
+                            dVW_dP_pert, ierr)
   dvis_ds = (VW_pert - VW) / thc_salinity_perturbation
   dvis_dC = dvis_ds * ds_dC
 
