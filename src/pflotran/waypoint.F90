@@ -268,7 +268,7 @@ subroutine WaypointInsertInList(new_waypoint,waypoint_list,option)
           call WaypointMerge(waypoint,new_waypoint)
           return ! do not increment num_waypoints at bottom
         else if (dabs((new_waypoint%time-waypoint%time)/ &
-                      waypoint%time) < 1.d-14) then
+                      max(waypoint%time,1.d-40)) < 1.d-14) then
           ! relative difference is very small, merge the two
           write(word,*) waypoint%time
           option%io_buffer = 'Merging waypoints with rounding error (' // &
