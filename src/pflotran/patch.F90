@@ -1178,8 +1178,37 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
 
           if (associated(coupler%flow_condition%rate)) then
 
-            if (option%iflowmode == ZFLOW_MODE .or. &
-                option%iflowmode == THC_MODE) then
+            if (option%iflowmode == THC_MODE) then
+              ndof = option%nflowdof
+              iflag = PETSC_FALSE
+              temp_int = 0
+              select case(coupler%flow_condition%rate%itype)
+                case(SCALED_VOLUMETRIC_RATE_SS,SCALED_MASS_RATE_SS, &
+                     PRES_REG_MASS_RATE_SS)
+                  ! these carry a water-aux scale/volume factor slot
+                  temp_int = 1
+                  iflag = PETSC_TRUE
+                case(VOLUMETRIC_RATE_SS,MASS_RATE_SS)
+                  ! no water-aux scale slot needed
+                case(HET_VOL_RATE_SS,HET_MASS_RATE_SS)
+                  option%io_buffer = 'Heterogeneous rate source/sinks not &
+                    &supported in THC mode.'
+                  call PrintErrMsg(option)
+                case default
+                  string = FlowSubConditionGetType(coupler%flow_condition% &
+                                                   rate%itype)
+                  option%io_buffer = &
+                    FlowConditionUnknownItype(coupler%flow_condition,'rate', &
+                                              string)
+                  call PrintErrMsg(option)
+              end select
+              allocate(coupler%flow_bc_type(ndof+temp_int))
+              allocate(coupler%flow_aux_real_var(ndof+temp_int,num_connections))
+              coupler%flow_bc_type = 0
+              coupler%flow_aux_real_var = 0.d0
+              coupler%flow_aux_mapping => &
+                THCAuxMapConditionIndices(iflag)
+            else if (option%iflowmode == ZFLOW_MODE) then
               ndof = option%nflowdof
               iflag = PETSC_FALSE
               temp_int = 0
@@ -1190,20 +1219,15 @@ subroutine PatchInitCouplerAuxVars(coupler_list,patch,option)
                 case(SCALED_MASS_RATE_SS,MASS_RATE_SS, &
                      HET_VOL_RATE_SS,HET_MASS_RATE_SS)
                   option%io_buffer = 'Mass rate source/sinks not &
-                    &supported in ZFLOW/THC mode.'
+                    &supported in ZFLOW mode.'
                   call PrintErrMsg(option)
               end select
               allocate(coupler%flow_bc_type(ndof+temp_int))
               allocate(coupler%flow_aux_real_var(ndof+temp_int,num_connections))
               coupler%flow_bc_type = 0
               coupler%flow_aux_real_var = 0.d0
-              if (option%iflowmode == ZFLOW_MODE) then
-                coupler%flow_aux_mapping => &
-                  ZFlowAuxMapConditionIndices(iflag)
-              else
-                coupler%flow_aux_mapping => &
-                  THCAuxMapConditionIndices(iflag)
-              endif
+              coupler%flow_aux_mapping => &
+                ZFlowAuxMapConditionIndices(iflag)
             else
               select case(coupler%flow_condition%rate%itype)
                 case(SCALED_MASS_RATE_SS,SCALED_VOLUMETRIC_RATE_SS, &
@@ -4734,7 +4758,8 @@ subroutine PatchUpdateCouplerAuxVarsTHC(patch,coupler,option)
     coupler%flow_aux_real_var(water_index,1:num_connections) = &
           flow_condition%rate%dataset%rarray(1)
     select case(flow_condition%rate%itype)
-      case(SCALED_VOLUMETRIC_RATE_SS)
+      case(SCALED_VOLUMETRIC_RATE_SS,SCALED_MASS_RATE_SS, &
+           PRES_REG_MASS_RATE_SS)
         call PatchScaleSourceSink(patch,coupler,flow_condition%rate%isubtype, &
                                   water_aux_index,option)
       case default

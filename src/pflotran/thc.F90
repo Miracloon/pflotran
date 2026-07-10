@@ -1083,6 +1083,7 @@ subroutine THCResidual(snes,xx,r,A,realization,debug,ierr)
                           source_sink%flow_aux_real_var(:,iconn), &
                           source_sink%flow_aux_mapping, &
                           source_sink%flow_bc_type, &
+                          source_sink%flow_condition%rate%aux_real(:), &
                           thc_auxvars(:,ghosted_id), &
                           global_auxvars(ghosted_id), &
                           material_auxvars(ghosted_id), &

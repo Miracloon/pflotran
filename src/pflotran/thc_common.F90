@@ -1089,7 +1089,7 @@ end subroutine THCBCFlux
 ! ************************************************************************** !
 
 subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
-                          flow_src_sink_type, &
+                          flow_src_sink_type, rate_aux_real, &
                           thc_auxvar,global_auxvar,material_auxvar, &
                           ss_flow_vol_flux,Res,Jdn,dResdparamdn, &
                           calculate_derivatives)
@@ -1110,6 +1110,7 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
   use Option_module
   use Material_Aux_module
   use EOS_Water_module
+  use Utility_module, only : Smoothstep
 
   implicit none
 
@@ -1117,6 +1118,7 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
   PetscReal :: flow_aux_real_var(:)
   PetscInt :: flow_src_sink_mapping(:)
   PetscInt :: flow_src_sink_type(:)
+  PetscReal :: rate_aux_real(:)
   type(thc_auxvar_type) :: thc_auxvar
   type(global_auxvar_type) :: global_auxvar
   type(material_auxvar_type) :: material_auxvar
@@ -1127,9 +1129,15 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
   PetscBool :: calculate_derivatives
 
   PetscReal, parameter :: L_per_m3 = 1.d3
-  PetscReal :: tempreal
   PetscReal :: qsrc_m3, qsrc_L
-  PetscReal :: c_p, den_kg, conc_used, temp_used
+  PetscReal :: qsrc0, qsrc_kmol, qsrc_mass
+  PetscReal :: dqsrc_kmol_dp, dqsrc_kmol_dT, dqsrc_kmol_dC
+  PetscReal :: dqsrc_mass_dp, dqsrc_mass_dT, dqsrc_mass_dC
+  PetscReal :: threshold_pressure, pressure_span
+  PetscReal :: min_pressure, max_pressure, volume_scale
+  PetscReal :: smoothstep_scale, dsmoothstep_dp, dqsrc_kmol_dsmoothstep
+  PetscBool :: inhibit_flow_above_pressure
+  PetscReal :: c_p, conc_used, temp_used
   PetscReal :: h_used, dh_used_dP, dh_used_dT, dh_used_dC
   PetscReal :: hw, hw_dp, hw_dT
   PetscErrorCode :: ierr
@@ -1140,21 +1148,73 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
   dResdparamdn = 0.d0
 
   c_p = thc_specific_heat_liquid       ! c_p,l [J/(kg.K)]
-  den_kg = thc_auxvar%den_kg
 
   ! ========================================================================= !
   ! Flow (liquid mass) source/sink : units kmol/s
-  !   Q_flow = q_vol * rho_kmol(P,T,C)   (density now solution-dependent)
+  !   Volumetric-input cases : qsrc_kmol = q_vol * rho_kmol(P,T,C)
+  !                            -> density-dependent (dden_* derivatives)
+  !   Mass-input cases       : qsrc_kmol = q_mass / M_w   (fixed molar rate)
+  !                            -> NO density derivative (avoids double-density)
   ! ========================================================================= !
   dof_index = flow_src_sink_mapping(THC_COND_WATER_INDEX)
+  qsrc0 = flow_aux_real_var(dof_index)
   qsrc_m3 = 0.d0
-  tempreal = flow_aux_real_var(dof_index)
+  qsrc_kmol = 0.d0
+  dqsrc_kmol_dp = 0.d0
+  dqsrc_kmol_dT = 0.d0
+  dqsrc_kmol_dC = 0.d0
   select case(flow_src_sink_type(dof_index))
     case(VOLUMETRIC_RATE_SS)
-      qsrc_m3 = tempreal
+      ! qsrc0 is the volumetric rate [m^3/s]; convert to kmol/s
+      qsrc_m3 = qsrc0
+      qsrc_kmol = qsrc_m3 * thc_auxvar%den_kmol
+      dqsrc_kmol_dp = qsrc_m3 * thc_auxvar%dden_dp / FMWH2O
+      dqsrc_kmol_dT = qsrc_m3 * thc_auxvar%dden_dT / FMWH2O
+      dqsrc_kmol_dC = qsrc_m3 * thc_auxvar%dden_dC / FMWH2O
     case(SCALED_VOLUMETRIC_RATE_SS)
       index_ = flow_src_sink_mapping(THC_COND_WATER_AUX_INDEX)
-      qsrc_m3 = tempreal*flow_aux_real_var(index_)
+      ! qsrc0 is the volumetric rate [m^3/s]; convert to kmol/s
+      qsrc_m3 = qsrc0 * flow_aux_real_var(index_)
+      qsrc_kmol = qsrc_m3 * thc_auxvar%den_kmol
+      dqsrc_kmol_dp = qsrc_m3 * thc_auxvar%dden_dp / FMWH2O
+      dqsrc_kmol_dT = qsrc_m3 * thc_auxvar%dden_dT / FMWH2O
+      dqsrc_kmol_dC = qsrc_m3 * thc_auxvar%dden_dC / FMWH2O
+    case(MASS_RATE_SS)
+      ! qsrc0 is the mass rate [kg/s]; convert to kmol/s
+      ! [kg/s -> kmol/s; FMWH2O -> g/mol = kg/kmol]
+      qsrc_kmol = qsrc0 / FMWH2O
+      qsrc_m3 = qsrc_kmol / thc_auxvar%den_kmol
+    case(SCALED_MASS_RATE_SS)
+      index_ = flow_src_sink_mapping(THC_COND_WATER_AUX_INDEX)
+      ! qsrc0 is the mass rate [kg/s]; convert to kmol/s
+      qsrc_kmol = qsrc0 / FMWH2O * flow_aux_real_var(index_)
+      qsrc_m3 = qsrc_kmol / thc_auxvar%den_kmol
+    case(PRES_REG_MASS_RATE_SS)
+      ! pressure-regulated mass rate: a smoothstep ramp on cell pressure scales
+      ! the injected/extracted mass rate (mirrors TH's PRES_REG_MASS_RATE_SS).
+      threshold_pressure = rate_aux_real(1)
+      inhibit_flow_above_pressure = (threshold_pressure > 0.d0)
+      threshold_pressure = dabs(threshold_pressure)
+      pressure_span = rate_aux_real(2)
+      if (inhibit_flow_above_pressure) then
+        min_pressure = threshold_pressure - pressure_span
+        max_pressure = threshold_pressure
+      else
+        min_pressure = threshold_pressure
+        max_pressure = threshold_pressure + pressure_span
+      endif
+      index_ = flow_src_sink_mapping(THC_COND_WATER_AUX_INDEX)
+      volume_scale = flow_aux_real_var(index_)
+      call Smoothstep(thc_auxvar%pres,min_pressure,max_pressure, &
+                      smoothstep_scale,dsmoothstep_dp)
+      if (inhibit_flow_above_pressure) then
+        smoothstep_scale = 1.d0 - smoothstep_scale
+        dsmoothstep_dp = -1.d0 * dsmoothstep_dp
+      endif
+      dqsrc_kmol_dsmoothstep = qsrc0 / FMWH2O * volume_scale
+      qsrc_kmol = dqsrc_kmol_dsmoothstep * smoothstep_scale
+      dqsrc_kmol_dp = dqsrc_kmol_dsmoothstep * dsmoothstep_dp
+      qsrc_m3 = qsrc_kmol / thc_auxvar%den_kmol
     case default
       option%io_buffer = 'src_sink_type not supported in THCSrcSink'
       call PrintErrMsg(option)
@@ -1162,17 +1222,21 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
   ss_flow_vol_flux = qsrc_m3
   qsrc_L = qsrc_m3 * L_per_m3
 
+  ! water mass source rate [kg/s] used by the energy equation
+  qsrc_mass = qsrc_kmol * FMWH2O
+  dqsrc_mass_dp = dqsrc_kmol_dp * FMWH2O
+  dqsrc_mass_dT = dqsrc_kmol_dT * FMWH2O
+  dqsrc_mass_dC = dqsrc_kmol_dC * FMWH2O
+
   ! Res[kmol/sec]
-  Res(thc_pressure_dof) = qsrc_m3 * thc_auxvar%den_kmol
+  Res(thc_pressure_dof) = qsrc_kmol
 
   if (calculate_derivatives) then
-    ! dQ_flow/dX = q_vol * d(rho_kmol)/dX  (rho_kmol = rho_kg / FMWH2O)
-    Jdn(thc_pressure_dof,thc_pressure_dof) = &
-      qsrc_m3 * thc_auxvar%dden_dp / FMWH2O
-    Jdn(thc_pressure_dof,thc_temperature_dof) = &
-      qsrc_m3 * thc_auxvar%dden_dT / FMWH2O
-    Jdn(thc_pressure_dof,thc_concentration_dof) = &
-      qsrc_m3 * thc_auxvar%dden_dC / FMWH2O
+    ! dQ_flow/dX : density-dependent for volumetric input, smoothstep-dependent
+    ! for the pressure-regulated case, zero for the fixed mass-rate cases.
+    Jdn(thc_pressure_dof,thc_pressure_dof) = dqsrc_kmol_dp
+    Jdn(thc_pressure_dof,thc_temperature_dof) = dqsrc_kmol_dT
+    Jdn(thc_pressure_dof,thc_concentration_dof) = dqsrc_kmol_dC
   endif
 
   ! ========================================================================= !
@@ -1192,12 +1256,16 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
       ! dQ_sol/dC = q_vol*1000   (C_cell depends on solution); 0 for injection
       Jdn(thc_concentration_dof,thc_concentration_dof) = qsrc_L
     endif
+    ! Note: for the mass-input cases qsrc_m3 = qsrc_kmol/rho_kmol carries a weak
+    ! density dependence on (P,T,C); those second-order solute cross-derivatives
+    ! are intentionally omitted (they only affect Newton convergence, not the
+    ! converged solution, and TH carries no solute term at all).
   endif
 
   ! ========================================================================= !
   ! Energy source/sink : units W
-  !   RHO_CP_T: Q_energy = q_vol * rho_kg(P,T,C) * c_p * T_used
-  !   FULL_EOS: Q_energy = q_vol * rho_kg(P,T,C) * h_spec_used
+  !   RHO_CP_T: Q_energy = q_mass(P,T,C) * c_p * T_used
+  !   FULL_EOS: Q_energy = q_mass(P,T,C) * h_spec_used
   !     injection  -> h_spec at prescribed T_inj and cell pressure
   !     extraction -> h_spec at cell conditions (thc_auxvar%h)
   ! ========================================================================= !
@@ -1232,32 +1300,32 @@ subroutine THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
       dh_used_dT = thc_auxvar%dh_dT
       dh_used_dC = thc_auxvar%dh_dC
     endif
-    Res(thc_temperature_dof) = qsrc_m3 * den_kg * h_used
+    Res(thc_temperature_dof) = qsrc_mass * h_used
     if (calculate_derivatives) then
-      ! product rule on rho_kg(P,T,C) * h_used(P[,T,C])
+      ! product rule on q_mass(P,T,C) * h_used(P[,T,C])
       Jdn(thc_temperature_dof,thc_pressure_dof) = &
-        qsrc_m3 * (thc_auxvar%dden_dp * h_used + den_kg * dh_used_dP)
+        dqsrc_mass_dp * h_used + qsrc_mass * dh_used_dP
       Jdn(thc_temperature_dof,thc_temperature_dof) = &
-        qsrc_m3 * (thc_auxvar%dden_dT * h_used + den_kg * dh_used_dT)
+        dqsrc_mass_dT * h_used + qsrc_mass * dh_used_dT
       Jdn(thc_temperature_dof,thc_concentration_dof) = &
-        qsrc_m3 * (thc_auxvar%dden_dC * h_used + den_kg * dh_used_dC)
+        dqsrc_mass_dC * h_used + qsrc_mass * dh_used_dC
     endif
   else
-    Res(thc_temperature_dof) = qsrc_m3 * den_kg * c_p * temp_used
+    Res(thc_temperature_dof) = qsrc_mass * c_p * temp_used
     if (calculate_derivatives) then
-      ! density-coupling terms (present for both injection and extraction)
+      ! q_mass-coupling terms (present for both injection and extraction)
       Jdn(thc_temperature_dof,thc_pressure_dof) = &
-        qsrc_m3 * c_p * temp_used * thc_auxvar%dden_dp
+        dqsrc_mass_dp * c_p * temp_used
       Jdn(thc_temperature_dof,thc_concentration_dof) = &
-        qsrc_m3 * c_p * temp_used * thc_auxvar%dden_dC
+        dqsrc_mass_dC * c_p * temp_used
       if (qsrc_m3 >= 0.d0) then
-        ! injection: T_inj fixed -> only density's T-dependence
+        ! injection: T_inj fixed -> only q_mass's T-dependence
         Jdn(thc_temperature_dof,thc_temperature_dof) = &
-          qsrc_m3 * c_p * temp_used * thc_auxvar%dden_dT
+          dqsrc_mass_dT * c_p * temp_used
       else
-        ! extraction: T_used = T_cell -> product rule on rho_kg*T_cell
+        ! extraction: T_used = T_cell -> product rule on q_mass*T_cell
         Jdn(thc_temperature_dof,thc_temperature_dof) = &
-          qsrc_m3 * c_p * (den_kg + temp_used * thc_auxvar%dden_dT)
+          c_p * (dqsrc_mass_dT * temp_used + qsrc_mass)
       endif
     endif
   endif
@@ -1485,7 +1553,7 @@ end subroutine THCBCFluxDerivative
 
 subroutine THCSrcSinkDerivative(option,flow_aux_real_var, &
                                     flow_src_sink_mapping, &
-                                    flow_src_sink_type, &
+                                    flow_src_sink_type, rate_aux_real, &
                                     thc_auxvar,global_auxvar, &
                                     material_auxvar, &
                                     ss_flow_vol_flux, &
@@ -1505,6 +1573,7 @@ subroutine THCSrcSinkDerivative(option,flow_aux_real_var, &
   PetscReal :: flow_aux_real_var(:)
   PetscInt :: flow_src_sink_mapping(:)
   PetscInt :: flow_src_sink_type(:)
+  PetscReal :: rate_aux_real(:)
   type(thc_auxvar_type) :: thc_auxvar(0:)
   type(global_auxvar_type) :: global_auxvar
   type(material_auxvar_type) :: material_auxvar
@@ -1522,7 +1591,7 @@ subroutine THCSrcSinkDerivative(option,flow_aux_real_var, &
   Jac = 0.d0
   ! unperturbed thc_auxvar's value
   call THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
-                      flow_src_sink_type, &
+                      flow_src_sink_type, rate_aux_real, &
                       thc_auxvar(ZERO_INTEGER),global_auxvar, &
                       material_auxvar, &
                       ss_flow_vol_flux, &
@@ -1532,7 +1601,7 @@ subroutine THCSrcSinkDerivative(option,flow_aux_real_var, &
     ! perturbed thc_auxvar's value
     do idof = 1, option%nflowdof
       call THCSrcSink(option,flow_aux_real_var,flow_src_sink_mapping, &
-                          flow_src_sink_type, &
+                          flow_src_sink_type, rate_aux_real, &
                           thc_auxvar(idof),global_auxvar, &
                           material_auxvar, &
                           dummy_real, &
