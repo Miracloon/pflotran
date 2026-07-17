@@ -1407,6 +1407,13 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
 
   geomech_regression => simulation%geomech%regression
 
+  if (option%flow%creep_closure_on) then
+    option%io_buffer = 'Creep closure is not supported with geomechanics-&
+      &subsurface coupling. Disable creep closure or geomechanics &
+      &coupling in InitSubsurfGeomechInitSimulation.'
+    call PrintErrMsg(option)
+  endif
+
   ! initialize geomech realization
   call InitSubsurfGeomechSetupRealization(simulation%realization,&
                                           simulation%geomech%realization)
@@ -1501,6 +1508,10 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
                       'to geomechanics InitSubsurfGeomechInitSimulation'
       call PrintErrMsg(option)
   end select
+
+  ! Map geomechanics material ids onto flow cells for fixed-stress approach
+  call GeomechMapMaterialIdsToFlow(subsurf_realization,geomech_realization)
+
   ! update auxvars once pointer is set
   call simulation%process_model_list%UpdateAuxVars()
 

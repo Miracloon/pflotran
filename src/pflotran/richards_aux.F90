@@ -575,8 +575,9 @@ subroutine RichardsAuxPorosity(auxvar,material_auxvar,global_auxvar, &
         case(GEOMECH_TWO_WAY_COUPLED)
           select case(option%geomechanics%split_scheme)
             case(GEOMECH_FIXED_STRESS_SPLIT)
-              mat_id = material_auxvar%id
-              ! get geomech and flow material properties
+              ! geomech mat id corresponding to cell
+              mat_id = material_auxvar%secondary_material_id
+              ! get geomech material properties
               youngs_mod = geomech_param%youngs_modulus(mat_id)
               poissons_ratio = geomech_param%poissons_ratio(mat_id)
               biot_coeff = geomech_param%biot_coeff(mat_id)

@@ -65,7 +65,11 @@ module Material_Aux_module
     type(fracture_auxvar_type), pointer :: fracture
     type(secondary_auxvar_type), pointer :: secondary_prop
     PetscReal, pointer :: geomechanics_subsurface_prop(:)
-    PetscInt :: creep_closure_id
+    ! Dual-purpose secondary material index:
+    !   - creep closure table id (when creep closure is active)
+    !   - geomechanics material id mapped onto this flow cell (fixed-stress)
+    ! Creep closure and geomechanics-subsurface coupling are mutually exclusive.
+    PetscInt :: secondary_material_id
 !    procedure(SaturationFunction), nopass, pointer :: SaturationFunction
 !  contains
 !    procedure, public :: PermeabilityTensorToScalar
@@ -292,7 +296,7 @@ subroutine MaterialAuxVarInit(auxvar,option)
   else
     nullify(auxvar%secondary_prop)
   endif
-  auxvar%creep_closure_id = 1
+  auxvar%secondary_material_id = 1
 
   if (max_material_index > 0) then
     allocate(auxvar%soil_properties(max_material_index))
@@ -344,6 +348,7 @@ subroutine MaterialAuxVarCopy(auxvar,auxvar2,option)
   type(material_auxvar_type) :: auxvar, auxvar2
   type(option_type) :: option
 
+  auxvar2%id = auxvar%id
   auxvar2%volume = auxvar%volume
   auxvar2%porosity_0 = auxvar%porosity_0
   auxvar2%porosity_base = auxvar%porosity_base
@@ -359,7 +364,7 @@ subroutine MaterialAuxVarCopy(auxvar,auxvar2,option)
   if (associated(auxvar%soil_properties)) then
     auxvar2%soil_properties = auxvar%soil_properties
   endif
-  auxvar2%creep_closure_id = auxvar%creep_closure_id
+  auxvar2%secondary_material_id = auxvar%secondary_material_id
 
 end subroutine MaterialAuxVarCopy
 

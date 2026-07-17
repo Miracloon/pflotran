@@ -376,8 +376,9 @@ subroutine WIPPFloAuxVarCompute(x,wippflo_auxvar,global_auxvar, &
     wippflo_auxvar%effective_porosity = material_auxvar%porosity_base
     ! creep_closure, fracture, and soil_compressibility are mutually exclusive
     if (option%flow%creep_closure_on .and. wippflo_use_creep_closure) then
-      creep_closure => wipp%creep_closure_tables_array( &
-                                         material_auxvar%creep_closure_id )%ptr
+      creep_closure => &
+        wipp%creep_closure_tables_array(material_auxvar% &
+                                          secondary_material_id )%ptr
 
       if (associated(creep_closure)) then
 

@@ -27,7 +27,8 @@ module Geomechanics_Force_module
             GeomechStoreInitialDisp, &
             GeomechStoreInitialPorosity, &
             GeomechForceSetupLinearSystem, &
-            GeomechForceAssembleCoeffMatrix
+            GeomechForceAssembleCoeffMatrix, &
+            GeomechMapMaterialIdsToFlow
 
 contains
 
@@ -2815,6 +2816,113 @@ subroutine GeomechStoreInitialPorosity(realization,geomech_realization)
                                      porosity_init_loc)
 
 end subroutine GeomechStoreInitialPorosity
+
+! ************************************************************************** !
+
+subroutine GeomechMapMaterialIdsToFlow(realization,geomech_realization)
+  !
+  ! Maps geomechanics material ids from geomech mesh nodes onto the
+  ! corresponding flow cells (DOFs) via the flow-geomech scatter. Each flow
+  ! cell stores the geomech material id on material_auxvar%secondary_material_id
+  ! so fixed-stress porosity updates use geomech properties, not flow mat ids.
+  !
+  ! Author: Jumanah Al Kubaisy
+  ! Date: 07/16/26
+  !
+  use Realization_Subsurface_class
+  use Geomechanics_Realization_class
+  use Geomechanics_Discretization_module
+  use Geomechanics_Field_module
+  use Geomechanics_Grid_Aux_module
+  use Grid_module
+  use Material_Aux_module
+  use Option_module
+  use Option_Geomechanics_module
+  use Patch_module
+  use Discretization_module
+
+  implicit none
+
+  class(realization_subsurface_type) :: realization
+  class(realization_geomech_type) :: geomech_realization
+
+  type(option_type), pointer :: option
+  type(grid_type), pointer :: grid
+  type(patch_type), pointer :: patch
+  type(geomech_field_type), pointer :: geomech_field
+  type(geomech_discretization_type), pointer :: geomech_discretization
+  type(gmdm_ptr_type), pointer :: dm_ptr
+  type(material_auxvar_type), pointer :: material_auxvars(:)
+
+  PetscReal, pointer :: subsurf_p(:)
+  PetscReal, pointer :: flow_work_p(:)
+  PetscInt :: local_id, ghosted_id
+  PetscInt :: mat_id
+  PetscErrorCode :: ierr
+
+  option => realization%option
+  if (option%geomechanics%flow_coupling /= GEOMECH_TWO_WAY_COUPLED) return
+  if (option%geomechanics%split_scheme /= GEOMECH_FIXED_STRESS_SPLIT) return
+
+  grid => realization%discretization%grid
+  patch => realization%patch
+  material_auxvars => patch%aux%Material%auxvars
+  geomech_field => geomech_realization%geomech_field
+  geomech_discretization => geomech_realization%geomech_discretization
+
+  dm_ptr => GeomechDiscretizationGetDMPtrFromIndex(geomech_discretization, &
+                                                   ONEDOF)
+
+  ! Promote local imech ids to global work (scratch; leave press untouched).
+  call GeomechDiscretizationLocalToGlobal(geomech_discretization, &
+                                          geomech_field%imech_loc, &
+                                          geomech_field%work,ONEDOF)
+
+  ! Reverse of subsurf->geomech scatter maps geomech node data onto flow cells.
+  call VecScatterBegin(dm_ptr%gmdm%scatter_subsurf_to_geomech_ndof, &
+                       geomech_field%work, &
+                       geomech_field%subsurf_vec_1dof, &
+                       INSERT_VALUES,SCATTER_REVERSE, &
+                       ierr);CHKERRQ(ierr)
+  call VecScatterEnd(dm_ptr%gmdm%scatter_subsurf_to_geomech_ndof, &
+                     geomech_field%work, &
+                     geomech_field%subsurf_vec_1dof, &
+                     INSERT_VALUES,SCATTER_REVERSE, &
+                     ierr);CHKERRQ(ierr)
+
+  ! subsurf_vec_1dof is MPI (local size nlmax). Promote to ghosted material
+  ! auxvars via flow work / work_loc.
+  call VecGetArray(geomech_field%subsurf_vec_1dof,subsurf_p, &
+                      ierr);CHKERRQ(ierr)
+  call VecGetArray(realization%field%work,flow_work_p,ierr);CHKERRQ(ierr)
+  do local_id = 1, grid%nlmax
+    flow_work_p(local_id) = subsurf_p(local_id)
+  enddo
+  call VecRestoreArray(geomech_field%subsurf_vec_1dof,subsurf_p, &
+                          ierr);CHKERRQ(ierr)
+  call VecRestoreArray(realization%field%work,flow_work_p,ierr);CHKERRQ(ierr)
+
+  call DiscretizationGlobalToLocal(realization%discretization, &
+                                   realization%field%work, &
+                                   realization%field%work_loc,ONEDOF)
+
+  call VecGetArray(realization%field%work_loc,flow_work_p,ierr);CHKERRQ(ierr)
+  do ghosted_id = 1, grid%ngmax
+    if (patch%imat(ghosted_id) <= 0) cycle
+    mat_id = nint(flow_work_p(ghosted_id))
+    if (mat_id <= 0) then
+      write(option%io_buffer,*) grid%nG2A(ghosted_id)
+      option%io_buffer = 'No geomechanics material id mapped to flow &
+        &cell id ' // trim(adjustl(option%io_buffer)) // &
+        ' in GeomechMapMaterialIdsToFlow.'
+      call PrintErrMsgByRank(option)
+    endif
+    material_auxvars(ghosted_id)%secondary_material_id = mat_id
+  enddo
+  call VecRestoreArray(realization%field%work_loc,flow_work_p, &
+                          ierr);CHKERRQ(ierr)
+
+end subroutine GeomechMapMaterialIdsToFlow
 
 ! ************************************************************************** !
 

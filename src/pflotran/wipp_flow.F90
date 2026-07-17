@@ -1853,7 +1853,7 @@ subroutine WIPPFloCreepShutDown(realization)
   wippflo_auxvars => realization%patch%aux%WIPPFlo%auxvars
 
   do ghosted_id = 1, grid%ngmax
-    creep_closure_id = material_auxvars(ghosted_id)%creep_closure_id
+    creep_closure_id = material_auxvars(ghosted_id)%secondary_material_id
     creep_closure => wipp%creep_closure_tables_array(creep_closure_id)%ptr
     if (associated(creep_closure)) then
       cell_pressure = wippflo_auxvars(ZERO_INTEGER,ghosted_id)%&
@@ -1869,7 +1869,7 @@ subroutine WIPPFloCreepShutDown(realization)
         ! which will shut down creep closure permanently since the pointer
         ! creep_closure => wipp%creep_closure_tables_array(creep_closure_id)%ptr
         ! will no longer be associated in future conditionals
-        material_auxvars(ghosted_id)%creep_closure_id = 1
+        material_auxvars(ghosted_id)%secondary_material_id = 1
       endif
     endif
   enddo

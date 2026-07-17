@@ -462,7 +462,7 @@ subroutine InitSubsurfAssignMatProperties(realization)
                              material_property%creep_closure_name, &
                              material_property%name,option)
         ! copy creep closure table id from material to material_aux
-        material_auxvars(ghosted_id)%creep_closure_id = &
+        material_auxvars(ghosted_id)%secondary_material_id = &
           material_property%creep_closure_id
       endif
     endif

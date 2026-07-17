@@ -1154,7 +1154,7 @@ subroutine GeneralAuxVarCompute(x,gen_auxvar,global_auxvar,material_auxvar, &
     ! creep_closure, fracture, and soil_compressibility are mutually exclusive
     if (option%flow%creep_closure_on) then
       creep_closure => wipp%creep_closure_tables_array( &
-                         material_auxvar%creep_closure_id )%ptr
+                         material_auxvar%secondary_material_id )%ptr
       if ( associated(creep_closure) ) then
         ! option%time here is the t time, not t + dt time.
         creep_closure_time = option%time
@@ -2323,7 +2323,7 @@ subroutine GeneralAuxVarCompute4(x,gen_auxvar,global_auxvar,material_auxvar, &
       ! creep_closure, fracture, and soil_compressibility are mutually exclusive
       if (option%flow%creep_closure_on) then
         creep_closure => wipp%creep_closure_tables_array( &
-                           material_auxvar%creep_closure_id )%ptr
+                           material_auxvar%secondary_material_id )%ptr
         if ( associated(creep_closure) ) then
           ! option%time here is the t time, not t + dt time.
           creep_closure_time = option%time
