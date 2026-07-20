@@ -11610,14 +11610,14 @@ subroutine PatchCalculateCFL1Timestep(patch,option,max_dt_cfl_1, &
                       (1.d0-fraction_upwind)* &
                       material_auxvars(ghosted_id_dn)%porosity* &
                       global_auxvars(ghosted_id_dn)%sat(iphase))
-        v_darcy = patch%internal_velocities(iphase,sum_connection)
+        v_darcy = dabs(patch%internal_velocities(iphase,sum_connection))
         v_pore_max = v_darcy / por_sat_min
         v_pore_ave = v_darcy / por_sat_ave
         !geh: I use v_pore_max to ensure that we limit the cfl based on the
         !     highest velocity through the face.  If porosity*saturation
         !     varies, the pore water velocity will be highest on the side
         !     of the face with the smalled value of porosity*saturation.
-        dt_cfl_1 = distance / dabs(v_pore_max)
+        dt_cfl_1 = distance / v_pore_max
         max_dt_cfl_1 = min(dt_cfl_1,max_dt_cfl_1)
         max_pore_velocity = max(v_pore_max,max_pore_velocity)
       enddo
@@ -11641,9 +11641,9 @@ subroutine PatchCalculateCFL1Timestep(patch,option,max_dt_cfl_1, &
         ! the _ave variable is being reused. it is actually, max
         por_sat_ave = material_auxvars(ghosted_id_dn)%porosity* &
                       global_auxvars(ghosted_id_dn)%sat(iphase)
-        v_darcy = patch%boundary_velocities(iphase,sum_connection)
+        v_darcy = dabs(patch%boundary_velocities(iphase,sum_connection))
         v_pore_ave = v_darcy / por_sat_ave
-        dt_cfl_1 = distance / dabs(v_pore_ave)
+        dt_cfl_1 = distance / v_pore_ave
         max_dt_cfl_1 = min(dt_cfl_1,max_dt_cfl_1)
         max_pore_velocity = max(v_pore_ave,max_pore_velocity)
       enddo
