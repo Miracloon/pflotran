@@ -235,7 +235,7 @@ subroutine RegressionCreateMapping(regression,realization)
     if (maxval(regression%natural_cell_ids) > grid%nmax) then
       option%io_buffer = 'Natural IDs outside problem domain requested ' // &
         'for regression output.  Removing non-existent IDs.'
-      call PrintWrnMsg(option)
+      call PrintErrMsg(option)
       count = 0
       allocate(int_array(size(regression%natural_cell_ids)))
       int_array = 0

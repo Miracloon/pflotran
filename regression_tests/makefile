@@ -66,6 +66,7 @@ STANDARD_CFG = \
 	default/batch/nucleation/nucleation.cfg \
 	default/capillarity/capillarity.cfg \
 	default/carbon_sandbox/carbon_sandbox.cfg \
+	default/cfl/cfl.cfg \
 	default/column/column.cfg \
 	default/constraint/constraint.cfg \
 	default/condition/condition.cfg \
