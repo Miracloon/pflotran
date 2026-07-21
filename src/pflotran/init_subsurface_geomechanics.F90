@@ -1408,8 +1408,8 @@ subroutine InitSubsurfGeomechInitSimulation(simulation, pm_geomech)
   geomech_regression => simulation%geomech%regression
 
   if (option%flow%creep_closure_on) then
-    option%io_buffer = 'Creep closure is not supported with geomechanics-&
-      &subsurface coupling. Disable creep closure or geomechanics &
+    option%io_buffer = 'Creep closure is not supported with geomechanics&
+      &-subsurface coupling. Disable creep closure or geomechanics &
       &coupling in InitSubsurfGeomechInitSimulation.'
     call PrintErrMsg(option)
   endif

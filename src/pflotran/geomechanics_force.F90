@@ -2821,10 +2821,10 @@ end subroutine GeomechStoreInitialPorosity
 
 subroutine GeomechMapMaterialIdsToFlow(realization,geomech_realization)
   !
-  ! Maps geomechanics material ids from geomech mesh nodes onto the
-  ! corresponding flow cells (DOFs) via the flow-geomech scatter. Each flow
+  ! Maps geomechanics material ids from geomech nodes onto the
+  ! corresponding flow cells via the flow-geomech scatter. Each flow
   ! cell stores the geomech material id on material_auxvar%secondary_material_id
-  ! so fixed-stress porosity updates use geomech properties, not flow mat ids.
+  ! so porosity updates (fixed-stress) use geomech imat
   !
   ! Author: Jumanah Al Kubaisy
   ! Date: 07/16/26
@@ -2873,12 +2873,12 @@ subroutine GeomechMapMaterialIdsToFlow(realization,geomech_realization)
   dm_ptr => GeomechDiscretizationGetDMPtrFromIndex(geomech_discretization, &
                                                    ONEDOF)
 
-  ! Promote local imech ids to global work (scratch; leave press untouched).
+  ! Promote local imech ids to global work
   call GeomechDiscretizationLocalToGlobal(geomech_discretization, &
                                           geomech_field%imech_loc, &
                                           geomech_field%work,ONEDOF)
 
-  ! Reverse of subsurf->geomech scatter maps geomech node data onto flow cells.
+  ! Reverse of subsurf->geomech scatter maps geomech node data onto flow cells
   call VecScatterBegin(dm_ptr%gmdm%scatter_subsurf_to_geomech_ndof, &
                        geomech_field%work, &
                        geomech_field%subsurf_vec_1dof, &
@@ -2890,8 +2890,7 @@ subroutine GeomechMapMaterialIdsToFlow(realization,geomech_realization)
                      INSERT_VALUES,SCATTER_REVERSE, &
                      ierr);CHKERRQ(ierr)
 
-  ! subsurf_vec_1dof is MPI (local size nlmax). Promote to ghosted material
-  ! auxvars via flow work / work_loc.
+  ! Promote to ghosted material auxvars via flow work / work_loc
   call VecGetArray(geomech_field%subsurf_vec_1dof,subsurf_p, &
                       ierr);CHKERRQ(ierr)
   call VecGetArray(realization%field%work,flow_work_p,ierr);CHKERRQ(ierr)
