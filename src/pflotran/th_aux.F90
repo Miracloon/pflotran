@@ -819,6 +819,10 @@ subroutine THAuxVarComputeNoFreezing(x,auxvar,global_auxvar, &
                   auxvar%dsat_dp
   auxvar%dKe_dT = 0.d0
 
+  if (option%iflag /= TH_UPDATE_FOR_PERTURBATION) then
+    global_auxvar%sat(1) = auxvar%sat
+  endif
+
 end subroutine THAuxVarComputeNoFreezing
 
 ! ************************************************************************** !
