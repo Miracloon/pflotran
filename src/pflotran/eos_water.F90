@@ -5263,7 +5263,7 @@ subroutine EOSWaterViscosityBatzleAndWang(T, P, PS, dPS_dT, &
   PetscReal :: exponential_term
   PetscReal :: temperature_term
 
-  t_C = T
+  t_C = max(T,1.d-3)
 
   ! this is Eq. 32 without all the salt terms.
   ! -0.057138d0 = -1.d0*0.42d0*(-0.17d0)**2.d0+0.045d0
@@ -5313,7 +5313,7 @@ subroutine EOSWaterViscosityBatzleAndWangExt(T, P, PS, dPS_dT, aux, &
   PetscReal :: temperature_term
 
   s = aux(1)
-  t_C = T
+  t_C = max(T,1.d-3)
 
   exponential_term = -1.d0*(0.42d0*(s**0.8d0-0.17d0)**2.d0 + 0.045d0)* &
                      t_C**0.8d0
