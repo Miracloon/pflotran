@@ -1,0 +1,559 @@
+## THIS IS THE ANSWER FOR THE CAPSTONE PROBLEM ##
+## ONLY USE WHEN STUCK ON A SECTION ## 
+
+#Crystalline Capstone Problem for the PFLOTRAN Advanced Short Course
+#Summer 2023
+#Authors: Teresa Portone, Ethan Conley, Michael Nole
+
+#=========================== flow mode ========================================
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS 
+    /
+    UFD_DECAY ufd_decay
+    /
+    WASTE_FORM wf_general
+      TYPE GENERAL
+    /
+    SUBSURFACE_TRANSPORT transport
+      MODE GIRT
+    /
+  /
+END
+SUBSURFACE
+
+#=========================== datasets =========================================
+DATASET permeabilityX
+  FILENAME cpm/anisotropic_k.h5
+  HDF5_DATASET_NAME PermeabilityX
+END
+
+DATASET permeabilityY
+  FILENAME cpm/anisotropic_k.h5
+  HDF5_DATASET_NAME PermeabilityY
+END
+
+DATASET permeabilityZ
+  FILENAME cpm/anisotropic_k.h5
+  HDF5_DATASET_NAME PermeabilityZ
+END
+
+DATASET porosity
+  FILENAME cpm/porosity.h5
+  HDF5_DATASET_NAME Porosity
+END
+
+DATASET tortuosity
+  FILENAME cpm/tortuosity.h5
+  HDF5_DATASET_NAME Tortuosity 
+END
+ 
+#=========================== chemistry ========================================
+CHEMISTRY
+  PRIMARY_SPECIES
+    I129
+    Tracer1     # repository residence time, one early pulse
+    Tracer2     # constant repository injection, no decay
+    Tracer3     # constant repository injection, ingrows
+    Tracer4     # constant repository injection, sorbs
+  /
+  MINERALS
+    I129(s)
+    Tracer3(s)
+    Tracer4(s)
+  /
+  MINERAL_KINETICS
+    I129(s)
+      RATE_CONSTANT 0.d0
+    /
+    Tracer3(s)
+      RATE_CONSTANT 0.d0
+    /
+    Tracer4(s)
+      RATE_CONSTANT 0.d0
+    /
+  /
+  TRUNCATE_CONCENTRATION 1.d-22 
+  DATABASE ufd-decay.dat
+  OUTPUT
+    TOTAL
+    TOTAL_SORBED
+    all
+  /
+
+END
+
+#=========================== discretization ===================================
+GRID
+  GRAVITY 0.d0 0.d0 -9.8d0
+  TYPE structured
+  ORIGIN 0.d0 0.d0 0.d0 
+  NXYZ 20 10 25
+  #NXYZ 50 50 24 
+  BOUNDS
+    0.0 0.0 0.0 
+    1000.0 1000.0 500.0 
+  /
+END
+
+#=========================== times ============================================
+
+TIME
+  FINAL_TIME 1.d6 y
+  INITIAL_TIMESTEP_SIZE 1.d-6 y
+  MAXIMUM_TIMESTEP_SIZE 1. y at 1. y
+  MAXIMUM_TIMESTEP_SIZE 5. y at 10. y
+  MAXIMUM_TIMESTEP_SIZE 50. y at 100. y
+  MAXIMUM_TIMESTEP_SIZE 500. y at 1000. y
+  MAXIMUM_TIMESTEP_SIZE 5000. y at 10000. y
+END
+
+#=========================== output options ===================================
+OUTPUT
+  SNAPSHOT_FILE
+    FORMAT HDF5
+    TIMES y 0 500.0 1000.0 5000.0 7500.0 10000.0 100000.0 1000000.0
+  /
+  VARIABLES
+    MATERIAL_ID_KLUDGE_FOR_VISIT
+    LIQUID_PRESSURE
+    PERMEABILITY_X
+    PERMEABILITY_Y
+    PERMEABILITY_Z
+    POROSITY
+  /
+  OBSERVATION_FILE
+    PERIODIC TIME 1. y between 0. y and 10. y
+    PERIODIC TIME 5. y between 0. y and 30. y
+    PERIODIC TIME 10. y between 0. y and 100. y
+    PERIODIC TIME 50. y between 0. y and 300. y
+    PERIODIC TIME 100. y between 0. y and 1000. y
+    PERIODIC TIME 500. y between 0. y and 3000. y
+    PERIODIC TIME 1000. y between 0. y and 10000. y
+    PERIODIC TIME 5000. y between 0. y and 30000. y
+    PERIODIC TIME 10000. y between 0. y and 100000. y
+    PERIODIC TIME 100000. y between 0. y and 1000000. y
+  /  
+  MASS_BALANCE_FILE
+    TIMES y 1 100 1000 3000 9999 10000 29999 30000 99999 100000 1000000
+    NO_PRINT_FINAL
+    TOTAL_MASS_REGIONS
+      repository_tight
+    /
+  /  
+END
+ 
+
+#=========================== observation points ===============================
+OBSERVATION
+ REGION glacial_obs
+#REGION glacial
+ AT_CELL_CENTER
+ AGGREGATE_METRICS AGGREGATE_ONLY
+  MAX Total I129
+  MAX Total Tracer2
+  MAX Total Tracer3
+  MAX Total Tracer4
+ /
+/
+OBSERVATION
+ REGION repository_tight
+ AT_CELL_CENTER
+ AGGREGATE_METRICS AGGREGATE_ONLY
+  MAX Total Tracer1
+ /
+/
+
+OBSERVATION
+ REGION glacial_obs
+/
+
+OBSERVATION
+ REGION repo_obs
+/
+
+#=========================== fluid properties =================================
+FLUID_PROPERTY
+  PHASE LIQUID
+  DIFFUSION_COEFFICIENT 1.d-9
+END
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY granite
+  ID 1
+  CHARACTERISTIC_CURVES default
+  POROSITY DATASET porosity
+  TORTUOSITY DATASET tortuosity
+  ROCK_DENSITY 2700.
+  THERMAL_CONDUCTIVITY_DRY 2.5d0
+  THERMAL_CONDUCTIVITY_WET 2.5d0
+  HEAT_CAPACITY 830.
+  PERMEABILITY
+    ANISOTROPIC
+    DATASET permeability
+  /
+/
+
+MATERIAL_PROPERTY glacial
+  ID 2
+  CHARACTERISTIC_CURVES default
+  POROSITY 0.20
+  TORTUOSITY 0.20
+  ROCK_DENSITY 2700.
+  THERMAL_CONDUCTIVITY_DRY 1.7d0
+  THERMAL_CONDUCTIVITY_WET 1.7d0
+  HEAT_CAPACITY 830.
+  PERMEABILITY
+    PERM_ISO {kGlacial}
+  /
+/
+
+MATERIAL_PROPERTY drz
+  ID 3
+  CHARACTERISTIC_CURVES default
+  POROSITY 0.01
+  TORTUOSITY 1.0 
+  ROCK_DENSITY 2700.
+  THERMAL_CONDUCTIVITY_DRY 2.5d0
+  THERMAL_CONDUCTIVITY_WET 2.5d0
+  HEAT_CAPACITY 830.
+  PERMEABILITY
+    PERM_ISO {permDRZ} 
+  /
+/
+
+MATERIAL_PROPERTY buffer 
+  ID 4
+  CHARACTERISTIC_CURVES default
+  POROSITY {pBuffer} # 0.4 
+  TORTUOSITY 0.35
+  ROCK_DENSITY 2700.
+  THERMAL_CONDUCTIVITY_DRY 1.5d0 
+  THERMAL_CONDUCTIVITY_WET 1.5d0 
+  HEAT_CAPACITY 830.
+  PERMEABILITY
+    PERM_ISO  {permBuffer} 
+  /                  
+/
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES default
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    M 0.5d0
+    ALPHA  1.d-4
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+    MAX_CAPILLARY_PRESSURE 1.d8 
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== flow conditions ==================================
+
+FLOW_CONDITION initial 
+  UNITS Pa,C,M,yr
+  TYPE
+    LIQUID_PRESSURE HYDROSTATIC
+  /
+  DATUM 1000.d0 0.d0 500.d0 # Specified at top right of domain
+  LIQUID_PRESSURE 101325.d0 # set it to atmospheric pressure; makes sure everything will be saturated
+  GRADIENT
+    LIQUID_PRESSURE -0.0013d0 0.d0 0.d0 # This is a head gradient m/m units
+  /
+END
+
+FLOW_CONDITION recharge
+  TYPE
+    LIQUID_FLUX NEUMANN
+  /
+  LIQUID_FLUX 2.d-3 m/yr
+END
+
+FLOW_CONDITION inject_repos     # slow injection of age tracers
+  TYPE
+    RATE SCALED_VOLUMETRIC_RATE VOLUME  #VOLUMETRIC_RATE NEIGHBOR_PERM
+  /
+  RATE 3.17d-14 m^3/s  #1.d-6 m^3/y
+END
+
+#=========================== transport conditions and constraints =============================
+
+TRANSPORT_CONDITION initial
+  TYPE dirichlet_zero_gradient
+  CONSTRAINT_LIST
+    0.d0 initial
+  /
+END
+
+TRANSPORT_CONDITION init_repos
+  TYPE DIRICHLET
+  TIME_UNITS yr
+  CONSTRAINT_LIST
+    0.d0 init_repos
+  /
+END
+
+TRANSPORT_CONDITION inject_repos   # for age tracers 2 and 3
+  TYPE DIRICHLET
+  CONSTRAINT_LIST
+    0.d0 inject_repos
+  /
+END
+CONSTRAINT initial
+  CONCENTRATIONS    
+    I129   1.d-22   T
+    Tracer1  1.d-22            F   
+    Tracer2  1.d-22            F   
+    Tracer3  1.d-22            F
+    Tracer4  1.d-22            F
+  /
+  MINERALS
+    I129(s)  0.d0  1.d0
+    Tracer3(s) 0.d0 1.0
+    Tracer4(s) 0.d0 1.0 
+  /
+END
+CONSTRAINT init_repos
+  CONCENTRATIONS
+    I129   1.d-22   T
+    Tracer1  1.d-1             F   
+    Tracer2  1.d-22            F
+    Tracer3  1.d-22            F
+    Tracer4  1.d-22            F
+  /
+END
+
+CONSTRAINT inject_repos
+  CONCENTRATIONS
+    I129   1.d-22   T
+    Tracer1  1.d-22           F   
+    Tracer2  1.d-2           F
+    Tracer3  1.d-2           F
+    Tracer4  1.d-2           F
+  /
+END
+
+#=========================== regions ==========================================
+
+REGION all
+  COORDINATES
+    0.d0 0.d0 0.d0
+    1000.d0 1000.d0 500.d0 
+  /
+END
+
+REGION glacial
+  COORDINATES
+    0.d0 0.d0 440.d0 
+    1000.d0 1000.d0 500.d0 
+  /
+END
+
+REGION repo_obs # Observation Point 1
+  COORDINATES
+   260.d0 500.d0 220.d0
+  /
+END
+
+REGION glacial_obs # Observation Point 2
+  COORDINATES
+    850.d0 500.d0 441.d0
+  / 
+END
+
+REGION west # left
+  FACE west
+  COORDINATES
+    0.0 0.0 0.0
+    0.0 1000.0 500.0
+
+  /
+END
+
+REGION east # right
+  FACE east
+  COORDINATES
+    1000.0 0.0 0.0
+    1000.0 1000.0 500.0
+  /
+END
+
+REGION top 
+  FACE top
+  COORDINATES
+    0.0 0.0 500.0
+    1000.0 1000.0 500.0
+  /
+END
+
+REGION bottom 
+  FACE bottom
+  COORDINATES
+    0.0 0.0 0.0
+    1000.0 1000.0 0.0
+  /
+END
+
+REGION south # back
+  FACE south
+  COORDINATES
+    0.0 0.0 0.0
+    1000.0 0.0 500.0
+  /
+END
+
+REGION north # front
+  FACE north
+  COORDINATES
+    0.0 1000.0 0.0
+    1000.0 1000.0 500.0
+  /
+END
+
+REGION repository_tight  
+  COORDINATES
+   40.d0 280.d0 200.d0 
+   480.d0 720.d0 240.d0 
+  /
+END
+
+REGION leak
+  COORDINATES
+    240.d0 480.d0 200.d0
+    280.d0 520.d0 240.d0
+  /
+END
+
+
+#======================= boundary condition couplers ===================================
+
+BOUNDARY_CONDITION top
+  FLOW_CONDITION recharge
+  TRANSPORT_CONDITION initial
+  REGION top
+END
+
+BOUNDARY_CONDITION west
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION west
+END
+
+BOUNDARY_CONDITION east
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION east
+END
+
+#============================= initial condition couplers ==================================
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION all
+END
+
+INITIAL_CONDITION all
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION all
+END
+
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION init_repos
+  REGION repository_tight
+END
+
+SOURCE_SINK inject_repos
+  FLOW_CONDITION inject_repos
+  TRANSPORT_CONDITION inject_repos
+  REGION repository_tight
+END
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL granite
+END
+
+STRATA
+  REGION glacial
+  MATERIAL glacial
+END
+
+STRATA
+  REGION repository_tight
+  MATERIAL drz
+END
+
+STRATA 
+  REGION leak
+  MATERIAL buffer
+END
+
+END_SUBSURFACE
+
+#=========================== waste form and UFD spec ============================
+WASTE_FORM_GENERAL
+  WASTE_FORM
+    REGION leak
+    EXPOSURE_FACTOR 1.d0
+    VOLUME 0.685d0 m^3 
+    MECHANISM_NAME csnf
+    CANISTER_BREACH_TIME {wpBreachTime} y
+  /
+  PRINT_MASS_BALANCE
+  MECHANISM CUSTOM
+    NAME csnf
+    FRACTIONAL_DISSOLUTION_RATE {rateUNF} 1/y 
+    MATRIX_DENSITY 10970. 
+    SEED 1
+    SPECIES
+      I129   128.90d0  1.29d-15  2.17d-4  0.10d0 #Johnson et al 2005 IRF
+    /
+    CANISTER_DEGRADATION_MODEL
+      CANISTER_MATERIAL_CONSTANT 1500.
+    /
+  END
+
+END_WASTE_FORM_GENERAL
+
+UFD_DECAY
+  ELEMENT I
+    SOLUBILITY 1.d4
+    KD 
+      buffer 0.d0 #kg water/m^3 bulk
+      granite 0.d0 #kg water/m^3 bulk
+      drz 0.d0 #kg water/m^3 bulk
+      glacial 0.d0
+    /
+  /
+  ISOTOPE I129
+    ELEMENT I
+    DECAY_RATE 1.29d-15
+  /
+  ELEMENT Tracer
+        SOLUBILITY 1.d20
+        KD
+      buffer 0.d0 #kg water/m^3 bulk
+      granite 0.d0 #kg water/m^3 bulk
+      drz 0.d0 #kg water/m^3 bulk
+      glacial 0.d0
+    /
+  /
+  ISOTOPE Tracer3
+        ELEMENT Tracer
+        DECAY_RATE 2.2e-13 # [1/s] 
+  /
+  ELEMENT Tracer4
+        SOLUBILITY 1.d20
+        KD
+      buffer 1.76d8 #kg water/m^3 bulk
+      granite 1.73d7 #kg water/m^3 bulk
+      drz 1.73d7 #kg water/m^3 bulk
+      glacial 6.43d6
+END

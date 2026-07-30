@@ -1,0 +1,65 @@
+## THIS IS THE ANSWER FOR THE DAKOTA INPUT FILE ##
+## ONLY USE IF STUCK ##
+
+#  DAKOTA INPUT FILE - 
+#  used for uncertainty quantification for the granite reference case
+#  and sensitivity to unknowns, because running on a single fracture realization
+
+environment
+  output_file 'dakota.stdout'
+  tabular_data
+  results_output hdf5
+        
+method,
+  sampling 
+    sample_type LHS
+    samples = 20
+    seed = 20220309 rng rnum2
+    num_probability_levels = 9
+    probability_levels = 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90
+
+variables,
+	
+  loguniform_uncertain = 4
+		                #UNF_deg_rate   glacial_k    DRZ_perm   buffer_perm   
+	  lower_bounds    1.e-8     1.e-15       1.e-17     1.e-18      
+	  upper_bounds    1.e-6     1.e-13       1.e-14     1.e-15     
+	  descriptors   'rateUNF' 'kGlacial'    'permDRZ'  'permBuffer'
+
+	uniform_uncertain = 2 #porosities and waste package breach time 
+	  lower_bounds   0.3       100.0        
+	  upper_bounds   0.5       1000.0        
+	  descriptors   'pBuffer' 'wpBreachTime'
+
+#Question 3
+#  loguniform_uncertain = 4
+#                                #UNF_deg_rate   glacial_k    DRZ_perm   buffer_perm
+#          lower_bounds    1.e-8     1.e-15       1.e-17     1.e-18       
+#          upper_bounds    1.e-6     1.e-13       1.e-14     1.e-15       
+#          descriptors   'rateUNF' 'kGlacial'    'permDRZ'  'permBuffer'
+#
+#  uniform_uncertain = 1 #porosity
+#          lower_bounds   0.3          
+#          upper_bounds   0.5          
+#          descriptors   'pBuffer'  
+#  normal_uncertain = 1 #waste package breach time
+#          means          9000
+#          std_deviations 1000
+#          descriptors   'wpBreachTime'
+interface, 
+   fork 
+    analysis_driver = './dakota_driver/DakotaDriver.py'
+	  parameters_file = 'params.in'
+    results_file    = 'results.out'
+          file_tag file_save
+	  work_directory directory_tag directory_save
+    named 'samples/workdir' #file_save directory_save
+    link_files './dakota_driver/ufd-decay.dat' './dfn_generation/output/dfnGen_output/cpm' './dakota_driver/pflotran.template'
+    asynchronous
+      evaluation_concurrency = 1
+	  
+responses,
+  response_functions 1
+  descriptors 'Peak_I129_in_Aquifer_M'
+	no_gradients
+	no_hessians

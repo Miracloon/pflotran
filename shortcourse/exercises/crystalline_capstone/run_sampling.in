@@ -1,0 +1,45 @@
+#  DAKOTA INPUT FILE - 
+#  used for uncertainty quantification for the granite reference case
+#  and sensitivity to unknowns, because running on a single fracture realization
+
+environment
+  output_file 'dakota.stdout'
+  tabular_data
+  results_output hdf5
+        
+method,
+  sampling 
+    sample_type ...
+    samples = ...
+    seed = 20220309 rng rnum2
+    num_probability_levels = 9
+    probability_levels = 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90
+
+variables,
+	
+  loguniform_uncertain = 4
+	  lower_bounds ...
+	  upper_bounds ...
+	  descriptors  ...
+  uniform_uncertain = 2
+	  lower_bounds ...                        
+	  upper_bounds ...                        
+	  descriptors  ...                   
+ 
+interface, 
+   fork 
+    analysis_driver = './dakota_driver/DakotaDriver.py'
+	  parameters_file = 'params.in'
+    results_file    = 'results.out'
+          file_tag file_save
+	  work_directory directory_tag directory_save
+    named 'samples/workdir' #file_save directory_save
+    link_files './dakota_driver/ufd-decay.dat' './dfn_generation/output/dfnGen_output/cpm' './dakota_driver/pflotran.template' 
+    asynchronous
+      evaluation_concurrency = 1
+	  
+responses,
+  response_functions 1
+  descriptors 'Peak_I129_in_Aquifer_M'
+	no_gradients
+	no_hessians
