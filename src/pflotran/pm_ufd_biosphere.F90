@@ -1723,6 +1723,8 @@ subroutine PMUFDBOutputHeader(this)
   PetscInt :: icolumn
   PetscBool :: exist
 
+  if (.not.associated(this%ERB_list)) return
+
   output_option => this%realization%output_option
 
   fid = 91
