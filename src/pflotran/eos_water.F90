@@ -3935,7 +3935,7 @@ subroutine EOSWaterEnthalpyTPPlanarSetup()
   PetscReal, parameter :: p0 = 1.d6
   PetscReal, parameter :: t0 = 30.d0
   PetscReal, parameter :: dh_dp = 1.65d-2
-  PetscReal, parameter :: dh_dT = 7.5d4
+  PetscReal, parameter :: dh_dT = 7.53762d4
   PetscReal, parameter :: h_reference = 2.27d6 ! J/kmol
 
   call GeomComputePlaneWithGradients(water_enthalpy_tp_plane,p0,t0, &
