@@ -1406,6 +1406,11 @@ subroutine OutputVariableToID(word,name,units,category,id,subvar,subsubvar, &
       units = 'C'
       category = OUTPUT_GENERIC
       id = WELL_TEMPERATURE
+    case ('WELL_CELLS')
+      name = 'Well Cells'
+      units = ''
+      category = OUTPUT_GENERIC
+      id = WELL_CELLS
     case('ELECTRICAL_CONDUCTIVITY','ELECTRICAL_POTENTIAL', &
          'ELECTRICAL_JACOBIAN','ELECTRICAL_POTENTIAL_DIPOLE', &
          'ARCHIE_CEMENTATION_EXPONENT','ARCHIE_SATURATION_EXPONENT', &

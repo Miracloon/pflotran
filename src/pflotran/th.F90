@@ -5740,11 +5740,11 @@ subroutine THSetPlotVariables(realization,list)
                                 TEMPERATURE)
 
     if (Initialized(th_well_dof)) then
-      name = 'Pipe Temperature'
+      name = 'Well Temperature'
       units = 'C'
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                    WELL_TEMPERATURE)
-      name = 'Pipe Cells'
+      name = 'Well Cells'
       units = ''
       call OutputVariableAddToList(list,name,OUTPUT_GENERIC,units, &
                                    WELL_CELLS)
