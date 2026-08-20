@@ -4654,12 +4654,13 @@ subroutine EOSWaterViscosityKestinExt(T, P, PS, dPS_dT, aux, &
   data b1,b2,b3 / -3.96d-2, 1.02d-2, -7.02d-4 /
   data c1,c2,c3,c4 / 1.2378d0, -1.303d-3, 3.06d-6, 2.55d-8 /
 
+  PetscReal :: xn,dxn_dtt,dck_dT,dms_dT,dfac_dT
+  PetscReal :: dbetaw_dT,dbetas_dT,dbetap_dfac,dbeta_dT,dmu0_dT
+
   data wnacl / 58.44277d-3 / ! (kg/mol NaCl)
 
-  if (calculate_derivatives) then
-    print *, 'Derivatives not set up in EOSWaterViscosityKestinExt().'
-    stop
-  endif
+  dVW_dT = 0.d0
+  dVW_dP = 0.d0
 
   !convert pressure to GPa
   p_GPa = P*1.d-9
@@ -4667,7 +4668,8 @@ subroutine EOSWaterViscosityKestinExt(T, P, PS, dPS_dT, aux, &
   xnacl = aux(1)
   mnacl = xnacl/(1.d0-xnacl)/wnacl
   tt = 20.d0-t
-  ck = (c1 + (c2 + (c3+c4*tt)*tt)*tt)*tt/(96.d0+t)
+  xn = (c1 + (c2 + (c3+c4*tt)*tt)*tt)*tt
+  ck = xn/(96.d0+t)
   ak = (a1 + (a2 + a3*mnacl)*mnacl)*mnacl
   bk = (b1 + (b2 + b3*mnacl)*mnacl)*mnacl
 
@@ -4681,6 +4683,22 @@ subroutine EOSWaterViscosityKestinExt(T, P, PS, dPS_dT, aux, &
   mu0 = 1001.74d-6 * 10.d0**(ak + ck*(bk + 1.d0))
 
   VW = mu0*(1.d0 + beta*p_GPa)
+
+  if (calculate_derivatives) then
+    ! d(tt)/dT = -1; quotient rule on ck = xn(tt)/(96+T)
+    dxn_dtt = c1 + (2.d0*c2 + (3.d0*c3 + 4.d0*c4*tt)*tt)*tt
+    dck_dT = (-dxn_dtt*(96.d0+t) - xn)/(96.d0+t)**2
+    dms_dT = 2.8d-3 + 7.2d-5*t
+    dfac_dT = -mnacl/ms**2*dms_dT
+    dbetaw_dT = 5.74d-2 + (-2.d0*6.97d-4 + (3.d0*4.47d-6 - &
+                4.d0*1.05d-8*t)*t)*t
+    dbetas_dT = 2.8d-3 - dbetaw_dT
+    dbetap_dfac = 2.5d0 + (-4.d0 + 1.5d0*fac)*fac
+    dbeta_dT = dbetas_dT*betap + betas*dbetap_dfac*dfac_dT + dbetaw_dT
+    dmu0_dT = mu0*log(10.d0)*(bk + 1.d0)*dck_dT
+    dVW_dT = dmu0_dT*(1.d0 + beta*p_GPa) + mu0*dbeta_dT*p_GPa
+    dVW_dP = mu0*beta*1.d-9
+  endif
 
 end subroutine EOSWaterViscosityKestinExt
 
