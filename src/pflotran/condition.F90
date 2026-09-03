@@ -18,8 +18,11 @@ module Condition_module
 
   ! source/sink scaling options
   PetscInt, parameter, public :: SCALE_BY_PERM = 1
-  PetscInt, parameter, public :: SCALE_BY_NEIGHBOR_PERM = 2
-  PetscInt, parameter, public :: SCALE_BY_VOLUME = 3
+  PetscInt, parameter, public :: SCALE_BY_VOLUME = 2
+  PetscInt, parameter, public :: SCALE_BY_NEIGHBOR_PERM_XY = 3
+  PetscInt, parameter, public :: SCALE_BY_NEIGHBOR_PERM_XZ = 4
+  PetscInt, parameter, public :: SCALE_BY_NEIGHBOR_PERM_YZ = 5
+  PetscInt, parameter, public :: SCALE_BY_NEIGHBOR_PERM_XYZ = 6
 
   type, public :: flow_condition_type
     PetscInt :: id                          ! id from which condition can be referenced
@@ -1058,6 +1061,58 @@ end subroutine FlowSubCondEnsureCompatibility
 
 ! ************************************************************************** !
 
+subroutine FlowConditionReadScaleSubtype(input,option,sub_condition, &
+                                         error_string)
+  !
+  ! Reads a source/sink scaling subtype keyword and maps it to an integer id
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/03/26
+  !
+  use Input_Aux_module
+  use Option_module
+  use String_module
+
+  implicit none
+
+  type(input_type), pointer :: input
+  type(option_type) :: option
+  type(flow_sub_condition_type) :: sub_condition
+  character(len=*) :: error_string
+
+  character(len=MAXWORDLENGTH) :: word
+
+  call InputReadWord(input,option,word,PETSC_TRUE)
+  if (.not.InputError(input)) then
+    call InputPushCard(input,word,option)
+    call StringToUpper(word)
+    sub_condition%ctype = trim(sub_condition%ctype) // word
+    select case(word)
+      case('NEIGHBOR_PERM','NEIGHBOR_PERM_XY')
+        sub_condition%isubtype = SCALE_BY_NEIGHBOR_PERM_XY
+      case('NEIGHBOR_PERM_XZ')
+        sub_condition%isubtype = SCALE_BY_NEIGHBOR_PERM_XZ
+      case('NEIGHBOR_PERM_YZ')
+        sub_condition%isubtype = SCALE_BY_NEIGHBOR_PERM_YZ
+      case('NEIGHBOR_PERM_XYZ')
+        sub_condition%isubtype = SCALE_BY_NEIGHBOR_PERM_XYZ
+      case('VOLUME')
+        sub_condition%isubtype = SCALE_BY_VOLUME
+      case('PERM')
+        sub_condition%isubtype = SCALE_BY_PERM
+      case default
+        call InputKeywordUnrecognized(input,word,error_string,option)
+    end select
+  else
+    option%io_buffer = 'Specify one of NEIGHBOR_PERM[_XY,_XZ,_YZ,_XYZ], &
+      &VOLUME, PERM subtypes in ' // trim(error_string)
+    call PrintErrMsg(option)
+  endif
+
+end subroutine FlowConditionReadScaleSubtype
+
+! ************************************************************************** !
+
 subroutine FlowConditionRead(condition,input,option)
   !
   ! Reads a condition from the input file
@@ -1285,31 +1340,10 @@ subroutine FlowConditionRead(condition,input,option)
                   sub_condition_ptr%itype = PRES_REG_MASS_RATE_SS
                   rate_unit_string = 'kg/sec'
               end select
-              ! store name of type for error messaging below.
-              string = word
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" ' // trim(string)
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in flow condition "' // &
-                  trim(condition%name) // '" ' // trim(string)
-                call PrintErrMsg(option)
-                endif
+              string = 'flow condition "' // trim(condition%name) // '" ' // &
+                       trim(word)
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('HYDROSTATIC')
               sub_condition_ptr%itype = HYDROSTATIC_BC
             case('CONDUCTANCE')
@@ -2245,60 +2279,20 @@ subroutine FlowConditionGeneralRead(condition,input,option)
             case('SCALED_MASS_RATE')
               sub_condition_ptr%itype = SCALED_MASS_RATE_SS
               rate_string = 'kg/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_mass_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_mass_rate type'
-                call PrintErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_mass_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('VOLUMETRIC_RATE')
               sub_condition_ptr%itype = VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
             case('SCALED_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = SCALED_VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_volumetric_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_volumetric_rate type'
-                call PrintErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_volumetric_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('HETEROGENEOUS_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = HET_VOL_RATE_SS
               rate_string = 'm^3/sec'
@@ -2880,60 +2874,20 @@ subroutine FlowConditionSCO2Read(condition,input,option)
             case('SCALED_MASS_RATE')
               sub_condition_ptr%itype = SCALED_MASS_RATE_SS
               rate_string = 'kg/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_mass_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_mass_rate type'
-                call PrintErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_mass_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('VOLUMETRIC_RATE')
               sub_condition_ptr%itype = VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
             case('SCALED_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = SCALED_VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_volumetric_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_volumetric_rate type'
-                call PrintErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_volumetric_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('HETEROGENEOUS_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = HET_VOL_RATE_SS
               rate_string = 'm^3/sec'
@@ -3418,60 +3372,20 @@ subroutine FlowConditionHydrateRead(condition,input,option)
             case('SCALED_MASS_RATE')
               sub_condition_ptr%itype = SCALED_MASS_RATE_SS
               rate_string = 'kg/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_mass_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_mass_rate type'
-                call printErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_mass_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('VOLUMETRIC_RATE')
               sub_condition_ptr%itype = VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
             case('SCALED_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = SCALED_VOLUMETRIC_RATE_SS
               rate_string = 'm^3/sec'
-              call InputReadWord(input,option,word,PETSC_TRUE)
-              if (.not.InputError(input)) then
-                call InputPushCard(input,word,option)
-                call StringToUpper(word)
-                sub_condition_ptr%ctype = trim(sub_condition_ptr%ctype) // word
-                select case(word)
-                  case('NEIGHBOR_PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_NEIGHBOR_PERM
-                  case('VOLUME')
-                    sub_condition_ptr%isubtype = SCALE_BY_VOLUME
-                  case('PERM')
-                    sub_condition_ptr%isubtype = SCALE_BY_PERM
-                  case default
-                    string = 'flow condition "' // trim(condition%name) // &
-                      '" scaled_volumetric_rate type'
-                    call InputKeywordUnrecognized(input,word,string,option)
-                end select
-              else
-                option%io_buffer = 'Specify one of NEIGHBOR_PERM, &
-                  &VOLUME, PERM subtypes in &
-                  &flow condition "' // trim(condition%name) // &
-                  '" scaled_volumetric_rate type'
-                call printErrMsg(option)
-              endif
+              string = 'flow condition "' // trim(condition%name) // &
+                       '" scaled_volumetric_rate type'
+              call FlowConditionReadScaleSubtype(input,option, &
+                                                 sub_condition_ptr,string)
             case('HETEROGENEOUS_VOLUMETRIC_RATE')
               sub_condition_ptr%itype = HET_VOL_RATE_SS
               rate_string = 'm^3/sec'

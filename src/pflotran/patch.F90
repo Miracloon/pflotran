@@ -6130,7 +6130,8 @@ end subroutine PatchUpdateCouplerSaturation
 
 subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
   !
-  ! Scales select source/sinks based on perms*volume
+  ! Scales select source/sinks based on volume, permeability*volume, or
+  ! neighboring cell permeability*area (XY, XZ, YZ, or XYZ)
   !
   ! Author: Glenn Hammond
   ! Date: 01/12/11
@@ -6167,7 +6168,7 @@ subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
   PetscInt :: iconn
   PetscReal :: scale, sum
   PetscInt :: icount, x_count, y_count, z_count
-  PetscInt, parameter :: x_width = 1, y_width = 1, z_width = 0
+  PetscInt :: x_width, y_width, z_width
   PetscInt :: ghosted_neighbors(27)
   PetscBool :: inactive_found
   type(material_auxvar_type), pointer :: material_auxvars(:)
@@ -6202,7 +6203,10 @@ subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
           material_auxvars(ghosted_id)%permeability(perm_xx_index) * &
           material_auxvars(ghosted_id)%volume
       enddo
-    case(SCALE_BY_NEIGHBOR_PERM)
+    case(SCALE_BY_NEIGHBOR_PERM_XY,SCALE_BY_NEIGHBOR_PERM_XZ, &
+         SCALE_BY_NEIGHBOR_PERM_YZ,SCALE_BY_NEIGHBOR_PERM_XYZ)
+      call PatchSetNeighborPermStencil(iscale_type,x_width,y_width,z_width, &
+                                       option)
       do iconn = 1, cur_connection_set%num_connections
         local_id = cur_connection_set%id_dn(iconn)
         ghosted_id = grid%nL2G(local_id)
@@ -6258,7 +6262,7 @@ subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
         enddo
         vec_ptr(local_id) = vec_ptr(local_id) + sum
       enddo
-    case(0)
+    case default
       option%io_buffer = 'Unknown scaling type in PatchScaleSourceSink ' // &
         'for FLOW_CONDITION "' // trim(source_sink%flow_condition%name) // '".'
       call PrintErrMsg(option)
@@ -6304,6 +6308,52 @@ subroutine PatchScaleSourceSink(patch,source_sink,iscale_type,index_,option)
   endif
 
 end subroutine PatchScaleSourceSink
+
+! ************************************************************************** !
+
+subroutine PatchSetNeighborPermStencil(iscale_type,x_width,y_width,z_width, &
+                                       option)
+  !
+  ! Sets neighbor stencil widths for NEIGHBOR_PERM scaling directions
+  !
+  ! Author: Glenn Hammond
+  ! Date: 09/03/26
+  !
+  use Option_module
+  use Condition_module
+
+  implicit none
+
+  PetscInt :: iscale_type
+  PetscInt :: x_width
+  PetscInt :: y_width
+  PetscInt :: z_width
+  type(option_type) :: option
+
+  select case(iscale_type)
+    case(SCALE_BY_NEIGHBOR_PERM_XY)
+      x_width = 1
+      y_width = 1
+      z_width = 0
+    case(SCALE_BY_NEIGHBOR_PERM_XZ)
+      x_width = 1
+      y_width = 0
+      z_width = 1
+    case(SCALE_BY_NEIGHBOR_PERM_YZ)
+      x_width = 0
+      y_width = 1
+      z_width = 1
+    case(SCALE_BY_NEIGHBOR_PERM_XYZ)
+      x_width = 1
+      y_width = 1
+      z_width = 1
+    case default
+      option%io_buffer = 'Unknown NEIGHBOR_PERM scaling direction in ' // &
+        'PatchSetNeighborPermStencil.'
+      call PrintErrMsg(option)
+  end select
+
+end subroutine PatchSetNeighborPermStencil
 
 ! ************************************************************************** !
 
